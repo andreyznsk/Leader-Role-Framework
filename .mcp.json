@@ -1,35 +1,5 @@
 {
   "mcpServers": {
-    "confluence-team": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@anthropic-ai/mcp-server-confluence"],
-      "env": {
-        "CONFLUENCE_URL": "https://YOUR_TEAM.atlassian.net/wiki",
-        "CONFLUENCE_USERNAME": "YOUR_EMAIL@company.ru",
-        "CONFLUENCE_API_TOKEN": "YOUR_TEAM_CONFLUENCE_TOKEN"
-      }
-    },
-    "confluence-corp": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@anthropic-ai/mcp-server-confluence"],
-      "env": {
-        "CONFLUENCE_URL": "https://YOUR_CORP.atlassian.net/wiki",
-        "CONFLUENCE_USERNAME": "YOUR_EMAIL@company.ru",
-        "CONFLUENCE_API_TOKEN": "YOUR_CORP_CONFLUENCE_TOKEN"
-      }
-    },
-    "jira": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@anthropic-ai/mcp-server-jira"],
-      "env": {
-        "JIRA_URL": "https://YOUR_COMPANY.atlassian.net",
-        "JIRA_USERNAME": "YOUR_EMAIL@company.ru",
-        "JIRA_API_TOKEN": "YOUR_JIRA_API_TOKEN"
-      }
-    },
     "github": {
       "type": "stdio",
       "command": "npx",

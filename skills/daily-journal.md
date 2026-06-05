@@ -1,3 +1,9 @@
+---
+name: daily-journal
+description: Структурирует рассказ о рабочем дне в журнал Tech Lead — извлекает факты, паттерны, риски и открытые вопросы, сохраняет в workspace/08_daily_journal/
+compatibility: claude-sonnet-4-6, claude-opus-4-8
+---
+
 # Скилл: daily-journal
 
 ## Когда использовать
