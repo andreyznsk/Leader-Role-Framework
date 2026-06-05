@@ -1,46 +1,18 @@
-target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-.kotlin
+# Claude Code local settings (personal, not shared)
+.claude/settings.local.json
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-workDir
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
+# MCP tokens - NEVER commit this file with real tokens
+# Copy .mcp.json to .mcp.local.json and put tokens there
+# Then reference .mcp.local.json in .gitignore
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
+# Environment files
+.env
+.env.*
+*.env
 
-### VS Code ###
-.vscode/
-
-### Mac OS ###
+# OS
 .DS_Store
+Thumbs.db
 
-.kube
-tokens
-logs
-/docker-infra/postgres
-/docker-infra/ollama
-OPENCODE.md
-.opencode
-.gigaide
-Downloads
+# Logs
+*.log
