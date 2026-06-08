@@ -608,7 +608,7 @@ open http://localhost:8080/ui/status
 
 ---
 
-## 15. .gitignore
+## 16. .gitignore
 
 ```
 application-local.properties
@@ -622,7 +622,7 @@ logs/
 
 ---
 
-## 16. SMTP — Future
+## 17. SMTP — Future
 
 SMTP нужен только для **отправки**. В MVP не реализуется.
 
@@ -633,7 +633,7 @@ SMTP нужен только для **отправки**. В MVP не реали
 
 ---
 
-## 17. Порядок реализации
+## 18. Порядок реализации
 
 1. `docker-compose.yml` — поднять Maildev, проверить UI на `:1080`
 2. `pom.xml` — Spring Boot 3.3, EWS, Jakarta Mail, Logback
