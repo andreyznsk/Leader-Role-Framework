@@ -1,0 +1,7 @@
+spring.profiles.active=local
+mail.protocol=maildev
+
+maildev.api-url=http://localhost:1080
+
+memory.service.enabled=false
+mail.poll-interval-seconds=30

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Инциденты')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Инциденты</h4>
+        <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#addModal">+ Новый инцидент</button>
+    </div>
+
+    <div th:if="${#lists.isEmpty(incidents)}" class="text-muted">Активных инцидентов нет</div>
+
+    <div th:each="inc : ${incidents}" class="card mb-3"
+         th:classappend="${inc.status == 'RESOLVED'} ? 'border-success opacity-75' : (${inc.severity == 'P1'} ? 'border-danger' : 'border-warning')">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="badge me-2"
+                          th:classappend="${inc.severity == 'P1'} ? 'bg-danger' : (${inc.severity == 'P2'} ? 'bg-warning text-dark' : 'bg-info text-dark')"
+                          th:text="${inc.severity}"></span>
+                    <strong th:text="${inc.title}"></strong>
+                    <span class="badge ms-2"
+                          th:classappend="${inc.status == 'RESOLVED'} ? 'bg-success' : (${inc.status == 'INVESTIGATING'} ? 'bg-primary' : 'bg-danger')"
+                          th:text="${inc.status}"></span>
+                </div>
+                <div th:if="${inc.status != 'RESOLVED'}">
+                    <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal"
+                            th:attr="data-bs-target='#resolve-' + ${inc.id}">Resolve</button>
+                </div>
+            </div>
+            <div th:if="${inc.description}" class="text-muted mt-2 small" th:text="${inc.description}"></div>
+            <div th:if="${inc.rootCause}" class="mt-2">
+                <span class="fw-bold small">Root cause:</span>
+                <span class="small text-muted" th:text="${inc.rootCause}"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resolve modals -->
+    <div th:each="inc : ${incidents}" th:if="${inc.status != 'RESOLVED'}">
+        <div class="modal fade" th:id="'resolve-' + ${inc.id}" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Закрыть инцидент: <span th:text="${inc.title}"></span></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="post" th:action="@{/ui/incidents/{id}/resolve(id=${inc.id})}">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Root cause</label>
+                                <textarea name="rootCause" class="form-control" rows="3" required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Action items</label>
+                                <textarea name="actionItems" class="form-control" rows="3" required></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-success">Закрыть инцидент</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add incident modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Новый инцидент</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="/ui/incidents/add">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Название</label>
+                        <input type="text" name="title" class="form-control" required/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Severity</label>
+                        <select name="severity" class="form-select">
+                            <option value="P1">P1</option>
+                            <option value="P2" selected>P2</option>
+                            <option value="P3">P3</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание</label>
+                        <textarea name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-danger">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
