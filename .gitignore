@@ -16,7 +16,41 @@ Thumbs.db
 
 # Logs
 *.log
-.idea
-Downloads
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IntelliJ IDEA
+.idea/
 *.iml
+*.iws
+*.ipr
+out/
+
+# Java / Maven / Gradle
+target/
+build/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+hs_err_pid*
+replay_pid*
+
+# Spring Boot
+spring-shell.log
+
+# Misc / project-specific
+Downloads
 tmp
+.gigaide

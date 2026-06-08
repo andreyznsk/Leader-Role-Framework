@@ -72,6 +72,7 @@ workspace/
 ## Доступные суб-агенты
 
 - `arch-analyst` — строит C4 карту из Confluence + Git
+- `k8s-arch-analyst` — строит карту архитектуры из Confluence (mcp-atlassian) + живого K8s кластера (mcp-kubernetes)
 - `risk-scanner` — ищет паттерны в Jira за 90 дней
 - `doc-writer` — генерирует DOCX/Markdown артефакты
 - `signal-filter` — сортирует сигнал vs шум
