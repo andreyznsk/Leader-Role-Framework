@@ -4,8 +4,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.andreyz.memoryservice.domain.PeopleNote;
 import ru.andreyz.memoryservice.domain.Person;
+import ru.andreyz.memoryservice.domain.PersonNameNote;
+import ru.andreyz.memoryservice.repository.PersonNameNoteRepository;
 import ru.andreyz.memoryservice.service.PeopleService;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -14,9 +17,12 @@ import java.util.Map;
 public class PeopleController {
 
     private final PeopleService peopleService;
+    private final PersonNameNoteRepository personNameNoteRepository;
 
-    public PeopleController(PeopleService peopleService) {
+    public PeopleController(PeopleService peopleService,
+                            PersonNameNoteRepository personNameNoteRepository) {
         this.peopleService = peopleService;
+        this.personNameNoteRepository = personNameNoteRepository;
     }
 
     @GetMapping
@@ -47,5 +53,17 @@ public class PeopleController {
                                               @RequestBody Map<String, String> body) {
         return ResponseEntity.ok(
                 peopleService.addNote(id, body.get("note"), body.get("tags")));
+    }
+
+    @PostMapping("/name/{name}/notes")
+    public ResponseEntity<PersonNameNote> addNoteByName(@PathVariable("name") String name,
+                                                        @RequestBody Map<String, String> body) {
+        PersonNameNote note = new PersonNameNote(null, name, body.get("note"), Instant.now());
+        return ResponseEntity.ok(personNameNoteRepository.save(note));
+    }
+
+    @GetMapping("/name/{name}/notes")
+    public ResponseEntity<List<PersonNameNote>> getNotesByName(@PathVariable("name") String name) {
+        return ResponseEntity.ok(personNameNoteRepository.findByPersonNameIgnoreCase(name));
     }
 }

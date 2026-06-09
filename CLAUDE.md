@@ -105,3 +105,30 @@ workspace/
 - URL содержит `YOUR_CORP.atlassian.net` → используй `confluence-corp`
 - Если я написал название space или страницы без URL → спроси какой хост имею в виду
 - Если домен не совпадает ни с одним → сообщи об этом и спроси
+
+## Handoff workflow (мобильный → десктоп)
+
+В конце мобильной сессии по запросу "сделай handoff":
+
+1. Сохранить актуальные файлы в Google Drive папку `Leader-Role-Framework/`:
+    - `ideas/` — копилка идей и артефакты сессии
+    - `architecture/` — патчи и схемы
+    - `cr/` — Change Request файлы
+
+2. Создать событие в Google Calendar на удобное время:
+    - Заголовок: "🖥️ Tech Lead Framework — Handoff с мобильного"
+    - Описание:
+        - что сделали в сессии
+        - что сделать на десктопе (пронумерованный список)
+        - ссылки на файлы в Drive
+    - Уведомление: popup at 0 minutes
+    - availability: FREE (не блокирует календарь)
+
+## Drive структура
+
+```
+Leader-Role-Framework/          (id: 10Q4KPHjsV_-8Vy_dfNaS6aNMJT5tUggj)
+├── ideas/                      (id: 1Qdx2TwSKeo7AuteTNRuXxRtm5cic89O1)
+├── architecture/               (id: 1CFsKNXVYpLqtceyNj2-tpoE710x3rrs4)
+└── cr/                         (id: 1c1HckfeLjDPIShZSywVcxxvYxGcGkJ_p)
+```

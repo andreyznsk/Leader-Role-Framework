@@ -1,3 +1,10 @@
+---
+name: arch-analyst
+description: Автономно читает документацию из Confluence и репозитории из GitHub, строит карту сервисов команды в формате C4. Запускай когда нужно понять архитектуру системы с нуля.
+tools: confluence, github, filesystem
+color: cyan
+---
+
 # Суб-агент: arch-analyst
 
 ## Роль
