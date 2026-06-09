@@ -23,22 +23,17 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: techlead
-      POSTGRES_USER: techlead
-      POSTGRES_PASSWORD: techlead
+      POSTGRES_DB: leaderos
+      POSTGRES_USER: leaderos
+      POSTGRES_PASSWORD: leaderos
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U techlead -d techlead"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # ─────────────────────────────────────────────
   # OpenSearch — используется: JavaRagService (векторное хранилище)
   # ─────────────────────────────────────────────
   opensearch:
-    image: opensearchproject/opensearch:2
+    image: opensearchproject/opensearch:3.5.0
     container_name: leaderos-opensearch
     restart: unless-stopped
     ports:
@@ -48,29 +43,11 @@ services:
       - discovery.type=single-node
       - DISABLE_SECURITY_PLUGIN=true        # локально без TLS
       - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m   # M1: не жадничать
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=!qazxsw23edC_1234
+      - OPENSEARCH_SSL_TRANSPORT_ENABLE=false
+      - OPENSEARCH_HTTP_ENABLE_TLS=false
     volumes:
-      - ./data/opensearch:/usr/share/opensearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-
-  # ─────────────────────────────────────────────
-  # OpenSearch Dashboards — опциональный UI для отладки индексов
-  # ─────────────────────────────────────────────
-  opensearch-dashboards:
-    image: opensearchproject/opensearch-dashboards:2
-    container_name: leaderos-opensearch-dashboards
-    restart: unless-stopped
-    ports:
-      - "5601:5601"
-    environment:
-      - OPENSEARCH_HOSTS=http://opensearch:9200
-      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
-    depends_on:
-      opensearch:
-        condition: service_healthy
+      - opensearch_data:/usr/share/opensearch/data
 
   # ─────────────────────────────────────────────
   # Maildev — только профиль local (SMTP-заглушка)
@@ -82,7 +59,7 @@ services:
     restart: unless-stopped
     profiles:
       - local
-    ports:
+    ports:со
       - "1080:1080"   # Web UI + HTTP API  →  http://localhost:1080
       - "1025:1025"   # SMTP
 
@@ -90,7 +67,5 @@ services:
 # Именованные volumes — данные живут между перезапусками
 # ─────────────────────────────────────────────
 volumes:
-  postgres_data:
-    name: leaderos-postgres-data
   opensearch_data:
     name: leaderos-opensearch-data
