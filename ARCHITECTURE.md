@@ -285,19 +285,22 @@ ru.andreyz.ragservice.*
 
 ```
 JavaMemoryService/
-├── RFC-memory-service.md     ← главная спека (живой документ)
+├── RFC/
+     └── [RFC-memory-service.md](JavaMemoryService/RFC/RFC-memory-service.md)     ← главная спека (живой документ)
 └── cr/
     ├── CR-001-capture-bot.md
     ├── CR-002-scheduler.md
     └── ...
 
 JavaRagService/
-├── RFC-rag-service.md
+├── RFC/
+      └── [RFC-rag-service.md](JavaRagService/RFC/RFC-rag-service.md)
 └── cr/
     └── ...
 
 JavaMailAgent/
-├── RFC-java-core.md
+├── RFC/
+      └── [RFC-JavaMailAgent.md](JavaMailAgent/RFC/RFC-JavaMailAgent.md)
 └── cr/
     └── ...
 ```

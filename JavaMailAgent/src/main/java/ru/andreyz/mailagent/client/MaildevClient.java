@@ -1,6 +1,7 @@
 package ru.andreyz.mailagent.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -12,6 +13,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -22,13 +24,34 @@ public class MaildevClient implements MailClient {
 
     private static final Logger log = LoggerFactory.getLogger(MaildevClient.class);
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .build();
     private final ObjectMapper objectMapper;
     private final String apiUrl;
 
     public MaildevClient(ObjectMapper objectMapper, MailConfig.MaildevProperties props) {
         this.objectMapper = objectMapper;
         this.apiUrl = props.getApiUrl();
+    }
+
+    @PostConstruct
+    public void checkConnection() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(apiUrl + "/email"))
+                .timeout(Duration.ofSeconds(3))
+                .GET()
+                .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                log.info("✅ Maildev connection OK — {}", apiUrl);
+            } else {
+                log.error("❌ Maildev returned HTTP {}", response.statusCode());
+            }
+        } catch (Exception e) {
+            log.error("❌ Maildev connection FAILED — {}: {}", apiUrl, e.getMessage());
+        }
     }
 
     @Override

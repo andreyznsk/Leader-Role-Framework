@@ -5,7 +5,7 @@
 #
 # Быстрый старт:
 #   docker compose up -d
-#   docker compose --profile local up -d   # + Maildev для local профиля
+#   docker compose --profile local up -d   # + Maildev для local профиля (Web UI: http://localhost:18080)
 #
 # Профили:
 #   (без профиля)     — prod/dev: PostgreSQL + OpenSearch + Dashboards
@@ -59,8 +59,8 @@ services:
     restart: unless-stopped
     profiles:
       - local
-    ports:со
-      - "1080:1080"   # Web UI + HTTP API  →  http://localhost:1080
+    ports:
+      - "18080:1080"  # Web UI + HTTP API  →  http://localhost:18080
       - "1025:1025"   # SMTP
 
 # ─────────────────────────────────────────────

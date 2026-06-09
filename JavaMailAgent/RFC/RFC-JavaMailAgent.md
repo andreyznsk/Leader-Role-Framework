@@ -80,6 +80,9 @@ memory.service.url=http://localhost:8082
 memory.service.tasks.pending.path=/api/tasks/pending
 memory.service.enabled=true
 
+# Mock agent — true для локальной разработки без Claude CLI
+mock.agent=false
+
 # Логи
 logging.file.name=logs/mail-agent.log
 logging.logback.rollingpolicy.max-file-size=10MB
@@ -99,6 +102,7 @@ maildev.smtp.port=1025
 
 memory.service.enabled=false
 mail.poll.interval.seconds=30
+mock.agent=true
 ```
 
 ### application-dev.properties.example — IMAP стенд
@@ -196,7 +200,9 @@ JavaMailAgent/
     │   │   ├── scheduler/
     │   │   │   ├── MailAgentJob.java           ← @Scheduled, главный цикл
     │   │   │   ├── PromptBuilder.java          ← формирует промпт для Claude
-    │   │   │   ├── ClaudeRunner.java           ← запускает Process, читает stdout
+    │   │   │   ├── ClaudeRunner.java           ← интерфейс (run prompt → AgentResponse)
+    │   │   │   ├── ClaudeRunnerImpl.java       ← реальный запуск claude CLI (@ConditionalOnProperty mock.agent=false)
+    │   │   │   ├── MockClaudeRunner.java       ← мок для локальной разработки (@ConditionalOnProperty mock.agent=true)
     │   │   │   └── ActionExecutor.java         ← switch по enum
     │   │   ├── integration/
     │   │   │   └── MemoryServiceClient.java    ← POST /api/tasks/pending
@@ -512,6 +518,15 @@ if (config.isEwsAutodiscover()) {
 
 Выбор клиента — через `@ConditionalOnProperty(name = "mail.protocol")` или
 фабрика в `@Configuration` классе.
+
+### Connection check при старте
+
+Каждый клиент проверяет соединение в `@PostConstruct` и пишет в лог:
+```
+INFO  MaildevClient - ✅ Maildev connection OK — http://localhost:1080
+ERROR EwsMailClient - ❌ EWS connection FAILED — https://mail.company.com/EWS/Exchange.asmx: Connection refused
+```
+Ошибка не бросает исключение — приложение стартует, проблема будет воспроизводиться в каждом цикле поллинга.
 
 ---
 
