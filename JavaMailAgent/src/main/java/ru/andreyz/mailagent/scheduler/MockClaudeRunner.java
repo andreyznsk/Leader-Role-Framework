@@ -8,11 +8,17 @@ import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.AgentResponseType;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 @Component
 @ConditionalOnProperty(name = "mock.agent", havingValue = "true")
 public class MockClaudeRunner implements ClaudeRunner {
 
     private static final Logger log = LoggerFactory.getLogger(MockClaudeRunner.class);
+
+    // Matches "emailId": "actual-id" in the PromptBuilder JSON example
+    private static final Pattern EMAIL_ID_PATTERN = Pattern.compile("\"emailId\":\\s*\"([^\"]+)\"");
 
     @PostConstruct
     public void init() {
@@ -22,9 +28,10 @@ public class MockClaudeRunner implements ClaudeRunner {
 
     @Override
     public AgentResponse run(String prompt) {
-        AgentResponseType type = detectType(prompt);
-        String priority       = detectPriority(prompt);
-        String emailId        = extractEmailId(prompt);
+        String emailSection = extractEmailSection(prompt);
+        AgentResponseType type = detectType(emailSection);
+        String priority        = detectPriority(emailSection);
+        String emailId         = extractEmailId(prompt);
 
         log.debug("MockClaudeRunner: detected type={}, priority={}", type, priority);
 
@@ -55,18 +62,34 @@ public class MockClaudeRunner implements ClaudeRunner {
         };
     }
 
-    private AgentResponseType detectType(String prompt) {
-        String upper = prompt.toUpperCase();
-        if (upper.contains("REQUEST")) return AgentResponseType.REQUEST;
-        if (upper.contains("DRAFT"))   return AgentResponseType.DRAFT;
-        return AgentResponseType.NOISE;
+    // Extract only the email header+body section, before the JSON template instructions.
+    // Fixes: PromptBuilder always includes keywords REQUEST/DRAFT/NOISE/CRITICAL/HIGH
+    // in the template text, which polluted the full-prompt keyword search.
+    private String extractEmailSection(String prompt) {
+        int idx = prompt.indexOf("Верни JSON");
+        return idx >= 0 ? prompt.substring(0, idx) : prompt;
     }
 
-    private String detectPriority(String prompt) {
-        String upper = prompt.toUpperCase();
-        if (upper.contains("CRITICAL")) return "CRITICAL";
-        if (upper.contains("HIGH"))     return "HIGH";
-        if (upper.contains("LOW"))      return "LOW";
+    private AgentResponseType detectType(String emailSection) {
+        String upper = emailSection.toUpperCase();
+        // DRAFT: requests for a response letter / draft
+        if (upper.contains("ОТВЕТН") || upper.contains("ЧЕРНОВИК"))
+            return AgentResponseType.DRAFT;
+        // NOISE: CI/CD notifications and automated reports
+        if (upper.contains("BUILD") || upper.contains("PIPELINE") ||
+            upper.contains("PASSED") || upper.contains("SUCCESS") || upper.contains("DURATION:"))
+            return AgentResponseType.NOISE;
+        return AgentResponseType.REQUEST;
+    }
+
+    private String detectPriority(String emailSection) {
+        String upper = emailSection.toUpperCase();
+        if (upper.contains("СРОЧНО") || upper.contains("ASAP") || upper.contains("P1 ИНЦИДЕНТ"))
+            return "CRITICAL";
+        if (upper.contains("ДО ЗАВТРА") || upper.contains("ВАЖНО") || upper.contains("ДЕДЛАЙН"))
+            return "HIGH";
+        if (upper.contains("КОГДА БУДЕТ ВРЕМЯ"))
+            return "LOW";
         return "NORMAL";
     }
 
@@ -79,21 +102,20 @@ public class MockClaudeRunner implements ClaudeRunner {
         };
     }
 
+    // Fixes: PromptBuilder formats emailId as `"emailId": "actualId"` with leading spaces/quotes,
+    // so startsWith-based extraction always failed and returned a mock-id-<timestamp> fallback.
     private String extractEmailId(String prompt) {
-        return extractField(prompt, "emailId", "mock-id-" + System.currentTimeMillis());
+        Matcher m = EMAIL_ID_PATTERN.matcher(prompt);
+        return m.find() ? m.group(1) : "mock-id-" + System.currentTimeMillis();
     }
 
     private String extractSender(String prompt) {
-        return extractField(prompt, "От", "unknown@mock.local");
-    }
-
-    private String extractField(String prompt, String field, String defaultValue) {
         for (String line : prompt.lines().toList()) {
-            if (line.toLowerCase().startsWith(field.toLowerCase())) {
+            if (line.toLowerCase().startsWith("от:")) {
                 String[] parts = line.split(":", 2);
                 if (parts.length == 2) return parts[1].trim();
             }
         }
-        return defaultValue;
+        return "unknown@mock.local";
     }
 }
