@@ -51,13 +51,21 @@ workspace/
 ├── 00_people/        # Stakeholder Map, заметки о людях
 ├── 01_services/
 │   └── architecture/ # C4, ADR, схемы, карточки сервисов
-├── 02_processes/     # Release flow, процессы команды
-├── 03_incidents/     # История инцидентов, постмортемы
+├── 02_incidents/     # История инцидентов, постмортемы
+├── 03_processes/     # Release flow, процессы команды
 ├── 04_releases/      # Release Notes, чеклисты
 ├── 05_questions/     # Открытые вопросы
 ├── 06_decisions/     # ADR
 ├── 07_risks/         # Operational risks
-└── 08_daily_journal/ # Дневник: YYYY-MM-DD.md
+├── 08_daily_journal/ # Дневник: YYYY-MM-DD-ToDay.md
+│   # Утром — план на день. Вечером — отчёт + перенос незавершённого в следующий день.
+├── 09_toDo/          # Задачи и бэклог
+├── 10_plans/         # Планы и стратегия
+├── 11_architecture/  # наши сервисы 
+├── 12_prompt/  # полезные промпты 
+├── 13_Documentation/  # различная полезная документация 
+├── 14_sprints/  # наши спринты 
+└── ...
 ```
 
 ## Доступные скиллы
