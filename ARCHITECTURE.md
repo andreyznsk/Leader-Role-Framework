@@ -1,6 +1,6 @@
-# Leader-Role-Framework — Architecture
+# Leader-Role-Framework — Architecture - Мастер-Спека
 
-**Последнее обновление:** 2026-06-06  
+**Последнее обновление:** 2026-06-10  
 **Статус:** Living document — обновлять при любом изменении контрактов между сервисами
 
 ---
@@ -17,7 +17,8 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 │  ┌─────────────────┐        ┌──────────────────────────────┐    │
 │  │  JavaMailAgent  │──────→ │      JavaMemoryService       │    │
 │  │  :8080          │  HTTP  │      :8082                   │    │
-│  │                 │        │  PostgreSQL (Docker :5432)   │    │
+│  │  schema:        │        │  schema: memory              │    │
+│  │  mailagent      │        │  PostgreSQL (Docker :5432)   │    │
 │  └────────┬────────┘        └──────────────────────────────┘    │
 │           │ запускает                                            │
 │           ↓                                                      │
@@ -47,6 +48,9 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 **Роль:** Читает входящую почту, запускает Claude-агента на каждое письмо,
 выполняет детерминированное действие по результату классификации.
 
+**База данных:** PostgreSQL, схема `mailagent`, владелец `mailagent_user`  
+**Миграции:** Flyway, `classpath:db/migration`, только схема `mailagent`
+
 **Протоколы подключения к почте:**
 | Профиль | Протокол | Клиент |
 |---------|----------|--------|
@@ -59,7 +63,11 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 |-----|----------|
 | `REQUEST` | Добавить в `plans/today.md` + POST `/api/tasks/pending` в JavaMemoryService |
 | `DRAFT` | Сохранить черновик в `drafts/` |
-| `NOISE` | Пометить прочитанным, переместить в `processed/` |
+| `NOISE` | Пометить прочитанным на сервере, переместить в `processed/` |
+
+**Трекинг обработанных писем:** таблица `mailagent.processed_emails`
+- `REQUEST` и `DRAFT` — письмо остаётся непрочитанным на сервере
+- `NOISE` — помечается прочитанным на сервере
 
 **Исходящие вызовы:**
 - `POST http://localhost:8082/api/tasks/pending` — создать PENDING задачу
@@ -77,7 +85,16 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 **Роль:** Операционная память техлида. Хранит быстро меняющиеся данные —
 задачи, планы, инциденты, состояние писем.
 
-**База данных:** PostgreSQL в Docker, порт 5432
+**База данных:** PostgreSQL, схема `memory`, владелец `memory_user`
+
+**Схемы PostgreSQL:**
+```
+БД: leader_framework
+├── schema: mailagent   ← JavaMailAgent   (owner: mailagent_user)
+└── schema: memory      ← JavaMemoryService (owner: memory_user)
+```
+Каждый сервис управляет только своей схемой через Flyway.  
+Инициализация: `infra/postgres/init.sql` — схемы, пользователи, права.
 
 **Ключевые endpoint-ы:**
 | Метод | Путь | Описание |
@@ -100,7 +117,6 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 **Статус:** In Progress
 
 **Роль:** RAG (Retrieval-Augmented Generation) — поиск по базе знаний команды.
-Принимает запрос, ищет релевантные документы в OpenSearch, возвращает контекст.
 
 **Зависимости:**
 - OpenSearch (Docker) — векторное хранилище, порт 9200
@@ -119,19 +135,18 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 ## Инфраструктура (Docker)
 
 ```yaml
-# Все инфра-сервисы — в Docker
-# Java-сервисы — локальные JAR (не Docker)
-
 services:
   postgres:
     image: postgres:16
     ports: ["5432:5432"]
-    # используется: JavaMemoryService
+    volumes:
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    # используется: JavaMailAgent (schema: mailagent)
+    #               JavaMemoryService (schema: memory)
 
   opensearch:
     image: opensearchproject/opensearch:2
     ports: ["9200:9200"]
-    # используется: JavaRagService
 
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2
@@ -140,9 +155,9 @@ services:
   maildev:
     image: maildev/maildev:latest
     ports:
-      - "1080:1080"   # Web UI + HTTP API
-      - "1025:1025"   # SMTP
-    # используется: JavaMailAgent (только local профиль)
+      - "1080:1080"
+      - "1025:1025"
+    profiles: [local]
 ```
 
 **Ollama** — нативно на macOS (Apple Silicon M1), не в Docker.  
@@ -150,9 +165,7 @@ services:
 
 ---
 
-## Файловая шина (Leader-Role-Framework корень)
-
-JavaMailAgent и Claude-агент общаются через файловую систему:
+## Файловая шина
 
 ```
 Leader-Role-Framework/
@@ -168,15 +181,10 @@ Leader-Role-Framework/
 
 ## Claude-агент
 
-Запускается JavaMailAgent как subprocess:
 ```bash
 claude --print "<промпт с текстом письма>"
 ```
 
-Рабочая директория запуска — корень `Leader-Role-Framework/`.  
-Агент автоматически читает корневой `CLAUDE.md` как контекст.
-
-**Возвращает** одну JSON строку в stdout:
 ```json
 {
   "type": "REQUEST|DRAFT|NOISE",
@@ -192,7 +200,7 @@ claude --print "<промпт с текстом письма>"
 
 ---
 
-## MCP серверы (`.mcp.json` в корне)
+## MCP серверы
 
 | Сервер | Что даёт агенту |
 |--------|----------------|
@@ -214,12 +222,8 @@ claude --print "<промпт с текстом письма>"
 | `dev` | IMAP стенд | localhost:8082 | localhost:8081 |
 | `prod` | Exchange EWS | localhost:8082 | localhost:8081 |
 
-Запуск сервисов:
 ```bash
-# Инфраструктура
 docker compose up -d
-
-# Java сервисы (каждый в отдельном терминале, из корня проекта)
 SPRING_PROFILES_ACTIVE=local java -jar JavaMemoryService/target/memory-service.jar
 SPRING_PROFILES_ACTIVE=local java -jar JavaRagService/target/rag-service.jar
 SPRING_PROFILES_ACTIVE=local java -jar JavaMailAgent/target/mail-agent.jar
@@ -235,18 +239,15 @@ JavaMailAgent  ──запускает──→  claude --print
 claude --print ──читает──→  JavaRagService (через MCP или HTTP /api/search)
 ```
 
-Прямых вызовов между JavaRagService и JavaMemoryService нет.  
-Оба доступны Claude-агенту независимо.
-
 ---
 
 ## Что ещё планируется (Future)
 
-- **Telegram-бот** в JavaMailAgent — отчёт после каждого цикла, вопросы агента
-- **SMTP отправка** — новый тип `SEND` в AgentResponseType
-- **Grafana** — визуализация capacity команды из Jira + PostgreSQL
-- **Obsidian** — экспорт заметок и планов
-- **macOS уведомления** — `osascript` / `say` при завершении задач агентом
+- **Chat-бот** в JavaMailAgent
+- **SMTP отправка** — тип `SEND`
+- **Grafana** — capacity из Jira + PostgreSQL
+- **Obsidian** — экспорт заметок
+- **macOS уведомления** — `osascript`
 
 ---
 
@@ -257,13 +258,6 @@ claude --print ──читает──→  JavaRagService (через MCP ил�
 | JavaMailAgent | `ru.andreyz.mailagent` | `mail-agent` |
 | JavaMemoryService | `ru.andreyz.memoryservice` | `memory-service` |
 | JavaRagService | `ru.andreyz.ragservice` | `rag-service` |
-
-Пакеты Java кода следуют groupId:
-```
-ru.andreyz.mailagent.*
-ru.andreyz.memoryservice.*
-ru.andreyz.ragservice.*
-```
 
 ---
 
@@ -350,9 +344,7 @@ ALTER TABLE ...
 Каждый сервис имеет симлинк `ARCHITECTURE.md → ../ARCHITECTURE.md`:
 
 ```bash
-cd JavaMailAgent   && ln -s ../ARCHITECTURE.md ARCHITECTURE.md
+cd JavaMailAgent        && ln -s ../ARCHITECTURE.md ARCHITECTURE.md
 cd ../JavaMemoryService && ln -s ../ARCHITECTURE.md ARCHITECTURE.md
 cd ../JavaRagService    && ln -s ../ARCHITECTURE.md ARCHITECTURE.md
 ```
-
-Симлинки закоммичены в git — работают после `git clone` на любой машине.
