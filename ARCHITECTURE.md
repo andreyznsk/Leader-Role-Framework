@@ -1,4 +1,4 @@
-# Leader-Role-Framework — Architecture - Мастер-Спека
+# LeaderOS — Architecture - Мастер-Спека
 
 **Последнее обновление:** 2026-06-10  
 **Статус:** Living document — обновлять при любом изменении контрактов между сервисами
@@ -12,7 +12,7 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Leader-Role-Framework                         │
+│                          LeaderOS                                │
 │                                                                  │
 │  ┌─────────────────┐        ┌──────────────────────────────┐    │
 │  │  JavaMailAgent  │──────→ │      JavaMemoryService       │    │
@@ -173,8 +173,17 @@ Leader-Role-Framework/
 ├── processed/          ← письма после обработки
 ├── drafts/             ← черновики ответов от агента
 ├── plans/
-│   └── today.md        ← план дня, агент дописывает REQUEST задачи
-└── workspace/          ← рабочее пространство агента
+│   └── today.md        ← план дня
+├── capture-inbox/      ← Capture Bot складывает сырые заметки (NEW)
+│   └── YYYY-MM-DD/
+│       └── HH-MM-SS.md
+├── workspace/
+│   └── tasks/          ← файлы задач по id (NEW)
+│       ├── TASK-001.md
+│       └── TASK-002.md
+└── cr/                 ← CR для ARCHITECTURE.md и CLAUDE.md (NEW)
+    ├── CR-ARCH-001-master-update.md
+    └── CR-CLAUDE-001-handoff.md
 ```
 
 ---
@@ -236,6 +245,7 @@ SPRING_PROFILES_ACTIVE=local java -jar JavaMailAgent/target/mail-agent.jar
 ```
 JavaMailAgent  ──POST /api/tasks/pending──→  JavaMemoryService
 JavaMailAgent  ──запускает──→  claude --print
+JavaMemoryService ──GET /api/calendar/today──→  JavaMailAgent  (NEW — идея 8)
 claude --print ──читает──→  JavaRagService (через MCP или HTTP /api/search)
 ```
 
@@ -243,11 +253,14 @@ claude --print ──читает──→  JavaRagService (через MCP ил�
 
 ## Что ещё планируется (Future)
 
-- **Chat-бот** в JavaMailAgent
 - **SMTP отправка** — тип `SEND`
-- **Grafana** — capacity из Jira + PostgreSQL
-- **Obsidian** — экспорт заметок
-- **macOS уведомления** — `osascript`
+- **Capture Bot** (CR-MEM-001) — модуль приёма заметок в java-memory-service
+- **Task File Storage** (CR-MEM-002) — файлы задач workspace/tasks/TASK-{id}.md
+- **Calendar Endpoint** (CR-MAIL-001) — GET /api/calendar/today из EWS
+- **Weekly Routine Manager** (идея 8) — UI routines + briefing по расписанию
+- **End of Day Summary** (идея 9) — git diff + резюме + EOD коммит
+- **LeaderOS Daily Cycle** — суточный цикл фреймворка (отдельный RFC)
+- **Grafana** — capacity из Jira + PostgreSQL (идея 3)
 
 ---
 
@@ -275,28 +288,36 @@ claude --print ──читает──→  JavaRagService (через MCP ил�
 
 Любое изменение в сервисе оформляется через CR — это сохраняет историю решений.
 
+### Префиксы
+
+| Префикс | Сервис / файл |
+|---------|--------------|
+| `MEM` | JavaMemoryService |
+| `RAG` | JavaRagService |
+| `MAIL` | JavaMailAgent |
+| `CLAUDE` | CLAUDE.md |
+| `ARCH` | ARCHITECTURE.md |
+
 ### Структура папок
 
 ```
+Leader-Role-Framework/
+└── cr/
+    └── CR-ARCH-001-master-update.md
+
 JavaMemoryService/
-├── RFC/
-     └── [RFC-memory-service.md](JavaMemoryService/RFC/RFC-memory-service.md)     ← главная спека (живой документ)
 └── cr/
     ├── CR-001-capture-bot.md
-    ├── CR-002-scheduler.md
-    └── ...
+    └── CR-002-claude-capture.md
 
 JavaRagService/
-├── RFC/
-      └── [RFC-rag-service.md](JavaRagService/RFC/RFC-rag-service.md)
 └── cr/
-    └── ...
+    └── (пусто)
 
 JavaMailAgent/
-├── RFC/
-      └── [RFC-JavaMailAgent.md](JavaMailAgent/RFC/RFC-JavaMailAgent.md)
 └── cr/
-    └── ...
+    ├── CR-001-mock-agent-and-connection-check.md
+    └── CR-002-processed-emails-tracking.md
 ```
 
 ### Процесс
@@ -304,7 +325,7 @@ JavaMailAgent/
 ```
 1. Новая идея / фича
         ↓
-2. Создать CR-XXX.md в cr/ нужного сервиса
+2. Создать CR-{PREFIX}-{NNN}.md в cr/ нужного сервиса
         ↓
 3. Агент читает CR → вносит изменения в RFC (главную спеку)
         ↓
@@ -313,31 +334,47 @@ JavaMailAgent/
 
 ### Шаблон CR файла
 
-# CR-XXX: Название изменения
+```markdown
+# CR-{PREFIX}-{NNN}: Название изменения
 
 **Дата:** YYYY-MM-DD
 **Статус:** Draft | Review | Approved | Implemented
-**Сервис:** JavaMemoryService | JavaRagService | JavaMailAgent
-**Зависимости:** (другие сервисы, инфраструктура)
+**Сервис:** MEM | RAG | MAIL | CLAUDE | ARCH
+**Зависимости:** ...
 
 ## Проблема / Мотивация
-Что не работает или чего не хватает.
-
 ## Решение
-Верхнеуровневое описание что делаем.
-
 ## Изменения в API
-| Метод | Путь | Описание |
-|-------|------|----------|
-| POST | /api/new-endpoint | ... |
-
 ## Изменения в схеме БД
-ALTER TABLE ...
-
 ## Зависимости от других сервисов
-
-
 ## Как тестировать
+```
+
+---
+
+## Правила коммитов
+
+**Формат:** `{PREFIX}_{тип}_{номер} {краткое описание}`
+
+| Тип | Когда |
+|-----|-------|
+| `cr` | изменение по Change Request |
+| `bugfix` | исправление бага |
+| `manual` | ручное изменение без CR |
+| `eod` | автоматический коммит конца дня |
+
+**Примеры:**
+```
+MEM_cr_001 добавлен capture bot модуль
+MEM_cr_002 task file storage реализован
+RAG_cr_001 подключён multilingual-e5-large
+MAIL_bugfix_042 исправлен парсинг EWS дат
+ARCH_manual обновлена схема связей сервисов
+INFRA_manual добавлен opensearch в docker-compose
+MEM_eod_2026-06-09 резюме дня
+```
+
+---
 
 ## Симлинки на этот файл
 
