@@ -21,12 +21,12 @@ class MaildevClientTest {
     @Test
     void listUnreadThrowsMailExceptionWhenUnreachable() {
         MaildevClient client = newClient("http://localhost:19999");
-        assertThrows(MailException.class, () -> client.listUnread(10));
+        assertThrows(MailException.class, () -> client.listUnread("INBOX", 10));
     }
 
     @Test
     void markAsReadThrowsMailExceptionWhenUnreachable() {
         MaildevClient client = newClient("http://localhost:19999");
-        assertThrows(MailException.class, () -> client.markAsRead("some-id"));
+        assertThrows(MailException.class, () -> client.markAsRead("some-id", "INBOX"));
     }
 }

@@ -7,5 +7,6 @@ public record Email(
     String subject,
     String from,
     String body,
-    LocalDateTime receivedAt
+    LocalDateTime receivedAt,
+    String folder
 ) {}

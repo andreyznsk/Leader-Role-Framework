@@ -4,6 +4,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.List;
+
 @Configuration
 @EnableConfigurationProperties({
     MailConfig.MailProperties.class,
@@ -12,7 +14,8 @@ import org.springframework.context.annotation.Configuration;
     MailConfig.MaildevProperties.class,
     MailConfig.ImapProperties.class,
     MailConfig.EwsProperties.class,
-    MailConfig.AgentProperties.class
+    MailConfig.AgentProperties.class,
+    MailConfig.FolderProperties.class
 })
 public class MailConfig {
 
@@ -109,5 +112,15 @@ public class MailConfig {
 
         public int getTimeoutMinutes() { return timeoutMinutes; }
         public void setTimeoutMinutes(int v) { this.timeoutMinutes = v; }
+    }
+
+    @ConfigurationProperties(prefix = "mail.folders")
+    public static class FolderProperties {
+        private List<String> exclude = List.of(
+            "Sent", "Drafts", "Trash", "Spam", "Archive", "Junk", "Deleted Items"
+        );
+
+        public List<String> getExclude() { return exclude; }
+        public void setExclude(List<String> v) { this.exclude = v; }
     }
 }

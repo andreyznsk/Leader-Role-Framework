@@ -8,7 +8,10 @@ import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.AgentResponse;
+import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.model.ProcessedEmail;
+import ru.andreyz.mailagent.repository.ProcessedEmailRepository;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,6 +29,8 @@ public class MailAgentJob {
     private final ActionExecutor actionExecutor;
     private final MailConfig.MailProperties mailProperties;
     private final MailConfig.PathProperties pathProperties;
+    private final MailConfig.FolderProperties folderProperties;
+    private final ProcessedEmailRepository processedEmailRepository;
     private final ObjectMapper objectMapper;
 
     public MailAgentJob(
@@ -35,6 +40,8 @@ public class MailAgentJob {
         ActionExecutor actionExecutor,
         MailConfig.MailProperties mailProperties,
         MailConfig.PathProperties pathProperties,
+        MailConfig.FolderProperties folderProperties,
+        ProcessedEmailRepository processedEmailRepository,
         ObjectMapper objectMapper
     ) {
         this.mailClient = mailClient;
@@ -43,56 +50,78 @@ public class MailAgentJob {
         this.actionExecutor = actionExecutor;
         this.mailProperties = mailProperties;
         this.pathProperties = pathProperties;
+        this.folderProperties = folderProperties;
+        this.processedEmailRepository = processedEmailRepository;
         this.objectMapper = objectMapper;
     }
 
-    // fixedDelay — следующий тик только после завершения предыдущего
     @Scheduled(fixedDelayString = "${mail.poll-interval-seconds:60}000")
     public void poll() {
         int limit = mailProperties.getFetchLimit();
-        log.info("Poll started, fetching up to {} unread emails", limit);
+        List<String> excludeFolders = folderProperties.getExclude();
 
-        List<Email> emails;
+        List<String> folders;
         try {
-            emails = mailClient.listUnread(limit);
+            folders = mailClient.listFolders(excludeFolders);
         } catch (Exception e) {
-            log.error("Failed to fetch emails: {}", e.getMessage());
+            log.error("Failed to list folders: {}", e.getMessage());
             return;
         }
 
-        log.info("Found {} unread emails", emails.size());
+        log.info("Poll started — scanning {} folder(s): {}", folders.size(), folders);
 
-        int errors = 0;
+        int total = 0, errors = 0;
         int[] counts = {0, 0, 0}; // REQUEST, DRAFT, NOISE
 
-        for (Email email : emails) {
+        for (String folder : folders) {
+            List<Email> emails;
             try {
-                AgentResponse resp = processEmail(email);
-                switch (resp.type()) {
-                    case REQUEST -> counts[0]++;
-                    case DRAFT   -> counts[1]++;
-                    case NOISE   -> counts[2]++;
-                }
+                emails = mailClient.listUnread(folder, limit);
             } catch (Exception e) {
-                errors++;
-                log.warn("Email {} failed: {}, will retry", email.id(), e.getMessage());
+                log.error("Failed to fetch emails from folder {}: {}", folder, e.getMessage());
+                continue;
+            }
+
+            log.info("Folder [{}]: {} unread email(s)", folder, emails.size());
+
+            for (Email email : emails) {
+                if (processedEmailRepository.existsByEmailId(email.id())) {
+                    log.debug("Email {} already processed, skipping", email.id());
+                    continue;
+                }
+                total++;
+                try {
+                    AgentResponse resp = processEmail(email);
+                    switch (resp.type()) {
+                        case REQUEST -> counts[0]++;
+                        case DRAFT   -> counts[1]++;
+                        case NOISE   -> counts[2]++;
+                    }
+                    processedEmailRepository.save(ProcessedEmail.of(email, resp.type().name()));
+                } catch (Exception e) {
+                    errors++;
+                    log.warn("Email {} failed: {}, will retry next poll", email.id(), e.getMessage());
+                }
             }
         }
 
         log.info("Poll finished: {} processed ({} REQUEST, {} DRAFT, {} NOISE, {} errors)",
-            emails.size() - errors, counts[0], counts[1], counts[2], errors);
+            total - errors, counts[0], counts[1], counts[2], errors);
     }
 
     private AgentResponse processEmail(Email email) throws Exception {
-        log.info("Processing email {} from {}: \"{}\"", email.id(), email.from(), email.subject());
+        log.info("Processing email {} from {}: \"{}\" [{}]",
+            email.id(), email.from(), email.subject(), email.folder());
         saveToInbox(email);
         String prompt = promptBuilder.build(email);
         AgentResponse resp = claudeRunner.run(prompt);
         log.info("Classified as {}{}", resp.type(),
             resp.priority() != null ? ", priority " + resp.priority() : "");
         actionExecutor.execute(resp);
-        mailClient.markAsRead(email.id());
-        log.info("Email {} marked as read, moved to processed/", email.id());
+        if (resp.type() == AgentResponseType.NOISE) {
+            mailClient.markAsRead(email.id(), email.folder());
+            log.info("Email {} marked as read (NOISE)", email.id());
+        }
         return resp;
     }
 

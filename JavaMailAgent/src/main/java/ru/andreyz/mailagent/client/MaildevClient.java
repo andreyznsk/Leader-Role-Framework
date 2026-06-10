@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 @ConditionalOnProperty(name = "mail.protocol", havingValue = "maildev")
@@ -55,7 +56,12 @@ public class MaildevClient implements MailClient {
     }
 
     @Override
-    public List<Email> listUnread(int limit) throws MailException {
+    public List<String> listFolders(List<String> excludeFolders) throws MailException {
+        return List.of("INBOX");
+    }
+
+    @Override
+    public List<Email> listUnread(String folder, int limit) throws MailException {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(apiUrl + "/email"))
@@ -72,7 +78,7 @@ public class MaildevClient implements MailClient {
             return all.stream()
                 .filter(e -> !Boolean.TRUE.equals(e.get("read")))
                 .limit(limit)
-                .map(this::toEmail)
+                .map(e -> toEmail(e, folder))
                 .toList();
 
         } catch (Exception e) {
@@ -81,7 +87,7 @@ public class MaildevClient implements MailClient {
     }
 
     @Override
-    public void markAsRead(String emailId) throws MailException {
+    public void markAsRead(String emailId, String folder) throws MailException {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(apiUrl + "/email/" + emailId + "/read"))
@@ -97,12 +103,12 @@ public class MaildevClient implements MailClient {
     @Override
     public void close() {}
 
-    private Email toEmail(Map<String, Object> raw) {
+    private Email toEmail(Map<String, Object> raw, String folder) {
         String id = String.valueOf(raw.get("id"));
         String subject = String.valueOf(raw.getOrDefault("subject", "(no subject)"));
         String from = extractFrom(raw);
         String body = String.valueOf(raw.getOrDefault("text", ""));
-        return new Email(id, subject, from, body, LocalDateTime.now());
+        return new Email(id, subject, from, body, LocalDateTime.now(), folder);
     }
 
     @SuppressWarnings("unchecked")

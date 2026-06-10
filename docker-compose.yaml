@@ -14,20 +14,27 @@
 services:
 
   # ─────────────────────────────────────────────
-  # PostgreSQL — используется: JavaMemoryService
+  # PostgreSQL — используется: JavaMailAgent (schema: mailagent)
+  #                             JavaMemoryService (schema: memory)
   # ─────────────────────────────────────────────
   postgres:
     image: postgres:15
-    container_name: leaderos-postgres
+    container_name: leader-postgres
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: leaderos
-      POSTGRES_USER: leaderos
-      POSTGRES_PASSWORD: leaderos
+      POSTGRES_DB: leader_framework
+      POSTGRES_USER: superuser
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-superpassword}
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superuser -d leader_framework"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ─────────────────────────────────────────────
   # OpenSearch — используется: JavaRagService (векторное хранилище)

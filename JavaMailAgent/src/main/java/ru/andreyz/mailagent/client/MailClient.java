@@ -5,7 +5,8 @@ import ru.andreyz.mailagent.model.Email;
 import java.util.List;
 
 public interface MailClient {
-    List<Email> listUnread(int limit) throws MailException;
-    void markAsRead(String emailId) throws MailException;
+    List<String> listFolders(List<String> excludeFolders) throws MailException;
+    List<Email> listUnread(String folder, int limit) throws MailException;
+    void markAsRead(String emailId, String folder) throws MailException;
     void close();
 }
