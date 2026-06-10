@@ -50,7 +50,7 @@ services:
       - discovery.type=single-node
       - DISABLE_SECURITY_PLUGIN=true        # локально без TLS
       - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m   # M1: не жадничать
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=!qazxsw23edC_1234
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-Admin_local1!}
       - OPENSEARCH_SSL_TRANSPORT_ENABLE=false
       - OPENSEARCH_HTTP_ENABLE_TLS=false
     volumes:
