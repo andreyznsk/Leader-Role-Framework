@@ -28,7 +28,7 @@ services:
       POSTGRES_USER: superuser
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-superpassword}
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U superuser -d leader_framework"]
@@ -62,10 +62,7 @@ services:
   # ─────────────────────────────────────────────
   maildev:
     image: maildev/maildev:latest
-    container_name: leaderos-maildev
     restart: unless-stopped
-    profiles:
-      - local
     ports:
       - "18080:1080"  # Web UI + HTTP API  →  http://localhost:18080
       - "1025:1025"   # SMTP
@@ -74,5 +71,7 @@ services:
 # Именованные volumes — данные живут между перезапусками
 # ─────────────────────────────────────────────
 volumes:
+  postgres_data:
+    name: leaderos-postgres-data
   opensearch_data:
     name: leaderos-opensearch-data

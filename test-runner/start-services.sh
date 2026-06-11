@@ -78,7 +78,7 @@ start_service() {
   # Запустить в фоне, логи в файл
   SPRING_PROFILES_ACTIVE="$PROFILE" \
   java -jar "$JAR" \
-    >> "$LOG_FILE" 2>&1 &
+    > "$LOG_FILE" 2>&1 &
 
   local PID=$!
   echo $PID > "$PID_FILE"

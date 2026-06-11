@@ -39,6 +39,7 @@ build/
 *.zip
 *.tar.gz
 *.rar
+*.pid
 .gradle/
 gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
