@@ -201,10 +201,19 @@ H2 в режиме `MODE=PostgreSQL` поддерживает `BIGSERIAL`, `TIME
 ```
 src/main/resources/db/
 ├── migration/           # PostgreSQL (prod)
-│   └── V1__init_schema.sql
+│   ├── V1__init_schema.sql
+│   └── V3__add_task_sort_order.sql
 └── migration-h2/        # H2 патчи (local/test)
     └── V1_1__h2_compat.sql
 ```
+
+`V3__add_task_sort_order.sql`:
+```sql
+ALTER TABLE tasks ADD COLUMN sort_order INT NOT NULL DEFAULT 0;
+CREATE INDEX idx_tasks_sort_order ON tasks(plan_id, sort_order);
+```
+
+При создании задачи `sort_order = MAX(sort_order) + 1` в рамках `plan_id`.
 
 ---
 
@@ -236,6 +245,7 @@ public record Task(
     LocalDate dueDate,
     String source,      // MANUAL | EMAIL | AGENT
     String emailId,     // заполняется если source=EMAIL
+    Integer sortOrder,  // порядок в списке плана (CR-MEM-003)
     Instant createdAt,
     Instant updatedAt
 ) {}
@@ -305,8 +315,10 @@ public interface DailyPlanRepository extends CrudRepository<DailyPlan, Long> {
 
 public interface TaskRepository extends CrudRepository<Task, Long> {
     List<Task> findByPlanId(Long planId);
+    List<Task> findByPlanIdOrderBySortOrder(Long planId);
     List<Task> findByStatus(String status);          // для PENDING очереди
     List<Task> findByDueDate(LocalDate date);
+    Optional<Task> findTopByPlanIdOrderBySortOrderDesc(Long planId);
 }
 
 public interface IncidentRepository extends CrudRepository<Incident, Long> {
@@ -392,6 +404,12 @@ POST /api/tasks                          # создать подтверждён
 PUT  /api/tasks/{id}
 POST /api/tasks/{id}/done
 POST /api/tasks/{id}/move                body: { "toDate": "2026-06-09" }
+POST /api/tasks/{id}/reorder             body: { "direction": "up"|"down" } | { "position": N }
+POST /api/tasks/{id}/delete              # мягкое удаление (статус → DELETED)
+
+# Описания задач (файловая шина workspace/tasks/)
+GET  /api/tasks/{id}/description         # 200 text/plain | 204 если файл отсутствует
+PUT  /api/tasks/{id}/description         body: text/plain → записать в файл
 
 # Очередь подтверждения (PENDING)
 GET  /api/tasks/pending                  # все задачи со статусом PENDING
@@ -432,6 +450,12 @@ Base: `http://localhost:8082/ui`
 
 **`/ui/today`** — Главная страница
 
+Секции страницы (порядок сверху вниз):
+1. **Сводка** — 4 карточки: задач сегодня / ожидают подтверждения / открытые инциденты / выполнено
+2. **Ожидают подтверждения** — показывается только если есть PENDING задачи
+3. **План на сегодня** — список задач с управлением (сортировка по `sort_order`)
+4. **Завтра** — список задач на следующий день (только просмотр + действия)
+
 Секция **"Ожидают подтверждения"** (показывается только если есть PENDING задачи):
 ```
 ┌─────────────────────────────────────────────────┐
@@ -447,14 +471,38 @@ Base: `http://localhost:8082/ui`
 └─────────────────────────────────────────────────┘
 ```
 
-Секция **"План на сегодня"**:
-- Инлайн-редактирование title и priority прямо в строке
-- Кнопки [Done] [Move →] [Delete] для каждой задачи
-- Форма добавить задачу вручную внизу
-- Редактируемый summary плана дня
+Секция **"План на сегодня"** — управление задачами в строке:
+
+| Элемент | Действие | HTTP |
+|---------|----------|------|
+| Чекбокс | `DONE` / снять | `POST /api/tasks/{id}/done` |
+| Стрелка ↑ | переместить вверх | `POST /api/tasks/{id}/reorder` `{"direction":"up"}` |
+| Стрелка ↓ | переместить вниз | `POST /api/tasks/{id}/reorder` `{"direction":"down"}` |
+| Иконка флага | циклически менять приоритет | `PUT /api/tasks/{id}` |
+| Иконка карандаша | открыть форму редактирования | `GET /ui/tasks/{id}/edit` |
+| Иконка корзины | удалить (без подтверждения) | `POST /api/tasks/{id}/delete` |
+| Drag handle `⠿` | drag-and-drop сортировка | `POST /api/tasks/{id}/reorder` `{"position":N}` |
+
+Добавление задачи: кнопка "добавить" раскрывает inline-строку — поле `title` + select `priority` + `POST /api/tasks`.
 
 Секция **"Завтра"**:
 - Список задач на завтра (только просмотр + те же кнопки)
+
+**`/ui/tasks/{id}/edit`** — Форма редактирования задачи
+
+| Поле | Тип | Источник данных |
+|------|-----|----------------|
+| `title` | text input | `tasks.title` (PostgreSQL) |
+| `description` | Markdown textarea | `workspace/tasks/TASK-{id}.md` (файловая шина) |
+| `priority` | select | `tasks.priority` |
+| `due_date` | date input | `tasks.due_date` |
+| `status` | radio-пилюли | `tasks.status` |
+| `source` | readonly badge | `tasks.source` + `tasks.email_id` |
+
+Markdown-редактор — две вкладки: `markdown` (raw, monospace) и `preview` (HTML-рендер через JS, без библиотек).
+Под textarea — бейдж с путём к файлу: `📄 workspace/tasks/TASK-003.md`.
+
+Удаление на странице edit — двойное подтверждение: первый клик меняет текст на "точно удалить?" (3 сек), второй — `POST /api/tasks/{id}/delete` + удаление файла описания.
 
 **`/ui/incidents`** — Активные инциденты
 - Список с severity badge (P1/P2/P3)
@@ -509,12 +557,15 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 | `markTaskDone` | Задача → DONE | "Отметь задачу X как выполненную" |
 | `moveTask` | Перенести задачу на дату | "Перенеси задачу X на завтра" |
 | `updateTaskStatus` | Изменить статус задачи | Любое изменение статуса |
+| `getTaskDescription` | Читать Markdown-описание задачи из файловой шины | "Покажи детали задачи X" |
 | `createIncident` | Зафиксировать инцидент | После подтверждения пользователем |
 | `resolveIncident` | Закрыть инцидент с root cause | После подтверждения пользователем |
 | `addRisk` | Добавить риск | После подтверждения пользователем |
 | `updateRisk` | Изменить статус/митигацию риска | После подтверждения пользователем |
 | `addPeopleNote` | Записать заметку о человеке | Наблюдение по итогам встречи и т.д. |
 | `searchPeople` | Найти человека по имени | "Что я знаю про Иванова?" |
+
+`getTaskDescription` реализован поверх `GET /api/tasks/{id}/description`; файл хранится в `workspace/tasks/TASK-{id}.md`.
 
 ### Правило подтверждения (ОБЯЗАТЕЛЬНО в CLAUDE.md агента)
 
@@ -578,12 +629,51 @@ public class TaskTools {
     public Task updateTaskStatus(
         @ToolParam(description = "Task ID") Long id,
         @ToolParam(description = "Status: TODO|IN_PROGRESS|DONE|BLOCKED") String status) { }
+
+    @Tool(description = "Get task description from file bus. Returns empty string if no file.")
+    public String getTaskDescription(
+        @ToolParam(description = "Task ID") Long id) { }
 }
 ```
 
 ---
 
-## 11. Интеграция с java-mail-agent
+## 11. Файловая шина описаний задач
+
+Описания задач хранятся вне PostgreSQL — в файловой системе:
+
+```
+Leader-Role-Framework/
+└── workspace/
+    └── tasks/
+        ├── TASK-001.md
+        ├── TASK-002.md
+        └── TASK-003.md
+```
+
+Формат имени файла: `TASK-` + id задачи с нулями до 3 знаков + `.md`.
+
+**Формат файла** — свободный Markdown, агент пишет в произвольном формате.
+Рекомендуемая структура (не обязательная):
+
+```markdown
+## Контекст
+...
+
+## Что нужно сделать
+- пункт 1
+
+## Дедлайн
+...
+```
+
+**`TaskFileService`** — создаёт директорию при старте (`@PostConstruct`), читает/пишет файлы через `Files.readString` / `Files.writeString`. Если файл отсутствует при чтении — возвращает пустую строку (нормально для старых задач).
+
+При удалении задачи через `POST /api/tasks/{id}/delete` файл описания удаляется (`Files.deleteIfExists`).
+
+---
+
+## 12. Интеграция с java-mail-agent
 
 Когда mail-agent классифицировал письмо как `REQUEST` и извлёк задачу:
 
@@ -607,7 +697,7 @@ Content-Type: application/json
 
 ---
 
-## 12. Тесты
+## 13. Тесты
 
 ### Структура
 
@@ -735,7 +825,7 @@ class McpContextToolTest extends BaseMcpTest {
 
 ---
 
-## 13. Структура проекта
+## 14. Структура проекта
 
 ```
 JavaMemoryService/
@@ -761,18 +851,21 @@ JavaMemoryService/
     │   │   ├── service/
     │   │   │   ├── ContextService.java
     │   │   │   ├── TaskService.java
+    │   │   │   ├── TaskFileService.java            # read/write workspace/tasks/TASK-{id}.md
     │   │   │   ├── IncidentService.java
     │   │   │   ├── RiskService.java
     │   │   │   └── PeopleService.java
     │   │   ├── api/
     │   │   │   ├── ContextController.java
-    │   │   │   ├── TaskController.java      # включает /pending endpoints
+    │   │   │   ├── TaskController.java          # включает /pending, /reorder, /delete endpoints
+    │   │   │   ├── TaskDescriptionController.java  # GET/PUT /api/tasks/{id}/description
     │   │   │   ├── PlanController.java
     │   │   │   ├── IncidentController.java
     │   │   │   ├── RiskController.java
     │   │   │   └── PeopleController.java
     │   │   ├── ui/
     │   │   │   ├── TodayViewController.java
+    │   │   │   ├── TaskEditController.java         # GET/POST /ui/tasks/{id}/edit
     │   │   │   ├── IncidentViewController.java
     │   │   │   ├── RiskViewController.java
     │   │   │   └── PeopleViewController.java
@@ -789,6 +882,7 @@ JavaMemoryService/
     │   │       ├── CreatePendingTaskRequest.java
     │   │       ├── EditTaskRequest.java
     │   │       ├── MoveTaskRequest.java
+    │   │       ├── ReorderTaskRequest.java          # { direction, position }
     │   │       └── ResolveIncidentRequest.java
     │   └── resources/
     │       ├── application.properties
@@ -796,16 +890,18 @@ JavaMemoryService/
     │       ├── application-prod.properties
     │       ├── db/
     │       │   ├── migration/
-    │       │   │   └── V1__init_schema.sql
+    │       │   │   ├── V1__init_schema.sql
+    │       │   │   └── V3__add_task_sort_order.sql
     │       │   └── migration-h2/
     │       │       └── V1_1__h2_compat.sql
     │       ├── templates/
     │       │   ├── fragments/layout.html
     │       │   ├── today.html
+    │       │   ├── task-edit.html                  # форма редактирования с MD-редактором
     │       │   ├── incidents.html
     │       │   ├── risks.html
     │       │   └── people.html
-    │       └── static/style.css
+    │       └── static/
     └── test/
         ├── java/ru/zaytsev/memory/
         │   ├── BaseMcpTest.java
@@ -906,6 +1002,7 @@ JavaMemoryService/
 
 ## 16. Порядок реализации для Claude Code
 
+**Базовый сервис:**
 1. `pom.xml` + `MemoryServiceApplication.java`
 2. `application.properties` (все три профиля)
 3. `V1__init_schema.sql` + `V1_1__h2_compat.sql`
@@ -917,6 +1014,15 @@ JavaMemoryService/
 9. MCP config + Tool classes
 10. Thymeleaf templates (today.html с секцией PENDING — в первую очередь)
 11. Тесты: repository → service → api → mcp
+
+**CR-MEM-003 (UI Task Manager):**
+12. `V3__add_task_sort_order.sql` — миграция поля сортировки
+13. `TaskFileService` + `workspace/tasks/` инициализация
+14. `TaskDescriptionController` (GET/PUT `/api/tasks/{id}/description`)
+15. Reorder endpoint в `TaskController` + `ReorderTaskRequest`
+16. `TaskEditController` + `task-edit.html` (форма с MD-редактором)
+17. Обновить `today.html`: sort_order, drag handle, стрелки, иконки карандаш/корзина, inline add
+18. `getTaskDescription` MCP tool в `TaskTools`
 
 ---
 
