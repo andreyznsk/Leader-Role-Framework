@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "permissions": {
+    "allow": [
+      "Bash(find . *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(echo *)",
+      "Read(./workspace/**)",
+      "Write(./workspace/**)",
+      "Read(./.claude/**)",
+      "Read(./skills/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(curl *)",
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
+  },
+
+  "env": {
+    "TECHLEAD_WORKSPACE": "./workspace"
+  },
+
+  "mcpServers": {
+
+    "memory": {
+      "type": "sse",
+      "url": "http://localhost:8082/mcp/sse",
+      "description": "JavaMemoryService — задачи, планы, инциденты, риски, люди."
+    },
+
+    "rag": {
+      "type": "sse",
+      "url": "http://localhost:8081/mcp",
+      "description": "JavaRagService — семантическая база знаний команды."
+    },
+
+    "postgres": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "postgresql://memory_user:memory_password@localhost:5432/leader_framework?search_path=memory"
+      },
+      "description": "Прямой доступ к PostgreSQL, схема memory."
+    },
+
+    "jira": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-jira"],
+      "env": {
+        "JIRA_URL": "https://your-org.atlassian.net",
+        "JIRA_EMAIL": "your@email.com",
+        "JIRA_TOKEN": "${JIRA_TOKEN}"
+      },
+      "description": "Jira — тикеты, баги, спринты."
+    },
+
+    "confluence-team": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-confluence"],
+      "env": {
+        "CONFLUENCE_URL": "https://YOUR_TEAM.atlassian.net",
+        "CONFLUENCE_EMAIL": "your@email.com",
+        "CONFLUENCE_TOKEN": "${CONFLUENCE_TEAM_TOKEN}"
+      },
+      "description": "Confluence команды. Использовать когда URL содержит YOUR_TEAM.atlassian.net."
+    },
+
+    "confluence-corp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-confluence"],
+      "env": {
+        "CONFLUENCE_URL": "https://YOUR_CORP.atlassian.net",
+        "CONFLUENCE_EMAIL": "your@email.com",
+        "CONFLUENCE_TOKEN": "${CONFLUENCE_CORP_TOKEN}"
+      },
+      "description": "Корпоративный Confluence. Использовать когда URL содержит YOUR_CORP.atlassian.net."
+    },
+
+    "kubernetes": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-kubernetes"],
+      "env": {
+        "KUBECONFIG": "${HOME}/.kube/config"
+      },
+      "description": "Kubernetes — состояние кластера, поды, деплойменты."
+    },
+
+    "bitbucket": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "garc33/bitbucket-server-mcp-server"],
+      "env": {
+        "BITBUCKET_URL": "https://bitbucket.your-company.com",
+        "BITBUCKET_TOKEN": "${BITBUCKET_TOKEN}"
+      },
+      "description": "Bitbucket Server self-hosted — репозитории, PR."
+    },
+
+    "jenkins": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-jenkins"],
+      "env": {
+        "JENKINS_URL": "https://jenkins.your-company.com",
+        "JENKINS_USER": "your-user",
+        "JENKINS_TOKEN": "${JENKINS_TOKEN}"
+      },
+      "description": "Jenkins — CI/CD пайплайны, статусы сборок."
+    },
+
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ],
+      "description": "Локальная файловая система — workspace/, plans/, capture-inbox/, rag-inbox/."
+    }
+
+  }
+}

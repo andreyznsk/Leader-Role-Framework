@@ -69,6 +69,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <form method="post" th:action="@{/ui/risks/{id}/edit(id=${risk.id})}">
+                        <input type="hidden" name="_method" value="PUT">
                         <div class="modal-body">
                             <div class="mb-3">
                                 <label class="form-label">Status</label>

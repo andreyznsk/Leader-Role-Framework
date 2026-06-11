@@ -36,7 +36,7 @@ public class RiskViewController {
         return "redirect:/ui/risks";
     }
 
-    @PostMapping("/{id}/edit")
+    @PutMapping("/{id}/edit")
     public String edit(@PathVariable Long id,
                        @RequestParam(required = false) String status,
                        @RequestParam(required = false) String mitigation) {

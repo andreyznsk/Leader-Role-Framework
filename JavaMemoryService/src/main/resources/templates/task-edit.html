@@ -13,6 +13,7 @@
     </div>
 
     <form method="post" th:action="@{/ui/tasks/{id}/edit(id=${task.id})}">
+        <input type="hidden" name="_method" value="PUT">
 
         <!-- Title -->
         <div class="mb-3">

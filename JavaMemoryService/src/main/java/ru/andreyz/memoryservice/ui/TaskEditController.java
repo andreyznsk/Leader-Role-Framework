@@ -33,7 +33,7 @@ public class TaskEditController {
         return "task-edit";
     }
 
-    @PostMapping("/{id}/edit")
+    @PutMapping("/{id}/edit")
     public String saveEdit(@PathVariable Long id,
                            @RequestParam String title,
                            @RequestParam(required = false) String priority,

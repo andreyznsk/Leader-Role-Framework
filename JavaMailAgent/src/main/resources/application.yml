@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: mail-agent
+  datasource:
+    url: jdbc:postgresql://localhost:5432/leader_framework
+    username: mailagent_user
+    password: ${POSTGRES_MAILAGENT_PASSWORD:mailagent_password}
+  flyway:
+    schemas: mailagent
+    default-schema: mailagent
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,mappings
+
+mail:
+  protocol: maildev
+  poll-interval-seconds: 60
+  fetch-limit: 20
+  folders:
+    exclude: "Sent,Drafts,Trash,Spam,Archive,Junk,Deleted Items"
+
+agent:
+  timeout-minutes: 5
+
+path:
+  inbox: mail/inbox
+  processed: mail/processed
+  drafts: mail/drafts
+  plan: plans/today.md
+
+memory:
+  service:
+    url: http://localhost:8082
+    enabled: true
+
+mock:
+  agent: false
+
+logging:
+  file:
+    name: logs/mail-agent.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{HH:mm:ss} %-5level %logger{36} - %msg%n"

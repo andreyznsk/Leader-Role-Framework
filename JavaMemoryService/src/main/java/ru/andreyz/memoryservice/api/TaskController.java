@@ -1,6 +1,7 @@
 package ru.andreyz.memoryservice.api;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.andreyz.memoryservice.domain.Task;
@@ -9,6 +10,7 @@ import ru.andreyz.memoryservice.dto.CreateTaskRequest;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
 import ru.andreyz.memoryservice.dto.MoveTaskRequest;
 import ru.andreyz.memoryservice.dto.ReorderTaskRequest;
+import ru.andreyz.memoryservice.dto.UpdateTaskStatusRequest;
 import ru.andreyz.memoryservice.service.TaskService;
 
 import java.time.LocalDate;
@@ -40,7 +42,7 @@ public class TaskController {
                 req.date() != null ? req.date() : LocalDate.now(),
                 req.title(), req.priority(), req.description(),
                 req.source(), null);
-        return ResponseEntity.ok(task);
+        return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
     @PutMapping("/{id}")
@@ -77,7 +79,15 @@ public class TaskController {
     public ResponseEntity<Task> createPending(@RequestBody CreatePendingTaskRequest req) {
         Task task = taskService.createPending(
                 req.title(), req.description(), req.emailId(), req.sender(), req.priority());
-        return ResponseEntity.ok(task);
+        return ResponseEntity.status(HttpStatus.CREATED).body(task);
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Task> updateStatus(@PathVariable Long id, @RequestBody UpdateTaskStatusRequest req) {
+        if ("PENDING".equals(req.status()) || "DELETED".equals(req.status())) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(taskService.updateStatus(id, req.status()));
     }
 
     @PostMapping("/{id}/reorder")

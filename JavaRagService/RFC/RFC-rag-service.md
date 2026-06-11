@@ -1,6 +1,6 @@
 # RFC: JavaRagService
 
-**Версия:** 1.1  
+**Версия:** 1.2  
 **Дата:** 2026-06-11  
 **Статус:** Draft  
 **Автор:** Андрей Зайцев  
@@ -134,6 +134,9 @@ Claude-агент подключается через `.mcp.json`:
 ```
 Файл (.md)
     ↓
+DocumentValidator → проверить frontmatter и структуру заголовков
+                    если невалиден → статус invalid + error_message в PostgreSQL, стоп
+    ↓
 ChunkSplitter  →  разбить на chunks по абзацам (двойной перенос строки)
                   минимум 100 символов на chunk, максимум 1000
                   overlap: последнее предложение предыдущего chunk
@@ -189,19 +192,33 @@ OpenSearchClient → kNN query:
 Владелец схемы — пользователь `rag_user` с `search_path = rag`.
 
 ```sql
--- Применяется через Flyway: db/migration/V1__create_indexed_documents.sql
+-- V1__create_indexed_documents.sql
 CREATE TABLE IF NOT EXISTS indexed_documents (
-    id           SERIAL PRIMARY KEY,
-    file_path    TEXT NOT NULL UNIQUE,
-    file_hash    TEXT NOT NULL,
-    indexed_at   TIMESTAMP NOT NULL DEFAULT NOW(),
-    chunk_count  INT,
-    status       TEXT NOT NULL DEFAULT 'indexed'
-    -- статусы: indexed | failed | outdated
+    id            SERIAL PRIMARY KEY,
+    file_path     TEXT        NOT NULL UNIQUE,
+    file_hash     TEXT        NOT NULL,
+    indexed_at    TIMESTAMP   NOT NULL DEFAULT NOW(),
+    chunk_count   INT,
+    status        TEXT        NOT NULL DEFAULT 'indexed',
+    error_message TEXT        -- заполняется при status = invalid | failed
+    -- статусы: indexed | invalid | failed | outdated
 );
+
+-- V2__add_error_message.sql
+ALTER TABLE indexed_documents
+    ADD COLUMN IF NOT EXISTS error_message TEXT;
 ```
 
-Миграция применяется автоматически при старте через Flyway (только схема `rag`).
+Миграции применяются автоматически при старте через Flyway (только схема `rag`).
+
+**Статусы документа:**
+
+| Статус | Когда | error_message |
+|--------|-------|---------------|
+| `indexed` | успешно проиндексирован | null |
+| `invalid` | не прошёл валидацию структуры | описание ошибок |
+| `failed` | ошибка при индексации (Ollama/OpenSearch недоступен) | текст исключения |
+| `outdated` | файл изменился, идёт переиндексация | null |
 
 ---
 
@@ -217,8 +234,14 @@ JavaRagService/
 │   ├── mcp/
 │   │   ├── McpServer.java           ← HTTP сервер MCP tools
 │   │   └── RagMcpTools.java         ← реализация rag_index, rag_search, rag_status
+│   ├── validation/
+│   │   ├── DocType.java             ← enum: SERVICE_CARD, PROCESS, GLOSSARY, ADR
+│   │   ├── DocField.java            ← enum обязательных полей frontmatter
+│   │   ├── DocSchema.java           ← маппинг тип → обязательные поля и секции
+│   │   ├── ValidationResult.java    ← record: valid, docType, errors
+│   │   └── DocumentValidator.java   ← @Component: проверка frontmatter + структуры
 │   ├── indexer/
-│   │   ├── FileIndexer.java         ← оркестратор: файл → chunks → OS
+│   │   ├── FileIndexer.java         ← оркестратор: валидация → chunks → OS
 │   │   ├── ChunkSplitter.java       ← разбивка .md на chunks
 │   │   └── IndexScheduler.java      ← scheduleWithFixedDelay, ls rag-inbox/
 │   ├── search/
@@ -234,7 +257,8 @@ JavaRagService/
 │   ├── application-dev.properties
 │   ├── application-prod.properties
 │   └── db/migration/
-│       └── V1__create_indexed_documents.sql
+│       ├── V1__create_indexed_documents.sql
+│       └── V2__add_error_message.sql
 └── target/
     └── rag-service.jar
 ```

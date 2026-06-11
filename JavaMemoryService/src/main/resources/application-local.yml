@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: "jdbc:postgresql://172.80.2.1:5432/leader_framework?sslmode=disable"
+    driver-class-name: org.postgresql.Driver
+    username: memory_user
+    password: memory_password
+  flyway:
+    locations: classpath:db/migration
+    schemas: memory
+    default-schema: memory

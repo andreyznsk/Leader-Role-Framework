@@ -12,13 +12,26 @@ public record IndexedDocument(
         String fileHash,
         LocalDateTime indexedAt,
         Integer chunkCount,
-        String status
+        String status,
+        String errorMessage
 ) {
-    public static IndexedDocument create(String filePath, String fileHash, int chunkCount) {
-        return new IndexedDocument(null, filePath, fileHash, LocalDateTime.now(), chunkCount, "indexed");
+    public static IndexedDocument indexed(String path, String hash, int chunks) {
+        return new IndexedDocument(null, path, hash, LocalDateTime.now(), chunks, "indexed", null);
+    }
+
+    public static IndexedDocument invalid(String path, String hash, String error) {
+        return new IndexedDocument(null, path, hash, LocalDateTime.now(), 0, "invalid", error);
+    }
+
+    public static IndexedDocument failed(String path, String hash, String error) {
+        return new IndexedDocument(null, path, hash, LocalDateTime.now(), 0, "failed", error);
     }
 
     public IndexedDocument withUpdated(String fileHash, int chunkCount, String status) {
-        return new IndexedDocument(id, filePath, fileHash, LocalDateTime.now(), chunkCount, status);
+        return new IndexedDocument(id, filePath, fileHash, LocalDateTime.now(), chunkCount, status, null);
+    }
+
+    public IndexedDocument withUpdated(String fileHash, int chunkCount, String status, String errorMessage) {
+        return new IndexedDocument(id, filePath, fileHash, LocalDateTime.now(), chunkCount, status, errorMessage);
     }
 }

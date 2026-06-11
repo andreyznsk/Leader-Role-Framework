@@ -1,0 +1,13 @@
+mail:
+  protocol: maildev
+  poll-interval-seconds: 30
+
+maildev:
+  api-url: http://172.80.2.1:18080
+
+memory:
+  service:
+    enabled: false
+
+mock:
+  agent: true
