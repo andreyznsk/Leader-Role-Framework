@@ -1,0 +1,10 @@
+spring.profiles.active=dev
+mail.protocol=imap
+
+mail.username=user@company.com
+mail.password=
+
+imap.host=mail.dev.company.com
+imap.port=993
+imap.ssl=true
+imap.folder=INBOX

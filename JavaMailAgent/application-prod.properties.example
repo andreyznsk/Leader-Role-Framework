@@ -1,0 +1,14 @@
+spring.profiles.active=prod
+mail.protocol=ews
+
+mail.username=user@company.com
+mail.password=
+
+ews.url=https://mail.company.com/EWS/Exchange.asmx
+ews.autodiscover=false
+ews.domain=
+
+# SMTP — Future (отправка черновиков)
+smtp.host=mail.company.com
+smtp.port=587
+smtp.starttls=true

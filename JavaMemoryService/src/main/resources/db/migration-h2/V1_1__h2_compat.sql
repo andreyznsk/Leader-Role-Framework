@@ -1,0 +1,3 @@
+-- H2 compatibility patch — applied only for local/test profiles
+-- Using TIMESTAMP instead of TIMESTAMPTZ in main migration, so no alterations needed
+-- This file is intentionally minimal; extend if H2-specific issues arise

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Редактирование задачи')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+
+<div class="container" style="max-width:800px">
+    <div class="d-flex align-items-center mb-3">
+        <a href="/ui/today" class="btn btn-sm btn-outline-secondary me-3">← Назад</a>
+        <h4 class="mb-0">Задача #<span th:text="${task.id}"></span></h4>
+        <span th:if="${task.source}" class="badge bg-secondary ms-2" th:text="${task.source}"></span>
+        <span th:if="${task.emailId}" class="badge bg-info ms-1 small" th:text="${task.emailId}"></span>
+    </div>
+
+    <form method="post" th:action="@{/ui/tasks/{id}/edit(id=${task.id})}">
+
+        <!-- Title -->
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Название</label>
+            <input type="text" name="title" class="form-control"
+                   th:value="${task.title}" required/>
+        </div>
+
+        <!-- Description with markdown editor -->
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Описание</label>
+            <ul class="nav nav-tabs mb-1" id="md-tabs">
+                <li class="nav-item">
+                    <button type="button" class="nav-link active" id="tab-edit"
+                            onclick="showTab('edit')">markdown</button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link" id="tab-preview"
+                            onclick="showTab('preview')">preview</button>
+                </li>
+            </ul>
+            <div id="pane-edit">
+                <textarea id="md-input" name="description" class="form-control"
+                          rows="10" style="font-family:monospace"
+                          th:text="${description}"></textarea>
+            </div>
+            <div id="pane-preview" class="border rounded p-3 d-none" style="min-height:200px">
+                <div id="md-preview-content"></div>
+            </div>
+            <div class="mt-1">
+                <span class="badge bg-light text-muted border small">
+                    📄 <span th:text="${filePath}"></span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Metadata row -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Приоритет</label>
+                <select name="priority" class="form-select">
+                    <option value="LOW" th:selected="${task.priority == 'LOW'}">LOW</option>
+                    <option value="NORMAL" th:selected="${task.priority == 'NORMAL'}">NORMAL</option>
+                    <option value="HIGH" th:selected="${task.priority == 'HIGH'}">HIGH</option>
+                    <option value="CRITICAL" th:selected="${task.priority == 'CRITICAL'}">CRITICAL</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Дедлайн</label>
+                <input type="date" name="dueDate" class="form-control"
+                       th:value="${task.dueDate}"/>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold d-block">Статус</label>
+                <div class="d-flex flex-wrap gap-1 pt-1">
+                    <th:block th:each="s : ${ {'TODO','IN_PROGRESS','BLOCKED','DONE'} }">
+                        <label class="mb-0">
+                            <input type="radio" name="status" th:value="${s}"
+                                   th:checked="${task.status == s}" class="visually-hidden status-radio"/>
+                            <span class="badge border px-2 py-1"
+                                  th:text="${s}"
+                                  th:classappend="${task.status == s} ? ' bg-primary text-white' : ' bg-light text-dark status-pill'"></span>
+                        </label>
+                    </th:block>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="d-flex justify-content-between">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="button" class="btn btn-outline-danger"
+                    id="delete-btn"
+                    th:data-action="@{/ui/tasks/{id}/delete(id=${task.id})}"
+                    onclick="confirmDelete(this)">
+                Удалить
+            </button>
+        </div>
+    </form>
+
+    <!-- Hidden delete form -->
+    <form id="delete-form" method="post" th:action="@{/ui/tasks/{id}/delete(id=${task.id})}"></form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Markdown tab switcher
+function showTab(tab) {
+    const editPane = document.getElementById('pane-edit');
+    const previewPane = document.getElementById('pane-preview');
+    const tabEdit = document.getElementById('tab-edit');
+    const tabPreview = document.getElementById('tab-preview');
+    if (tab === 'edit') {
+        editPane.classList.remove('d-none');
+        previewPane.classList.add('d-none');
+        tabEdit.classList.add('active');
+        tabPreview.classList.remove('active');
+    } else {
+        editPane.classList.add('d-none');
+        previewPane.classList.remove('d-none');
+        tabEdit.classList.remove('active');
+        tabPreview.classList.add('active');
+        const raw = document.getElementById('md-input').value;
+        document.getElementById('md-preview-content').innerHTML = simpleMarkdown(raw);
+    }
+}
+
+// Minimal markdown renderer (headings, bold, italic, lists, code, newlines)
+function simpleMarkdown(md) {
+    return md
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/^#{3} (.+)$/gm, '<h5>$1</h5>')
+        .replace(/^#{2} (.+)$/gm, '<h4>$1</h4>')
+        .replace(/^# (.+)$/gm, '<h3>$1</h3>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+}
+
+// Double-confirm delete
+let deleteTimer = null;
+function confirmDelete(btn) {
+    if (btn.dataset.confirmed === 'true') {
+        document.getElementById('delete-form').submit();
+        return;
+    }
+    btn.dataset.confirmed = 'true';
+    const original = btn.textContent;
+    btn.textContent = 'Точно удалить?';
+    btn.classList.replace('btn-outline-danger', 'btn-danger');
+    deleteTimer = setTimeout(() => {
+        btn.dataset.confirmed = 'false';
+        btn.textContent = original;
+        btn.classList.replace('btn-danger', 'btn-outline-danger');
+    }, 3000);
+}
+
+// Status radio pill styling
+document.querySelectorAll('.status-radio').forEach(radio => {
+    radio.addEventListener('change', () => {
+        document.querySelectorAll('.status-radio').forEach(r => {
+            const pill = r.nextElementSibling;
+            if (r.checked) {
+                pill.classList.add('bg-primary', 'text-white');
+                pill.classList.remove('bg-light', 'text-dark');
+            } else {
+                pill.classList.remove('bg-primary', 'text-white');
+                pill.classList.add('bg-light', 'text-dark');
+            }
+        });
+    });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+services:
+  maildev:
+    image: maildev/maildev:latest
+    ports:
+      - "18080:1080"  # Web UI + HTTP API
+      - "1025:1025"   # SMTP

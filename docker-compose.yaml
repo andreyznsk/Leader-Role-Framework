@@ -1,0 +1,78 @@
+# LeaderOS — Infrastructure Docker Compose
+# Последнее обновление: 2026-06-09
+#
+# Запускает ТОЛЬКО инфраструктуру — Java-сервисы запускаются нативно на macOS.
+#
+# Быстрый старт:
+#   docker compose up -d
+#   docker compose --profile local up -d   # + Maildev для local профиля (Web UI: http://localhost:18080)
+#
+# Профили:
+#   (без профиля)     — prod/dev: PostgreSQL + OpenSearch + Dashboards
+#   --profile local   — + Maildev (SMTP-заглушка для разработки)
+
+services:
+
+  # ─────────────────────────────────────────────
+  # PostgreSQL — используется: JavaMailAgent (schema: mailagent)
+  #                             JavaMemoryService (schema: memory)
+  # ─────────────────────────────────────────────
+  postgres:
+    image: postgres:15
+    container_name: leader-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: leader_framework
+      POSTGRES_USER: superuser
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-superpassword}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superuser -d leader_framework"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # OpenSearch — используется: JavaRagService (векторное хранилище)
+  # ─────────────────────────────────────────────
+  opensearch:
+    image: opensearchproject/opensearch:3.5.0
+    container_name: leaderos-opensearch
+    restart: unless-stopped
+    ports:
+      - "9200:9200"
+      - "9600:9600"   # performance analyser
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true        # локально без TLS
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m   # M1: не жадничать
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-Admin_local1!}
+      - OPENSEARCH_SSL_TRANSPORT_ENABLE=false
+      - OPENSEARCH_HTTP_ENABLE_TLS=false
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+
+  # ─────────────────────────────────────────────
+  # Maildev — только профиль local (SMTP-заглушка)
+  # Используется: JavaMailAgent с mail.protocol=maildev
+  # ─────────────────────────────────────────────
+  maildev:
+    image: maildev/maildev:latest
+    container_name: leaderos-maildev
+    restart: unless-stopped
+    profiles:
+      - local
+    ports:
+      - "18080:1080"  # Web UI + HTTP API  →  http://localhost:18080
+      - "1025:1025"   # SMTP
+
+# ─────────────────────────────────────────────
+# Именованные volumes — данные живут между перезапусками
+# ─────────────────────────────────────────────
+volumes:
+  opensearch_data:
+    name: leaderos-opensearch-data
