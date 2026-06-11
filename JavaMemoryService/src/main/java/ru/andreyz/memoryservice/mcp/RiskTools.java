@@ -29,7 +29,8 @@ public class RiskTools {
             @ToolParam(description = "Risk ID") Long id,
             @ToolParam(description = "New status: OPEN|MITIGATED|ACCEPTED|CLOSED", required = false) String status,
             @ToolParam(description = "Mitigation plan", required = false) String mitigation) {
-        Risk existing = riskService.findById(id);
+        Risk existing = riskService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Risk not found: " + id));
         Risk updated = new Risk(existing.id(), existing.title(), existing.description(),
                 existing.probability(), existing.impact(),
                 status != null ? status : existing.status(),

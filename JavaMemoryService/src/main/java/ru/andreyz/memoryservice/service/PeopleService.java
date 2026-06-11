@@ -8,6 +8,7 @@ import ru.andreyz.memoryservice.repository.PersonRepository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class PeopleService {
@@ -29,7 +30,8 @@ public class PeopleService {
     }
 
     public Person update(Long id, Person updated) {
-        Person existing = findById(id);
+        Person existing = personRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Person not found: " + id));
         Person toSave = new Person(existing.id(), updated.fullName(), updated.login(),
                 updated.email(), updated.phone(), updated.domain(), updated.currentTask(),
                 updated.capacitySprint(), updated.capacityMonth(), updated.capacityQuarter(),
@@ -38,7 +40,8 @@ public class PeopleService {
     }
 
     public PeopleNote addNote(Long personId, String note, String tags) {
-        findById(personId);
+        personRepository.findById(personId)
+                .orElseThrow(() -> new IllegalArgumentException("Person not found: " + personId));
         PeopleNote toSave = new PeopleNote(null, personId, note, tags, Instant.now());
         return noteRepository.save(toSave);
     }
@@ -55,8 +58,11 @@ public class PeopleService {
         return personRepository.findByFullNameContainingIgnoreCase(name);
     }
 
-    public Person findById(Long id) {
-        return personRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Person not found: " + id));
+    public Optional<Person> findById(Long id) {
+        return personRepository.findById(id);
+    }
+
+    public void delete(Long id) {
+        personRepository.deleteById(id);
     }
 }

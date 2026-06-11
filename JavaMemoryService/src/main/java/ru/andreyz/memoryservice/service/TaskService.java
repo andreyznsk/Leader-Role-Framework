@@ -149,14 +149,16 @@ public class TaskService {
 
     public List<Task> findByDate(LocalDate date) {
         return planRepository.findByPlanDate(date)
-                .map(plan -> taskRepository.findByPlanIdOrderBySortOrder(plan.id()))
+                .map(plan -> taskRepository.findByPlanIdAndStatusNotOrderBySortOrder(plan.id(), "DELETED"))
                 .orElse(List.of());
     }
 
     public List<Task> findByDateAndStatus(LocalDate date, String status) {
-        return findByDate(date).stream()
-                .filter(t -> t.status().equalsIgnoreCase(status))
-                .toList();
+        return planRepository.findByPlanDate(date)
+                .map(plan -> taskRepository.findByPlanIdOrderBySortOrder(plan.id()).stream()
+                        .filter(t -> t.status().equalsIgnoreCase(status))
+                        .toList())
+                .orElse(List.of());
     }
 
     public List<Task> findPending() {

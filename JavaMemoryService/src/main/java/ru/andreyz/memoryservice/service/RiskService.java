@@ -6,6 +6,7 @@ import ru.andreyz.memoryservice.repository.RiskRepository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class RiskService {
@@ -25,8 +26,19 @@ public class RiskService {
         return riskRepository.save(risk);
     }
 
-    public Risk update(Long id, Risk updated) {
-        findById(id);
+    public Risk update(Long id, Risk incoming) {
+        Risk existing = riskRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Risk not found: " + id));
+        Risk updated = new Risk(
+                existing.id(),
+                incoming.title() != null ? incoming.title() : existing.title(),
+                incoming.description() != null ? incoming.description() : existing.description(),
+                incoming.probability() != null ? incoming.probability() : existing.probability(),
+                incoming.impact() != null ? incoming.impact() : existing.impact(),
+                incoming.status() != null ? incoming.status() : existing.status(),
+                incoming.mitigation() != null ? incoming.mitigation() : existing.mitigation(),
+                existing.createdAt(),
+                Instant.now());
         return riskRepository.save(updated);
     }
 
@@ -38,8 +50,17 @@ public class RiskService {
         return (List<Risk>) riskRepository.findAll();
     }
 
-    public Risk findById(Long id) {
-        return riskRepository.findById(id)
+    public Optional<Risk> findById(Long id) {
+        return riskRepository.findById(id);
+    }
+
+    public void delete(Long id) {
+        Risk existing = riskRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Risk not found: " + id));
+        Risk closed = new Risk(
+                existing.id(), existing.title(), existing.description(),
+                existing.probability(), existing.impact(),
+                "CLOSED", existing.mitigation(), existing.createdAt(), Instant.now());
+        riskRepository.save(closed);
     }
 }

@@ -10,6 +10,7 @@ import java.util.List;
 
 public interface TaskRepository extends CrudRepository<Task, Long> {
     List<Task> findByPlanIdOrderBySortOrder(Long planId);
+    List<Task> findByPlanIdAndStatusNotOrderBySortOrder(Long planId, String status);
     List<Task> findByStatus(String status);
     List<Task> findByDueDate(LocalDate date);
 
