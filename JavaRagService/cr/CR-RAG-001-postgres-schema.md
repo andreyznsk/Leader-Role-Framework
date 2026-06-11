@@ -1,7 +1,7 @@
 # CR-RAG-001: PostgreSQL схема rag + Flyway миграция
 
 **Дата:** 2026-06-11  
-**Статус:** Approved  
+**Статус:** Done  
 **Сервис:** RAG  
 **Зависимости:** `infra/postgres/init.sql`
 
@@ -46,6 +46,8 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA rag GRANT ALL ON TABLES TO rag_user;
 ├── schema: memory      ← JavaMemoryService (owner: memory_user)
 └── schema: rag         ← JavaRagService   (owner: rag_user)
 ```
+
+Каждому пользователю нужно поставить search_path по умолчанию на свою схему
 
 ---
 

@@ -25,3 +25,18 @@ REVOKE ALL ON SCHEMA memory FROM mailagent_user;
 
 ALTER ROLE mailagent_user SET search_path TO mailagent;
 ALTER ROLE memory_user    SET search_path TO memory;
+
+-- JavaRagService
+CREATE SCHEMA IF NOT EXISTS rag;
+CREATE USER rag_user WITH PASSWORD 'rag_password';
+
+GRANT USAGE, CREATE ON SCHEMA rag TO rag_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA rag TO rag_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA rag TO rag_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA rag GRANT ALL PRIVILEGES ON TABLES TO rag_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA rag GRANT ALL PRIVILEGES ON SEQUENCES TO rag_user;
+
+REVOKE ALL ON SCHEMA mailagent FROM rag_user;
+REVOKE ALL ON SCHEMA memory    FROM rag_user;
+
+ALTER ROLE rag_user SET search_path TO rag;

@@ -1,7 +1,7 @@
 # RFC: JavaRagService
 
-**Версия:** 1.0  
-**Дата:** 2026-06-08  
+**Версия:** 1.1  
+**Дата:** 2026-06-11  
 **Статус:** Draft  
 **Автор:** Андрей Зайцев  
 **Проект:** Leader-Role-Framework
@@ -183,21 +183,25 @@ OpenSearchClient → kNN query:
 
 ---
 
-### 4.5 PostgreSQL — таблица indexed_documents
+### 4.5 PostgreSQL — схема и таблица indexed_documents
+
+Сервис использует изолированную схему `rag` в общей БД `leader_framework`.  
+Владелец схемы — пользователь `rag_user` с `search_path = rag`.
 
 ```sql
-CREATE TABLE indexed_documents (
+-- Применяется через Flyway: db/migration/V1__create_indexed_documents.sql
+CREATE TABLE IF NOT EXISTS indexed_documents (
     id           SERIAL PRIMARY KEY,
     file_path    TEXT NOT NULL UNIQUE,
     file_hash    TEXT NOT NULL,
-    indexed_at   TIMESTAMP DEFAULT NOW(),
+    indexed_at   TIMESTAMP NOT NULL DEFAULT NOW(),
     chunk_count  INT,
-    status       TEXT DEFAULT 'indexed'
+    status       TEXT NOT NULL DEFAULT 'indexed'
     -- статусы: indexed | failed | outdated
 );
 ```
 
-Схема применяется при старте сервиса (Flyway или ручной скрипт в `resources/sql/`).
+Миграция применяется автоматически при старте через Flyway (только схема `rag`).
 
 ---
 
@@ -229,7 +233,7 @@ JavaRagService/
 │   ├── application-local.properties
 │   ├── application-dev.properties
 │   ├── application-prod.properties
-│   └── sql/
+│   └── db/migration/
 │       └── V1__create_indexed_documents.sql
 └── target/
     └── rag-service.jar
@@ -253,8 +257,13 @@ rag.inbox.path=../rag-inbox
 rag.scheduler.interval-ms=60000
 
 spring.datasource.url=jdbc:postgresql://localhost:5432/leader_framework
-spring.datasource.username=postgres
-spring.datasource.password=postgres
+spring.datasource.username=rag_user
+spring.datasource.password=rag_password
+spring.datasource.hikari.connection-init-sql=SET search_path TO rag
+
+spring.flyway.schemas=rag
+spring.flyway.default-schema=rag
+spring.flyway.locations=classpath:db/migration
 ```
 
 ---
