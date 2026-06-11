@@ -6,11 +6,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import ru.andreyz.ragservice.client.OllamaClient;
 import ru.andreyz.ragservice.client.OpenSearchClient;
 import ru.andreyz.ragservice.db.IndexedDocument;
 import ru.andreyz.ragservice.db.IndexedDocumentRepository;
 import ru.andreyz.ragservice.indexer.FileIndexer.IndexResult;
+import ru.andreyz.ragservice.validation.DocumentValidator;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -21,40 +24,32 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import org.mockito.quality.Strictness;
-import org.mockito.junit.jupiter.MockitoSettings;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class FileIndexerTest {
 
     @TempDir
     Path tempDir;
 
-    @Mock
-    OllamaClient ollama;
-    @Mock
-    OpenSearchClient openSearch;
-    @Mock
-    IndexedDocumentRepository repository;
+    @Mock OllamaClient ollama;
+    @Mock OpenSearchClient openSearch;
+    @Mock IndexedDocumentRepository repository;
 
     FileIndexer indexer;
 
     @BeforeEach
     void setUp() {
-        indexer = new FileIndexer(new ChunkSplitter(), ollama, openSearch, repository);
-        // lenient: not every test exercises both stubs (e.g. skipped/not-found tests)
+        indexer = new FileIndexer(new ChunkSplitter(), ollama, openSearch, repository, new DocumentValidator());
         lenient().when(ollama.embed(anyString())).thenReturn(new float[1024]);
         lenient().when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
     void indexFile_newFile_statusIndexed() throws IOException {
-        Path file = writeFile("new.md", longContent("New file content."));
+        Path file = writeFile("new.md", validServiceCard("New"));
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.empty());
 
         IndexResult result = indexer.indexFile(file.toString());
@@ -66,7 +61,7 @@ class FileIndexerTest {
 
     @Test
     void indexFile_newFile_savesDocumentToRepository() throws IOException {
-        Path file = writeFile("adr.md", longContent("ADR content."));
+        Path file = writeFile("adr.md", validAdr("Content"));
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.empty());
 
         indexer.indexFile(file.toString());
@@ -80,9 +75,7 @@ class FileIndexerTest {
 
     @Test
     void indexFile_newFile_callsEmbedForEachChunk() throws IOException {
-        // Content that splits into multiple chunks
-        String content = buildMultiChunkContent(3);
-        Path file = writeFile("multi.md", content);
+        Path file = writeFile("multi.md", validServiceCard(buildLongContent(3)));
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.empty());
 
         IndexResult result = indexer.indexFile(file.toString());
@@ -92,7 +85,7 @@ class FileIndexerTest {
 
     @Test
     void indexFile_newFile_indexesDocumentInOpenSearch() throws IOException {
-        Path file = writeFile("service.md", longContent("Service card content."));
+        Path file = writeFile("service.md", validServiceCard("Service card content."));
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.empty());
 
         IndexResult result = indexer.indexFile(file.toString());
@@ -104,10 +97,10 @@ class FileIndexerTest {
 
     @Test
     void indexFile_sameHash_skipped() throws IOException {
-        String content = longContent("Unchanged content.");
+        String content = validServiceCard("Unchanged.");
         Path file = writeFile("unchanged.md", content);
         String hash = sha256(content);
-        IndexedDocument existing = new IndexedDocument(1L, file.toString(), hash, null, 2, "indexed");
+        IndexedDocument existing = new IndexedDocument(1L, file.toString(), hash, null, 2, "indexed", null);
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.of(existing));
 
         IndexResult result = indexer.indexFile(file.toString());
@@ -120,9 +113,9 @@ class FileIndexerTest {
 
     @Test
     void indexFile_changedHash_deletesOldChunksThenReindexes() throws IOException {
-        String newContent = longContent("Updated content for the file.");
+        String newContent = validServiceCard("Updated content.");
         Path file = writeFile("changed.md", newContent);
-        IndexedDocument existing = new IndexedDocument(1L, file.toString(), "old-hash-value", null, 3, "indexed");
+        IndexedDocument existing = new IndexedDocument(1L, file.toString(), "old-hash-value", null, 3, "indexed", null);
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.of(existing));
 
         indexer.indexFile(file.toString());
@@ -133,14 +126,13 @@ class FileIndexerTest {
 
     @Test
     void indexFile_changedHash_updatesExistingRecord() throws IOException {
-        String newContent = longContent("Updated content for the ADR.");
+        String newContent = validServiceCard("Updated ADR.");
         Path file = writeFile("updated.md", newContent);
-        IndexedDocument existing = new IndexedDocument(42L, file.toString(), "stale-hash", null, 1, "indexed");
+        IndexedDocument existing = new IndexedDocument(42L, file.toString(), "stale-hash", null, 1, "indexed", null);
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.of(existing));
 
         indexer.indexFile(file.toString());
 
-        // Must save a document with the same id (update, not insert)
         verify(repository).save(argThat(doc -> doc.id() != null && doc.id().equals(42L)));
     }
 
@@ -155,7 +147,7 @@ class FileIndexerTest {
 
     @Test
     void indexFile_chunkIdContainsFilenameAndIndex() throws IOException {
-        Path file = writeFile("glossary.md", longContent("Glossary content here."));
+        Path file = writeFile("glossary.md", validGlossary("Glossary content."));
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.empty());
 
         indexer.indexFile(file.toString());
@@ -166,6 +158,22 @@ class FileIndexerTest {
         );
     }
 
+    @Test
+    void indexFile_invalidDocument_savesInvalidStatusAndSkipsIndexing() throws IOException {
+        Path file = writeFile("bad.md", "# No frontmatter here\nSome content.");
+        when(repository.findByFilePath(file.toString())).thenReturn(Optional.empty());
+
+        IndexResult result = indexer.indexFile(file.toString());
+
+        assertThat(result.status()).isEqualTo("invalid");
+        assertThat(result.chunksAdded()).isEqualTo(0);
+        verifyNoInteractions(ollama, openSearch);
+        verify(repository).save(argThat(doc ->
+                "invalid".equals(doc.status()) &&
+                doc.errorMessage() != null && !doc.errorMessage().isBlank()
+        ));
+    }
+
     // --- helpers ---
 
     private Path writeFile(String name, String content) throws IOException {
@@ -174,11 +182,56 @@ class FileIndexerTest {
         return file;
     }
 
-    private String longContent(String seed) {
-        return seed + " " + "X".repeat(150) + ". More details here. " + "Y".repeat(150) + ".";
+    private String validServiceCard(String extra) {
+        return """
+                ---
+                type: service-card
+                service: TST
+                updated: 2026-06-11
+                review_by: 2026-09-11
+                ---
+                # TestService (TST)
+                ## Назначение
+                %s
+                ## Стек
+                - Java 21
+                ## Интеграции
+                - none
+                ## Деплой
+                - Kubernetes
+                """.formatted(extra);
     }
 
-    private String buildMultiChunkContent(int paragraphs) {
+    private String validAdr(String extra) {
+        return """
+                ---
+                type: adr
+                updated: 2026-06-11
+                ---
+                # ADR title
+                ## Статус
+                Accepted
+                ## Контекст
+                %s
+                ## Решение
+                Some decision.
+                ## Последствия
+                Some consequences.
+                """.formatted(extra);
+    }
+
+    private String validGlossary(String extra) {
+        return """
+                ---
+                type: glossary
+                updated: 2026-06-11
+                ---
+                # Глоссарий
+                %s
+                """.formatted(extra);
+    }
+
+    private String buildLongContent(int paragraphs) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < paragraphs; i++) {
             if (i > 0) sb.append("\n\n");

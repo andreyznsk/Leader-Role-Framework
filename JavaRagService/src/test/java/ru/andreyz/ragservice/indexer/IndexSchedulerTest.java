@@ -64,7 +64,7 @@ class IndexSchedulerTest {
         Path file = inbox.resolve("stable.md");
         Files.writeString(file, content);
         String hash = sha256(content);
-        IndexedDocument existing = new IndexedDocument(1L, file.toString(), hash, null, 1, "indexed");
+        IndexedDocument existing = new IndexedDocument(1L, file.toString(), hash, null, 1, "indexed", null);
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.of(existing));
 
         IndexScheduler scheduler = new IndexScheduler(inbox.toString(), fileIndexer, repository);
@@ -78,7 +78,7 @@ class IndexSchedulerTest {
         String content = "Updated document content that changed since last index.";
         Path file = inbox.resolve("changed.md");
         Files.writeString(file, content);
-        IndexedDocument stale = new IndexedDocument(1L, file.toString(), "old-hash", null, 1, "indexed");
+        IndexedDocument stale = new IndexedDocument(1L, file.toString(), "old-hash", null, 1, "indexed", null);
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.of(stale));
 
         IndexScheduler scheduler = new IndexScheduler(inbox.toString(), fileIndexer, repository);

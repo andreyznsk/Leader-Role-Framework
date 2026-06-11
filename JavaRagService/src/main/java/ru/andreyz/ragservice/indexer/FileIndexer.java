@@ -7,6 +7,8 @@ import ru.andreyz.ragservice.client.OllamaClient;
 import ru.andreyz.ragservice.client.OpenSearchClient;
 import ru.andreyz.ragservice.db.IndexedDocument;
 import ru.andreyz.ragservice.db.IndexedDocumentRepository;
+import ru.andreyz.ragservice.validation.DocumentValidator;
+import ru.andreyz.ragservice.validation.ValidationResult;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,13 +28,16 @@ public class FileIndexer {
     private final OllamaClient ollama;
     private final OpenSearchClient openSearch;
     private final IndexedDocumentRepository repository;
+    private final DocumentValidator validator;
 
     public FileIndexer(ChunkSplitter splitter, OllamaClient ollama,
-                       OpenSearchClient openSearch, IndexedDocumentRepository repository) {
+                       OpenSearchClient openSearch, IndexedDocumentRepository repository,
+                       DocumentValidator validator) {
         this.splitter = splitter;
         this.ollama = ollama;
         this.openSearch = openSearch;
         this.repository = repository;
+        this.validator = validator;
     }
 
     public IndexResult indexFile(String filePath) throws IOException {
@@ -43,12 +48,24 @@ public class FileIndexer {
         String content = Files.readString(path);
         String hash = sha256(content);
 
+        ValidationResult validation = validator.validate(content);
+        if (!validation.valid()) {
+            Optional<IndexedDocument> existing = repository.findByFilePath(filePath);
+            IndexedDocument doc = existing
+                    .map(d -> d.withUpdated(hash, 0, "invalid", validation.errorsAsString()))
+                    .orElse(IndexedDocument.invalid(filePath, hash, validation.errorsAsString()));
+            repository.save(doc);
+            log.warn("⚠️  File failed validation, skipping: {} — {}", filePath, validation.errorsAsString());
+            return new IndexResult(0, "invalid", filePath);
+        }
+
         Optional<IndexedDocument> existing = repository.findByFilePath(filePath);
-        if (existing.isPresent() && existing.get().fileHash().equals(hash)) {
+        if (existing.isPresent()
+                && existing.get().fileHash().equals(hash)
+                && "indexed".equals(existing.get().status())) {
             return new IndexResult(existing.get().chunkCount(), "skipped", filePath);
         }
 
-        // Remove old chunks before re-indexing
         if (existing.isPresent()) {
             openSearch.deleteBySource(filePath);
         }
@@ -56,21 +73,31 @@ public class FileIndexer {
         List<String> chunks = splitter.split(content);
         String docId = path.getFileName().toString().replaceAll("\\.md$", "");
 
-        for (int i = 0; i < chunks.size(); i++) {
-            String chunk = chunks.get(i);
-            float[] vector = ollama.embed(chunk);
-            String chunkId = docId + "_" + i;
-            openSearch.indexDocument(chunkId, chunk, vector, filePath, docId, i);
+        try {
+            for (int i = 0; i < chunks.size(); i++) {
+                String chunk = chunks.get(i);
+                float[] vector = ollama.embed(chunk);
+                openSearch.indexDocument(docId + "_" + i, chunk, vector, filePath, docId, i);
+            }
+            int indexed = chunks.size();
+
+            IndexedDocument doc = existing
+                    .map(d -> d.withUpdated(hash, indexed, "indexed"))
+                    .orElse(IndexedDocument.indexed(filePath, hash, indexed));
+            repository.save(doc);
+
+            log.info("✅ Indexed {} chunks from {}", indexed, filePath);
+            return new IndexResult(indexed, "indexed", filePath);
+
+        } catch (Exception e) {
+            String errMsg = e.getMessage();
+            IndexedDocument doc = existing
+                    .map(d -> d.withUpdated(hash, 0, "failed", errMsg))
+                    .orElse(IndexedDocument.failed(filePath, hash, errMsg));
+            repository.save(doc);
+            log.error("❌ Indexing error: {} — {}", filePath, errMsg);
+            return new IndexResult(0, "failed: " + errMsg, filePath);
         }
-        int indexed = chunks.size();
-
-        IndexedDocument doc = existing
-                .map(d -> d.withUpdated(hash, indexed, "indexed"))
-                .orElse(IndexedDocument.create(filePath, hash, indexed));
-        repository.save(doc);
-
-        log.info("Indexed {} chunks from {}", indexed, filePath);
-        return new IndexResult(indexed, "indexed", filePath);
     }
 
     private String sha256(String content) {

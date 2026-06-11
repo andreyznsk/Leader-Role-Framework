@@ -73,6 +73,7 @@
             <h5 class="mb-0">План на сегодня
                 <span class="text-muted fw-normal small" th:text="${#temporals.format(today, 'dd.MM.yyyy')}"></span>
             </h5>
+            <small class="text-muted">🚨&nbsp;CRITICAL &nbsp;🔴&nbsp;HIGH &nbsp;🔵&nbsp;NORMAL &nbsp;⚪&nbsp;LOW</small>
         </div>
         <div class="card-body p-0">
             <div th:if="${#lists.isEmpty(todayTasks)}" class="text-muted p-3">Задач нет</div>
@@ -94,15 +95,13 @@
                     </form>
 
                     <!-- Priority flag -->
-                    <form method="post" th:action="@{/api/tasks/{id}(id=${task.id})}" class="me-2">
-                        <input type="hidden" name="_method" value="PUT"/>
-                        <input type="hidden" name="priority"
-                               th:value="${task.priority == 'NORMAL'} ? 'HIGH' : (${task.priority == 'HIGH'} ? 'CRITICAL' : (${task.priority == 'CRITICAL'} ? 'LOW' : 'NORMAL'))"/>
-                        <button type="submit" class="btn btn-sm p-0 border-0"
-                                th:title="'Приоритет: ' + ${task.priority}">
-                            <span th:text="${task.priority == 'CRITICAL'} ? '🚨' : (${task.priority == 'HIGH'} ? '🔴' : (${task.priority == 'LOW'} ? '⚪' : '🔵'))"></span>
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-sm p-0 border-0 me-2"
+                            th:data-id="${task.id}"
+                            th:data-next-priority="${task.priority == 'NORMAL'} ? 'HIGH' : (${task.priority == 'HIGH'} ? 'CRITICAL' : (${task.priority == 'CRITICAL'} ? 'LOW' : 'NORMAL'))"
+                            th:title="'Приоритет: ' + ${task.priority}"
+                            onclick="togglePriority(this)">
+                        <span th:text="${task.priority == 'CRITICAL'} ? '🚨' : (${task.priority == 'HIGH'} ? '🔴' : (${task.priority == 'LOW'} ? '⚪' : '🔵'))"></span>
+                    </button>
 
                     <!-- Title -->
                     <span class="flex-grow-1"
@@ -197,6 +196,15 @@
 (function () {
     const list = document.getElementById('today-list');
     if (!list) return;
+    function togglePriority(btn) {
+        fetch('/api/tasks/' + btn.dataset.id, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({priority: btn.dataset.nextPriority})
+        }).then(() => location.reload());
+    }
+    window.togglePriority = togglePriority;
+
     let dragged = null;
 
     list.querySelectorAll('.drag-handle').forEach(handle => {
