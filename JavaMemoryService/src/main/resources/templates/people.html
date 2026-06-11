@@ -40,8 +40,8 @@
             </div>
 
             <!-- Notes -->
-            <div th:with="notes=${__${'notes_' + person.id}__}">
-                <div th:each="note : ${notes}" class="border-start border-3 border-secondary ps-2 mt-2 small">
+            <div>
+                <div th:each="note : ${notesByPerson[person.id]}" class="border-start border-3 border-secondary ps-2 mt-2 small">
                     <span th:text="${note.note}"></span>
                     <span th:if="${note.tags}" class="text-muted ms-1">[<span th:text="${note.tags}"></span>]</span>
                     <span class="text-muted ms-1" th:text="${#temporals.format(note.createdAt, 'dd.MM HH:mm')}"></span>
@@ -67,6 +67,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <form method="post" th:action="@{/ui/people/{id}/edit(id=${person.id})}">
+                        <input type="hidden" name="_method" value="PUT">
                         <div class="modal-body">
                             <div class="mb-2">
                                 <label class="form-label">ФИО</label>

@@ -1,0 +1,117 @@
+{
+  "mcpServers": {
+
+    "memory": {
+      "type": "sse",
+      "url": "http://localhost:8082/mcp/sse",
+      "description": "JavaMemoryService — задачи, планы, инциденты, риски, люди."
+    },
+
+    "rag": {
+      "type": "sse",
+      "url": "http://localhost:8081/mcp",
+      "description": "JavaRagService — семантическая база знаний команды."
+    },
+
+    "postgres": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "postgresql://memory_user:${POSTGRES_MEMORY_PASSWORD}@localhost:5432/leader_framework?search_path=memory"
+      },
+      "description": "Прямой доступ к PostgreSQL, схема memory."
+    },
+
+    "jira": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-jira"],
+      "env": {
+        "JIRA_URL": "${JIRA_URL}",
+        "JIRA_EMAIL": "${JIRA_EMAIL}",
+        "JIRA_TOKEN": "${JIRA_TOKEN}"
+      },
+      "description": "Jira — тикеты, баги, спринты."
+    },
+
+    "confluence-team": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-confluence"],
+      "env": {
+        "CONFLUENCE_URL": "${CONFLUENCE_TEAM_URL}",
+        "CONFLUENCE_EMAIL": "${CONFLUENCE_EMAIL}",
+        "CONFLUENCE_TOKEN": "${CONFLUENCE_TEAM_TOKEN}"
+      },
+      "description": "Confluence команды. Использовать когда URL содержит YOUR_TEAM.atlassian.net."
+    },
+
+    "confluence-corp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-confluence"],
+      "env": {
+        "CONFLUENCE_URL": "${CONFLUENCE_CORP_URL}",
+        "CONFLUENCE_EMAIL": "${CONFLUENCE_EMAIL}",
+        "CONFLUENCE_TOKEN": "${CONFLUENCE_CORP_TOKEN}"
+      },
+      "description": "Корпоративный Confluence. Использовать когда URL содержит YOUR_CORP.atlassian.net."
+    },
+
+    "kubernetes": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-kubernetes"],
+      "env": {
+        "KUBECONFIG": "${HOME}/.kube/config"
+      },
+      "description": "Kubernetes — состояние кластера, поды, деплойменты."
+    },
+
+    "bitbucket": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "garc33/bitbucket-server-mcp-server"],
+      "env": {
+        "BITBUCKET_URL": "${BITBUCKET_URL}",
+        "BITBUCKET_TOKEN": "${BITBUCKET_TOKEN}"
+      },
+      "description": "Bitbucket Server self-hosted — репозитории, PR."
+    },
+
+    "jenkins": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-jenkins"],
+      "env": {
+        "JENKINS_URL": "${JENKINS_URL}",
+        "JENKINS_USER": "${JENKINS_USER}",
+        "JENKINS_TOKEN": "${JENKINS_TOKEN}"
+      },
+      "description": "Jenkins — CI/CD пайплайны, статусы сборок."
+    },
+
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ],
+      "description": "Локальная файловая система — workspace/, plans/, capture-inbox/, rag-inbox/."
+    },
+    "mcp": {
+      "disabled": [
+        "jira",
+        "confluence-team",
+        "confluence-corp",
+        "kubernetes",
+        "bitbucket",
+        "jenkins",
+        "filesystem"
+      ]
+    }
+  }
+}
