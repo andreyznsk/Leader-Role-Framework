@@ -9,6 +9,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 @SpringBootApplication
 @EnableScheduling
@@ -18,6 +19,11 @@ public class MemoryServiceApplication implements ApplicationRunner {
 
     @Autowired
     private Environment env;
+
+
+    @Autowired
+    private RequestMappingHandlerMapping requestMappingHandlerMapping;
+
 
     public static void main(String[] args) {
         SpringApplication.run(MemoryServiceApplication.class, args);
@@ -37,5 +43,11 @@ public class MemoryServiceApplication implements ApplicationRunner {
                   Database:  {}
                 =======================================""",
                 port, port, port, db);
+
+        log.debug("=== Registered mappings ===");
+        requestMappingHandlerMapping.getHandlerMethods().forEach((info, method) ->
+                log.debug("{} -> {}", info, method.getShortLogMessage())
+        );
+        log.debug("=== End of mappings ===");
     }
 }

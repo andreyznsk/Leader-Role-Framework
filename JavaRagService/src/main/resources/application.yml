@@ -1,0 +1,43 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: java-rag-service
+  ai:
+    mcp:
+      server:
+        name: java-rag-service
+        version: 1.0.0
+        type: SYNC
+        sse-message-endpoint: /mcp/message
+  datasource:
+    url: jdbc:postgresql://localhost:5432/leader_framework
+    username: rag_user
+    password: rag_password
+    hikari:
+      connection-init-sql: "SET search_path TO rag"
+  flyway:
+    schemas: rag
+    default-schema: rag
+    locations: classpath:db/migration
+
+ollama:
+  url: http://localhost:11434
+  model: multilingual-e5-large
+
+opensearch:
+  url: http://localhost:9200
+  index: rag-knowledge
+
+rag:
+  inbox:
+    path: ../rag-inbox
+  scheduler:
+    interval-ms: 60000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

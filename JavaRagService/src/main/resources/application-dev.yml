@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/leader_framework
+    username: postgres
+    password: postgres
+
+ollama:
+  url: http://localhost:11434
+
+opensearch:
+  url: http://localhost:9200
+
+rag:
+  inbox:
+    path: ../rag-inbox

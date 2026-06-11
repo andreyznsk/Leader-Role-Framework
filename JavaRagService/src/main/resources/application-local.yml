@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/leader_framework
+    username: rag_user
+    password: rag_password
+    hikari:
+      maximum-pool-size: 3
+      connection-init-sql: "SET search_path TO rag"
+  flyway:
+    schemas: rag
+    default-schema: rag
+
+ollama:
+  url: http://localhost:11434
+  model: multilingual-e5-large
+
+opensearch:
+  url: http://localhost:9200
+  index: rag-knowledge
+
+rag:
+  inbox:
+    path: ../rag-inbox
+  scheduler:
+    interval-ms: 60000
+
+logging:
+  level:
+    ru.andreyz.ragservice: DEBUG

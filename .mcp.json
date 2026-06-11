@@ -101,17 +101,6 @@
         "."
       ],
       "description": "Локальная файловая система — workspace/, plans/, capture-inbox/, rag-inbox/."
-    },
-    "mcp": {
-      "disabled": [
-        "jira",
-        "confluence-team",
-        "confluence-corp",
-        "kubernetes",
-        "bitbucket",
-        "jenkins",
-        "filesystem"
-      ]
     }
   }
 }
