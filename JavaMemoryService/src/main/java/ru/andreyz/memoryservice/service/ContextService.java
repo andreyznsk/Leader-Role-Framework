@@ -56,7 +56,7 @@ public class ContextService {
     }
 
     private List<Task> activeTasks(DailyPlan plan) {
-        return taskRepository.findByPlanId(plan.id()).stream()
+        return taskRepository.findByPlanIdOrderBySortOrder(plan.id()).stream()
                 .filter(t -> !"DELETED".equals(t.status()) && !"PENDING".equals(t.status()))
                 .toList();
     }

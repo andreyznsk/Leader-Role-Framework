@@ -278,9 +278,9 @@ claude --print ──читает──→  JavaRagService (через MCP ил�
 
 | Сервис | RFC | Статус |
 |--------|-----|--------|
-| JavaMailAgent | `JavaMailAgent/RFC-java-core.md` | ✅ Ready |
-| JavaMemoryService | `JavaMemoryService/RFC-memory-service.md` | ⬜ Нужно создать |
-| JavaRagService | `JavaRagService/RFC-rag-service.md` | ⬜ Нужно создать |
+| JavaMailAgent | `JavaMailAgent/RFC/RFC-JavaMailAgent.md` | ✅ Ready |
+| JavaMemoryService | `JavaMemoryService/RFC/RFC-memory-service.md` | ✅ Ready |
+| JavaRagService | `JavaRagService/RFC/RFC-rag-service.md` | ✅ Ready |
 
 ---
 

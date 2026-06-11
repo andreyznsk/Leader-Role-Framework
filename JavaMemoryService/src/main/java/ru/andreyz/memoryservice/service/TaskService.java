@@ -25,10 +25,11 @@ public class TaskService {
     public Task createConfirmed(LocalDate date, String title, String priority,
                                 String description, String source, String emailId) {
         Long planId = getOrCreatePlan(date).id();
+        int sortOrder = taskRepository.findMaxSortOrderByPlanId(planId) + 1;
         Task task = new Task(null, planId, title, description,
                 "TODO", priority != null ? priority : "NORMAL",
                 date, source != null ? source : "MANUAL", emailId,
-                Instant.now(), Instant.now());
+                sortOrder, Instant.now(), Instant.now());
         return taskRepository.save(task);
     }
 
@@ -38,7 +39,7 @@ public class TaskService {
         Task task = new Task(null, null, title, desc,
                 "PENDING", priority != null ? priority : "NORMAL",
                 null, "EMAIL", emailId,
-                Instant.now(), Instant.now());
+                0, Instant.now(), Instant.now());
         return taskRepository.save(task);
     }
 
@@ -46,9 +47,10 @@ public class TaskService {
         Task task = findById(id);
         LocalDate today = LocalDate.now();
         Long planId = getOrCreatePlan(today).id();
+        int sortOrder = taskRepository.findMaxSortOrderByPlanId(planId) + 1;
         Task confirmed = new Task(task.id(), planId, task.title(), task.description(),
                 "TODO", task.priority(), today, task.source(), task.emailId(),
-                task.createdAt(), Instant.now());
+                sortOrder, task.createdAt(), Instant.now());
         return taskRepository.save(confirmed);
     }
 
@@ -65,7 +67,7 @@ public class TaskService {
                 req.priority() != null ? req.priority() : task.priority(),
                 req.dueDate() != null ? req.dueDate() : task.dueDate(),
                 task.source(), task.emailId(),
-                task.createdAt(), Instant.now());
+                task.sortOrder(), task.createdAt(), Instant.now());
         return taskRepository.save(updated);
     }
 
@@ -76,10 +78,11 @@ public class TaskService {
     public Task moveToDate(Long id, LocalDate toDate) {
         Task task = findById(id);
         Long planId = getOrCreatePlan(toDate).id();
+        int sortOrder = taskRepository.findMaxSortOrderByPlanId(planId) + 1;
         Task moved = new Task(task.id(), planId, task.title(), task.description(),
                 task.status().equals("DONE") ? "TODO" : task.status(),
                 task.priority(), toDate, task.source(), task.emailId(),
-                task.createdAt(), Instant.now());
+                sortOrder, task.createdAt(), Instant.now());
         return taskRepository.save(moved);
     }
 
@@ -87,13 +90,66 @@ public class TaskService {
         Task task = findById(id);
         Task updated = new Task(task.id(), task.planId(), task.title(), task.description(),
                 status, task.priority(), task.dueDate(), task.source(), task.emailId(),
-                task.createdAt(), Instant.now());
+                task.sortOrder(), task.createdAt(), Instant.now());
         return taskRepository.save(updated);
+    }
+
+    public Task reorder(Long id, String direction, Integer position) {
+        Task task = findById(id);
+        if (task.planId() == null) return task;
+
+        List<Task> siblings = taskRepository.findByPlanIdOrderBySortOrder(task.planId()).stream()
+                .filter(t -> !"DELETED".equals(t.status()) && !"PENDING".equals(t.status()))
+                .toList();
+
+        int idx = -1;
+        for (int i = 0; i < siblings.size(); i++) {
+            if (siblings.get(i).id().equals(id)) { idx = i; break; }
+        }
+        if (idx == -1) return task;
+
+        if (position != null) {
+            int target = Math.max(0, Math.min(position, siblings.size() - 1));
+            reassignSortOrders(siblings, idx, target);
+        } else if ("up".equalsIgnoreCase(direction) && idx > 0) {
+            swapSortOrders(siblings.get(idx), siblings.get(idx - 1));
+        } else if ("down".equalsIgnoreCase(direction) && idx < siblings.size() - 1) {
+            swapSortOrders(siblings.get(idx), siblings.get(idx + 1));
+        }
+
+        return findById(id);
+    }
+
+    private void swapSortOrders(Task a, Task b) {
+        Integer orderA = a.sortOrder();
+        Task updatedA = new Task(a.id(), a.planId(), a.title(), a.description(),
+                a.status(), a.priority(), a.dueDate(), a.source(), a.emailId(),
+                b.sortOrder(), a.createdAt(), Instant.now());
+        Task updatedB = new Task(b.id(), b.planId(), b.title(), b.description(),
+                b.status(), b.priority(), b.dueDate(), b.source(), b.emailId(),
+                orderA, b.createdAt(), Instant.now());
+        taskRepository.save(updatedA);
+        taskRepository.save(updatedB);
+    }
+
+    private void reassignSortOrders(List<Task> tasks, int fromIdx, int toIdx) {
+        // Build new order by moving element at fromIdx to toIdx
+        java.util.ArrayList<Task> reordered = new java.util.ArrayList<>(tasks);
+        Task moved = reordered.remove(fromIdx);
+        reordered.add(toIdx, moved);
+        for (int i = 0; i < reordered.size(); i++) {
+            Task t = reordered.get(i);
+            if (!t.sortOrder().equals(i)) {
+                taskRepository.save(new Task(t.id(), t.planId(), t.title(), t.description(),
+                        t.status(), t.priority(), t.dueDate(), t.source(), t.emailId(),
+                        i, t.createdAt(), Instant.now()));
+            }
+        }
     }
 
     public List<Task> findByDate(LocalDate date) {
         return planRepository.findByPlanDate(date)
-                .map(plan -> taskRepository.findByPlanId(plan.id()))
+                .map(plan -> taskRepository.findByPlanIdOrderBySortOrder(plan.id()))
                 .orElse(List.of());
     }
 

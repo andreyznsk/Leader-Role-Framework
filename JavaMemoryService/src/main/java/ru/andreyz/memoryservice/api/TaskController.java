@@ -8,6 +8,7 @@ import ru.andreyz.memoryservice.dto.CreatePendingTaskRequest;
 import ru.andreyz.memoryservice.dto.CreateTaskRequest;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
 import ru.andreyz.memoryservice.dto.MoveTaskRequest;
+import ru.andreyz.memoryservice.dto.ReorderTaskRequest;
 import ru.andreyz.memoryservice.service.TaskService;
 
 import java.time.LocalDate;
@@ -77,5 +78,16 @@ public class TaskController {
         Task task = taskService.createPending(
                 req.title(), req.description(), req.emailId(), req.sender(), req.priority());
         return ResponseEntity.ok(task);
+    }
+
+    @PostMapping("/{id}/reorder")
+    public ResponseEntity<Task> reorder(@PathVariable Long id, @RequestBody ReorderTaskRequest req) {
+        return ResponseEntity.ok(taskService.reorder(id, req.direction(), req.position()));
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
+        taskService.updateStatus(id, "DELETED");
+        return ResponseEntity.noContent().build();
     }
 }

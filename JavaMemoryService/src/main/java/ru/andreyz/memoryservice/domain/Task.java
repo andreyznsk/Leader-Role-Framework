@@ -17,6 +17,7 @@ public record Task(
         LocalDate dueDate,
         String source,
         String emailId,
+        Integer sortOrder,
         Instant createdAt,
         Instant updatedAt
 ) {}
