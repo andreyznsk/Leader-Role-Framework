@@ -1,7 +1,7 @@
 # RFC: JavaMailAgent — Java Application Core
 
-**Статус:** Draft  
-**Дата:** 2026-06-06  
+**Статус:** Living Document  
+**Дата:** 2026-06-12  
 **Проект:** Leader-Role-Framework / JavaMailAgent  
 **Запускать Claude Code из:** `Leader-Role-Framework/JavaMailAgent/`
 
@@ -49,123 +49,156 @@ Spring Boot 3 приложение. Подключается к корпорат
 
 ### Концепция
 
-Spring Boot нативно поддерживает профили через `application-{ENV}.properties`.
-Файлы лежат рядом с JAR. Профиль выбирается через `--spring.profiles.active`
+Spring Boot поддерживает профили через `application-{ENV}.yml`.
+Файлы в `src/main/resources/`. Профиль выбирается через `--spring.profiles.active`
 или `SPRING_PROFILES_ACTIVE`.
 
 ```
-target/
-├── mail-agent-1.0.0.jar
-├── application.properties             ← общие настройки (в git)
-├── application-local.properties       ← Maildev Docker (НЕ в git)
-├── application-dev.properties         ← IMAP стенд (НЕ в git)
-└── application-prod.properties        ← Exchange on-premise (НЕ в git)
+src/main/resources/
+├── application.yml              ← общие настройки (в git)
+└── application-local.yml        ← Maildev Docker (НЕ в git)
+
+корень проекта (примеры):
+├── application-local.yml.example
+├── application-dev.yml.example
+└── application-prod.yml.example
 ```
 
-В git — только `application.properties` и `application-*.properties.example`.
+В git — только `application.yml` и `*.example` шаблоны.
 
-### application.properties — общие настройки (в git)
-```properties
-spring.application.name=mail-agent
+### application.yml — общие настройки (в git)
+```yaml
+spring:
+  application:
+    name: mail-agent
+  datasource:
+    url: jdbc:postgresql://localhost:5432/leader_framework
+    username: mailagent_user
+    password: ${POSTGRES_MAILAGENT_PASSWORD:mailagent_password}
+  flyway:
+    schemas: mailagent
+    default-schema: mailagent
+    locations: classpath:db/migration
 
-# Scheduling — один поток, fixedDelay
-mail.poll-interval-seconds=60
-agent.timeout-minutes=5
-mail.fetch-limit=20
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,mappings
 
-# Папки: сканировать все, кроме перечисленных
-mail.folders.exclude=Sent,Drafts,Trash,Spam,Archive,Junk,Deleted Items
+mail:
+  protocol: maildev
+  poll-interval-seconds: 60
+  fetch-limit: 20
+  folders:
+    exclude: "Sent,Drafts,Trash,Spam,Archive,Junk,Deleted Items"
 
-# Пути (относительно рабочей директории = корень Leader-Role-Framework)
-path.inbox=mail/inbox
-path.processed=mail/processed
-path.drafts=mail/drafts
-path.plan=plans/today.md
+agent:
+  timeout-minutes: 5
 
-# PostgreSQL / Flyway
-spring.datasource.url=jdbc:postgresql://localhost:5432/leader_framework
-spring.datasource.username=mailagent_user
-spring.datasource.password=${POSTGRES_MAILAGENT_PASSWORD:mailagent_password}
-spring.flyway.schemas=mailagent
-spring.flyway.default-schema=mailagent
-spring.flyway.locations=classpath:db/migration
+path:
+  inbox: mail/inbox
+  processed: mail/processed
+  drafts: mail/drafts
+  plan: plans/today.md
 
-# java-memory-service интеграция
-memory.service.url=http://localhost:8082
-memory.service.enabled=true
+memory:
+  service:
+    url: http://localhost:8082
+    enabled: true
 
-# Mock agent — true для локальной разработки без Claude CLI
-mock.agent=false
+mock:
+  agent: false
 
-# Логи
-logging.file.name=logs/mail-agent.log
-logging.logback.rollingpolicy.max-file-size=10MB
-logging.logback.rollingpolicy.max-history=30
-logging.pattern.file=%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n
-logging.pattern.console=%d{HH:mm:ss} %-5level %logger{36} - %msg%n
+logging:
+  file:
+    name: logs/mail-agent.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{HH:mm:ss} %-5level %logger{36} - %msg%n"
 ```
 
-### application-local.properties.example — Maildev
-```properties
-spring.profiles.active=local
-mail.protocol=maildev
+### application-local.yml — Maildev (локально, НЕ в git)
+```yaml
+# Maildev запускается в Docker (JavaMailAgent/docker-compose.yml)
+# Порты: 18080:1080 (Web UI + HTTP API), 1025:1025 (SMTP)
+# IP 172.80.2.1 — Docker bridge, доступен с хоста
+spring:
+  datasource:
+    url: "jdbc:postgresql://172.80.2.1:5432/leader_framework?sslmode=disable"
+    username: mailagent_user
+    password: mailagent_password
 
-maildev.api.url=http://localhost:1080
-maildev.smtp.host=localhost
-maildev.smtp.port=1025
+mail:
+  protocol: maildev
+  poll-interval-seconds: 30
 
-memory.service.enabled=false
-mail.poll.interval.seconds=30
-mock.agent=true
+maildev:
+  api-url: http://172.80.2.1:18080
+
+memory:
+  service:
+    enabled: false
+
+mock:
+  agent: true
 ```
 
-### application-dev.properties.example — IMAP стенд
-```properties
-spring.profiles.active=dev
-mail.protocol=imap
+### application-dev.yml.example — IMAP стенд
+```yaml
+mail:
+  protocol: imap
+  username: user@company.com
+  password:
 
-mail.username=user@company.com
-mail.password=
-
-imap.host=mail.dev.company.com
-imap.port=993
-imap.ssl=true
-imap.folder=INBOX
+imap:
+  host: mail.dev.company.com
+  port: 993
+  ssl: true
+  folder: INBOX
 ```
 
-### application-prod.properties.example — Exchange
-```properties
-spring.profiles.active=prod
-mail.protocol=ews
+### application-prod.yml.example — Exchange
+```yaml
+mail:
+  protocol: ews
+  username: user@company.com
+  password:
 
-mail.username=user@company.com
-mail.password=
-
-ews.url=https://mail.company.com/EWS/Exchange.asmx
-ews.autodiscover=false
-ews.domain=
+ews:
+  url: https://mail.company.com/EWS/Exchange.asmx
+  autodiscover: false
+  domain:
 
 # SMTP — Future (отправка черновиков)
-smtp.host=mail.company.com
-smtp.port=587
-smtp.starttls=true
+smtp:
+  host: mail.company.com
+  port: 587
+  starttls: true
 ```
 
 ---
 
 ## 4. Docker Compose — локальное тестирование
 
-`docker-compose.yaml` находится в корне `Leader-Role-Framework/`.
-Запускает инфраструктуру; Java-сервисы стартуют нативно.
+Два файла:
+- `Leader-Role-Framework/docker-compose.yml` — PostgreSQL + OpenSearch (общая инфраструктура)
+- `JavaMailAgent/docker-compose.yml` — Maildev (только для mail-agent)
 
 ```bash
-# Только инфраструктура (PostgreSQL + OpenSearch)
+# Общая инфраструктура (PostgreSQL + OpenSearch)
 docker compose up -d
 
-# + Maildev для local-профиля
-docker compose --profile local up -d
+# Maildev для local-профиля (из JavaMailAgent/)
+cd JavaMailAgent && docker compose up -d
 # Web UI: http://localhost:18080
 ```
+
+Порты Maildev: `18080` → Web UI + HTTP API, `1025` → SMTP.
 
 Postgres поднимается с БД `leader_framework`, суперюзер `superuser`.
 При первом старте `infra/postgres/init.sql` создаёт изолированные схемы
@@ -192,46 +225,52 @@ EOF
 ```
 JavaMailAgent/
 ├── CLAUDE.md
-├── RFC-java-core.md
-├── docker-compose.yml
-├── application.properties.example
-├── application-local.properties.example
-├── application-dev.properties.example
-├── application-prod.properties.example
+├── ARCHITECTURE.md               ← симлинк на ../ARCHITECTURE.md
+├── RFC/
+│   └── RFC-JavaMailAgent.md      ← этот файл
+├── cr/
+│   ├── CR-001-mock-agent-and-connection-check.md
+│   └── CR-002-processed-emails-tracking.md
+├── docker-compose.yml            ← Maildev (18080:1080, 1025:1025)
+├── application-local.yml.example
+├── application-dev.yml.example
+├── application-prod.yml.example
 ├── pom.xml
 └── src/
     ├── main/
     │   ├── java/ru/andreyz/mailagent/
-    │   │   ├── MailAgentApplication.java       ← @SpringBootApplication
+    │   │   ├── MailAgentApplication.java       ← @SpringBootApplication + @EnableScheduling
     │   │   ├── config/
-    │   │   │   └── MailConfig.java             ← @ConfigurationProperties
+    │   │   │   └── MailConfig.java             ← @ConfigurationProperties (вложенные static классы)
     │   │   ├── client/
     │   │   │   ├── MailClient.java             ← интерфейс
-    │   │   │   ├── EwsMailClient.java          ← Exchange (prod)
-    │   │   │   ├── ImapMailClient.java         ← IMAP (dev)
-    │   │   │   └── MaildevClient.java          ← HTTP API (local)
+    │   │   │   ├── MailException.java          ← checked exception для MailClient
+    │   │   │   ├── MaildevClient.java          ← HTTP API (local) ✅ реализован
+    │   │   │   ├── ImapMailClient.java         ← IMAP (dev) 🔜 planned
+    │   │   │   └── EwsMailClient.java          ← Exchange (prod) 🔜 planned
     │   │   ├── model/
     │   │   │   ├── Email.java                  ← record (id, subject, from, body, receivedAt, folder)
-    │   │   │   ├── AgentResponse.java          ← record
-    │   │   │   ├── AgentResponseType.java      ← enum: DRAFT/REQUEST/NOISE
+    │   │   │   ├── AgentResponse.java          ← record (@JsonInclude NON_NULL)
+    │   │   │   ├── AgentResponseType.java      ← enum: REQUEST/DRAFT/NOISE
     │   │   │   ├── PendingTaskRequest.java     ← record, payload для memory-service
     │   │   │   └── ProcessedEmail.java         ← Spring Data JDBC record (@Table mailagent.processed_emails)
     │   │   ├── repository/
     │   │   │   └── ProcessedEmailRepository.java ← CrudRepository, existsByEmailId()
     │   │   ├── scheduler/
-    │   │   │   ├── MailAgentJob.java           ← @Scheduled, главный цикл
+    │   │   │   ├── MailAgentJob.java           ← @Scheduled(fixedDelay), главный цикл
     │   │   │   ├── PromptBuilder.java          ← формирует промпт для Claude
     │   │   │   ├── ClaudeRunner.java           ← интерфейс (run prompt → AgentResponse)
-    │   │   │   ├── ClaudeRunnerImpl.java       ← реальный запуск claude CLI (@ConditionalOnProperty mock.agent=false)
-    │   │   │   ├── MockClaudeRunner.java       ← мок для локальной разработки (@ConditionalOnProperty mock.agent=true)
-    │   │   │   └── ActionExecutor.java         ← switch по enum
+    │   │   │   ├── ClaudeRunnerImpl.java       ← запуск claude --print (@ConditionalOnProperty mock.agent=false)
+    │   │   │   ├── MockClaudeRunner.java       ← мок (@ConditionalOnProperty mock.agent=true)
+    │   │   │   └── ActionExecutor.java         ← switch по AgentResponseType
     │   │   ├── integration/
-    │   │   │   └── MemoryServiceClient.java    ← POST /api/tasks/pending
+    │   │   │   └── MemoryServiceClient.java    ← POST /api/tasks/pending + isHealthy()
     │   │   └── web/
-    │   │       └── StatusController.java       ← UI: /ui/status
+    │   │       └── StatusController.java       ← GET /ui/status (Thymeleaf)
     │   └── resources/
-    │       ├── application.properties
-    │       ├── logback-spring.xml              ← конфиг логов
+    │       ├── application.yml                 ← общие настройки (в git)
+    │       ├── application-local.yml           ← Maildev Docker (НЕ в git)
+    │       ├── logback-spring.xml              ← ротация логов по профилям
     │       ├── db/migration/
     │       │   └── V1__create_processed_emails.sql
     │       └── templates/
@@ -389,6 +428,7 @@ public record PendingTaskRequest(
 ### MemoryServiceClient.java
 
 Использует `java.net.http.HttpClient` — встроен в Java 21, новых зависимостей нет.
+Конфигурация через `MailConfig.MemoryServiceProperties` (constructor injection).
 
 ```java
 @Component
@@ -396,12 +436,14 @@ public class MemoryServiceClient {
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper;
+    private final String baseUrl;
+    private final boolean enabled;
 
-    @Value("${memory.service.url}")
-    private String baseUrl;
-
-    @Value("${memory.service.enabled}")
-    private boolean enabled;
+    public MemoryServiceClient(ObjectMapper objectMapper, MailConfig.MemoryServiceProperties props) {
+        this.objectMapper = objectMapper;
+        this.baseUrl = props.getUrl();
+        this.enabled = props.isEnabled();
+    }
 
     public void createPendingTask(PendingTaskRequest request) {
         if (!enabled) {
@@ -428,6 +470,20 @@ public class MemoryServiceClient {
         } catch (Exception e) {
             // Не останавливаем обработку почты если memory-service недоступен
             log.warn("Failed to reach memory-service: {}", e.getMessage());
+        }
+    }
+
+    // Используется StatusController для пинга на /ui/status
+    public boolean isHealthy() {
+        if (!enabled) return false;
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/actuator/health"))
+                .GET().timeout(Duration.ofSeconds(2)).build();
+            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+            return response.statusCode() == 200;
+        } catch (Exception e) {
+            return false;
         }
     }
 }
@@ -513,7 +569,7 @@ public interface MailClient {
 `markAsRead` вызывается **только для NOISE** — `REQUEST` и `DRAFT` остаются
 непрочитанными в почте, повторная обработка предотвращается через `processed_emails`.
 
-### EwsMailClient — Exchange on-premise
+### EwsMailClient — Exchange on-premise (🔜 planned)
 ```java
 ExchangeService service = new ExchangeService(ExchangeVersion.Exchange2010_SP2);
 service.setCredentials(new WebCredentials(username, password, domain));
@@ -528,14 +584,14 @@ if (config.isEwsAutodiscover()) {
 - `listUnread` — `FindItemsResults` + `IsRead = false`, `BodyType.Text`
 - `markAsRead` — `email.setIsRead(true); email.update(...)`
 
-### ImapMailClient — IMAP
+### ImapMailClient — IMAP (🔜 planned)
 ```java
 // listFolders   — store.getDefaultFolder().list("*"), фильтр excludeFolders
 // listUnread    — FlagTerm(Flags.Flag.SEEN, false) в указанной папке
 // markAsRead    — message.setFlag(Flags.Flag.SEEN, true)
 ```
 
-### MaildevClient — HTTP API (только local)
+### MaildevClient — HTTP API (только local) ✅ реализован
 ```java
 // listFolders   → всегда возвращает ["INBOX"] (Maildev не имеет папок)
 // listUnread    → GET {apiUrl}/email, фильтр "read": false
@@ -549,10 +605,74 @@ if (config.isEwsAutodiscover()) {
 
 Каждый клиент проверяет соединение в `@PostConstruct` и пишет в лог:
 ```
-INFO  MaildevClient - ✅ Maildev connection OK — http://localhost:1080
+INFO  MaildevClient - ✅ Maildev connection OK — http://172.80.2.1:18080
 ERROR EwsMailClient - ❌ EWS connection FAILED — https://mail.company.com/EWS/Exchange.asmx: Connection refused
+WARN  MockClaudeRunner - ⚠️  MOCK ClaudeRunner is active — real Claude agent will NOT be called
 ```
 Ошибка не бросает исключение — приложение стартует, проблема будет воспроизводиться в каждом цикле поллинга.
+
+---
+
+## 11a. ClaudeRunner — запуск агента
+
+### ClaudeRunner.java — интерфейс
+```java
+public interface ClaudeRunner {
+    AgentResponse run(String prompt) throws IOException, InterruptedException;
+}
+```
+
+### ClaudeRunnerImpl.java — реальный запуск (`mock.agent=false`)
+```java
+@Component
+@ConditionalOnProperty(name = "mock.agent", havingValue = "false", matchIfMissing = true)
+public class ClaudeRunnerImpl implements ClaudeRunner {
+    // Запускает: ProcessBuilder("claude", "--print")
+    // Передаёт промпт через stdin, ждёт waitFor(timeoutMinutes, MINUTES)
+    // Парсит JSON из stdout: ищет первый { ... } в ответе
+}
+```
+
+### MockClaudeRunner.java — мок (`mock.agent=true`)
+
+Реальная логика (отличается от CR-001, доработана по результатам тестов):
+
+```java
+@Component
+@ConditionalOnProperty(name = "mock.agent", havingValue = "true")
+public class MockClaudeRunner implements ClaudeRunner {
+
+    // Извлекает секцию письма ДО строки "Верни JSON" из промпта
+    // (иначе ключевые слова REQUEST/DRAFT/NOISE из шаблона мешают классификации)
+    private String extractEmailSection(String prompt) {
+        int idx = prompt.indexOf("Верни JSON");
+        return idx >= 0 ? prompt.substring(0, idx) : prompt;
+    }
+
+    // Классификация по русским сигналам в тексте письма
+    private AgentResponseType detectType(String emailSection) {
+        String upper = emailSection.toUpperCase();
+        if (upper.contains("ОТВЕТН") || upper.contains("ЧЕРНОВИК"))
+            return AgentResponseType.DRAFT;
+        if (upper.contains("BUILD") || upper.contains("PIPELINE") ||
+            upper.contains("PASSED") || upper.contains("SUCCESS") || upper.contains("DURATION:"))
+            return AgentResponseType.NOISE;
+        return AgentResponseType.REQUEST;  // default
+    }
+
+    // Приоритет по русским сигналам
+    private String detectPriority(String emailSection) {
+        String upper = emailSection.toUpperCase();
+        if (upper.contains("СРОЧНО") || upper.contains("ASAP") || upper.contains("P1 ИНЦИДЕНТ")) return "CRITICAL";
+        if (upper.contains("ДО ЗАВТРА") || upper.contains("ВАЖНО") || upper.contains("ДЕДЛАЙН")) return "HIGH";
+        if (upper.contains("КОГДА БУДЕТ ВРЕМЯ")) return "LOW";
+        return "NORMAL";
+    }
+
+    // emailId: парсится regex "emailId": "actual-id" из промпта
+    private static final Pattern EMAIL_ID_PATTERN = Pattern.compile("\"emailId\":\\s*\"([^\"]+)\"");
+}
+```
 
 ---
 
@@ -624,12 +744,23 @@ Flyway управляет схемой `mailagent`. Файлы — в `classpath
 @Controller
 public class StatusController {
 
+    private final MailConfig.PathProperties pathProperties;
+    private final MemoryServiceClient memoryServiceClient;
+    private final String logFile;
+
+    public StatusController(
+        MailConfig.PathProperties pathProperties,
+        MemoryServiceClient memoryServiceClient,
+        @Value("${logging.file.name:logs/mail-agent.log}") String logFile
+    ) { ... }
+
     @GetMapping("/ui/status")
     public String status(Model model) {
-        model.addAttribute("recentLogs", logReader.getRecentLines(50));
-        model.addAttribute("inboxCount", countFiles(inboxPath));
-        model.addAttribute("processedCount", countFiles(processedPath));
-        model.addAttribute("draftsCount", countFiles(draftsPath));
+        model.addAttribute("inboxCount", countFiles(pathProperties.getInbox()));
+        model.addAttribute("processedCount", countFiles(pathProperties.getProcessed()));
+        model.addAttribute("draftsCount", countFiles(pathProperties.getDrafts()));
+        model.addAttribute("recentLogs", readRecentLogs(50));   // читает log-файл напрямую
+        model.addAttribute("memoryServiceHealthy", memoryServiceClient.isHealthy());
         return "status";
     }
 }
@@ -638,8 +769,8 @@ public class StatusController {
 ### status.html — Thymeleaf
 Показывает:
 - количество писем в `inbox/`, `processed/`, `drafts/`
-- последние 50 строк лога
-- статус подключения к `java-memory-service` (ping)
+- последние 50 строк лога (читает файл `logs/mail-agent.log` напрямую)
+- статус подключения к `java-memory-service` (ping на `/actuator/health`)
 
 ---
 
@@ -717,14 +848,14 @@ open http://localhost:8080/ui/status
 ## 17. .gitignore
 
 ```
-application-local.properties
-application-dev.properties
-application-prod.properties
+application-local.yml
+application-dev.yml
+application-prod.yml
 target/
 logs/
 ```
 
-В git — только `application.properties` и `*.example` шаблоны.
+В git — только `application.yml` и `*.example` шаблоны.
 
 ---
 
@@ -735,28 +866,32 @@ SMTP нужен только для **отправки**. В MVP не реали
 Когда понадобится:
 - `SmtpSender.java` через Jakarta Mail
 - Новый тип `SEND` в `AgentResponseType`
-- Конфиг `smtp.*` уже есть в `application-prod.properties.example`
+- Конфиг `smtp.*` уже есть в `application-prod.yml.example`
 
 ---
 
 ## 19. Порядок реализации
 
-1. `docker-compose.yml` — поднять Maildev, проверить UI на `:1080`
-2. `pom.xml` — Spring Boot 3.3, EWS, Jakarta Mail, Logback
-3. `application.properties` + профильные `*.example`
+### Реализовано ✅
+1. `JavaMailAgent/docker-compose.yml` — Maildev (порт 18080)
+2. `pom.xml` — Spring Boot 3.3, Jakarta Mail, Logback, Spring Data JDBC, Flyway
+3. `application.yml` + `application-local.yml`
 4. `MailAgentApplication.java` — `@SpringBootApplication` + `@EnableScheduling`
-5. `MailConfig.java` — `@ConfigurationProperties`
-6. `Email`, `AgentResponseType`, `AgentResponse`, `PendingTaskRequest` — records
+5. `MailConfig.java` — `@ConfigurationProperties` (вложенные static классы)
+6. `Email`, `AgentResponseType`, `AgentResponse`, `PendingTaskRequest`, `ProcessedEmail` — records
 7. `MailClient.java` — интерфейс + `MailException`
-8. `MaildevClient.java` — HTTP API (первый рабочий клиент)
+8. `MaildevClient.java` — HTTP API + `@PostConstruct` connection check
 9. `PromptBuilder.java` — формирует промпт из `Email`
-10. `ClaudeRunner.java` — Process + waitFor + парсинг JSON
-11. `MemoryServiceClient.java` — POST /api/tasks/pending
-12. `ActionExecutor.java` — switch по enum + вызов MemoryServiceClient
-13. `MailAgentJob.java` — `@Scheduled(fixedDelay)`
-14. `StatusController.java` + `status.html` — Web UI
-15. `logback-spring.xml` — ротация логов по профилям
-16. Сквозной тест: письмо через SMTP → Maildev → агент → `plans/today.md` + memory-service
-17. `ImapMailClient.java` — dev окружение
-18. `EwsMailClient.java` — prod окружение
-19. Fat-jar, проверка всех трёх профилей
+10. `ClaudeRunnerImpl.java` — Process + waitFor + парсинг JSON
+11. `MockClaudeRunner.java` — мок с логикой по русским ключевым словам
+12. `MemoryServiceClient.java` — POST /api/tasks/pending + isHealthy()
+13. `ActionExecutor.java` — switch по enum + вызов MemoryServiceClient
+14. `MailAgentJob.java` — `@Scheduled(fixedDelay)`, мульти-папки, dedup через processed_emails
+15. `ProcessedEmailRepository.java` + `V1__create_processed_emails.sql`
+16. `StatusController.java` + `status.html` — Web UI
+17. `logback-spring.xml` — ротация логов по профилям
+
+### Planned 🔜
+18. `ImapMailClient.java` — dev окружение (IMAP)
+19. `EwsMailClient.java` — prod окружение (Exchange)
+20. E2E тесты: письмо → Maildev → агент → `plans/today.md` + memory-service

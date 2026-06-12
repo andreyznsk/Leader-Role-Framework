@@ -29,7 +29,7 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 │                              │  Ollama (local :11434)       │    │
 │  ┌─────────────────┐        └──────────────────────────────┘    │
 │  │  Maildev        │                                             │
-│  │  Docker :1080   │   ← только local окружение                 │
+│  │  Docker :18080  │   ← только local окружение                 │
 │  │  SMTP   :1025   │                                             │
 │  └─────────────────┘                                             │
 └─────────────────────────────────────────────────────────────────┘
@@ -42,7 +42,7 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 ### JavaMailAgent
 **Порт:** 8080  
 **Тип:** Spring Boot 3, fat-jar, запускается из корня проекта  
-**RFC:** `JavaMailAgent/RFC-java-core.md`  
+**RFC:** `JavaMailAgent/RFC/RFC-JavaMailAgent.md`  
 **Статус:** In Progress
 
 **Роль:** Читает входящую почту, запускает Claude-агента на каждое письмо,
@@ -52,11 +52,11 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 **Миграции:** Flyway, `classpath:db/migration`, только схема `mailagent`
 
 **Протоколы подключения к почте:**
-| Профиль | Протокол | Клиент |
-|---------|----------|--------|
-| local | Maildev HTTP API | `MaildevClient` |
-| dev | IMAP | `ImapMailClient` |
-| prod | EWS (Exchange on-premise) | `EwsMailClient` |
+| Профиль | Протокол | Клиент | Статус |
+|---------|----------|--------|--------|
+| local | Maildev HTTP API | `MaildevClient` | ✅ реализован |
+| dev | IMAP | `ImapMailClient` | 🔜 planned |
+| prod | EWS (Exchange on-premise) | `EwsMailClient` | 🔜 planned |
 
 **Классификация писем (enum AgentResponseType):**
 | Тип | Действие |
@@ -120,7 +120,7 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 
 **Зависимости:**
 - OpenSearch (Docker) — векторное хранилище, порт 9200
-- Ollama (локально) — эмбеддинги через `multilingual-e5-large`, порт 11434
+- Ollama (локально) — эмбеддинги через `mxbai-embed-large`, порт 11434
 
 **Ключевые endpoint-ы:**
 | Метод | Путь | Описание |
@@ -134,6 +134,7 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 
 ## Инфраструктура (Docker)
 
+### `docker-compose.yml` — корень Leader-Role-Framework (общая инфраструктура)
 ```yaml
 services:
   postgres:
@@ -151,17 +152,20 @@ services:
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2
     ports: ["5601:5601"]
+```
 
+### `JavaMailAgent/docker-compose.yml` — Maildev (только для mail-agent)
+```yaml
+services:
   maildev:
     image: maildev/maildev:latest
     ports:
-      - "1080:1080"
-      - "1025:1025"
-    profiles: [local]
+      - "18080:1080"  # Web UI + HTTP API
+      - "1025:1025"   # SMTP
 ```
 
-**Ollama** — нативно на macOS (Apple Silicon M1), не в Docker.  
-Модель эмбеддингов: `multilingual-e5-large`
+**Ollama** — нативно, не в Docker.  
+Модель эмбеддингов: `mxbai-embed-large`
 
 ---
 
