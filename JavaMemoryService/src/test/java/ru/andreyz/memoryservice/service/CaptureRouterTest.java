@@ -27,6 +27,7 @@ class CaptureRouterTest {
     @Mock TaskService taskService;
     @Mock RiskService riskService;
     @Mock QuestionService questionService;
+    @Mock NoteService noteService;
     @Mock PersonNameNoteRepository personNameNoteRepository;
 
     @TempDir Path tempDir;
@@ -36,7 +37,7 @@ class CaptureRouterTest {
     @BeforeEach
     void setUp() {
         router = new CaptureRouter(
-                taskService, riskService, questionService, personNameNoteRepository,
+                taskService, riskService, questionService, noteService, personNameNoteRepository,
                 tempDir.resolve("rag-inbox").toString(),
                 tempDir.resolve("workspace").toString()
         );
@@ -58,14 +59,24 @@ class CaptureRouterTest {
 
         router.route(c);
 
-        verify(riskService).create("Single point of failure", "only one person knows deploy", "MEDIUM", "HIGH");
+        verify(riskService).create("Single point of failure", "only one person knows deploy", "MEDIUM", "MEDIUM");
     }
 
     @Test
-    void route_risk_lowPriority_mapsToLowImpact() {
+    void route_risk_usesMediumDefaults() {
         router.route(capture(3L, "RISK", "Minor risk", "body", "LOW"));
 
-        verify(riskService).create(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.eq("LOW"));
+        verify(riskService).create(anyString(), anyString(), org.mockito.ArgumentMatchers.eq("MEDIUM"), org.mockito.ArgumentMatchers.eq("MEDIUM"));
+    }
+
+    @Test
+    void route_note_savesCaptureNote() {
+        ClassifiedCapture c = capture(11L, "NOTE", "Observation", "raw note", "LOW");
+
+        String routedTo = router.route(c);
+
+        verify(noteService).create("raw note", null, "capture");
+        assertThat(routedTo).isEqualTo("notes");
     }
 
     @Test
@@ -141,6 +152,6 @@ class CaptureRouterTest {
     }
 
     private ClassifiedCapture capture(Long id, String type, String title, String body, String priority) {
-        return new ClassifiedCapture(id, type, title, body, priority);
+        return new ClassifiedCapture(id, null, type, title, body, null, priority);
     }
 }

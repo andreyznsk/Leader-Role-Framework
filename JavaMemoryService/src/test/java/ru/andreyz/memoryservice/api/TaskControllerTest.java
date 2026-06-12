@@ -30,7 +30,7 @@ class TaskControllerTest {
                         .content("""
                                 {"title":"Test task","date":"%s","priority":"HIGH","source":"MANUAL"}
                                 """.formatted(today)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Test task"))
                 .andExpect(jsonPath("$.status").value("TODO"));
 
@@ -45,8 +45,8 @@ class TaskControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Email task","emailId":"msg-123","sender":"test@test.com","priority":"NORMAL"}
-                                """))
-                .andExpect(status().isOk())
+                """))
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.source").value("EMAIL"));
     }

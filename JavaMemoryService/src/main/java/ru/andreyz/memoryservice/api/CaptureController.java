@@ -28,11 +28,12 @@ public class CaptureController {
 
     @PostMapping
     public ResponseEntity<CaptureResponse> capture(@RequestBody CaptureRequest req) {
-        Capture saved = captureService.save(req);
+        CaptureService.CaptureSaveResult result = captureService.saveWithFile(req);
+        Capture saved = result.capture();
         String savedAt = saved.capturedAt()
                 .atOffset(ZoneOffset.UTC)
                 .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-        return ResponseEntity.ok(new CaptureResponse(saved.id(), savedAt));
+        return ResponseEntity.ok(new CaptureResponse(result.file().toString(), true, saved.id(), savedAt));
     }
 
     @GetMapping("/today")
@@ -52,5 +53,10 @@ public class CaptureController {
                 "total", result.total(),
                 "routed", result.routed()
         ));
+    }
+
+    @PostMapping("/process-now")
+    public ResponseEntity<Map<String, Object>> processNow() {
+        return processToday();
     }
 }

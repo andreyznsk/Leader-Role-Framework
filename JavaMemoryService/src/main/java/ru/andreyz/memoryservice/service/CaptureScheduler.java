@@ -16,9 +16,9 @@ public class CaptureScheduler {
         this.processingService = processingService;
     }
 
-    @Scheduled(cron = "0 0 18 * * *")
+    @Scheduled(cron = "${app.capture.process-cron:0 0 * * * *}")
     public void processEndOfDay() {
-        log.info("18:00 — starting scheduled capture processing");
+        log.info("Starting scheduled capture processing");
         CaptureProcessingService.ProcessResult result = processingService.processToday();
         log.info("Capture processing done: {}/{} routed", result.routed(), result.total());
     }

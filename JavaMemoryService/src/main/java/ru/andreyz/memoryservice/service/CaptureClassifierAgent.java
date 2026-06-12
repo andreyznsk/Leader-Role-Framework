@@ -27,7 +27,16 @@ public class CaptureClassifierAgent {
 
     public List<ClassifiedCapture> classify(List<Capture> captures) throws IOException, InterruptedException {
         String prompt = buildPrompt(captures);
+        return runClaude(prompt);
+    }
 
+    public List<ClassifiedCapture> classifyFiles(List<CaptureService.CaptureFile> files, String dayContext)
+            throws IOException, InterruptedException {
+        String prompt = buildFilePrompt(files, dayContext);
+        return runClaude(prompt);
+    }
+
+    private List<ClassifiedCapture> runClaude(String prompt) throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder("claude", "--print");
         pb.redirectErrorStream(false);
         Process process = pb.start();
@@ -57,15 +66,56 @@ public class CaptureClassifierAgent {
                 Для каждой заметки верни JSON-объект в массиве:
                 {
                   "captureId": <число>,
-                  "type": "TASK|RISK|PERSON_NOTE|KNOWLEDGE|JOURNAL|QUESTION",
+                  "type": "TASK|RISK|NOTE|PERSON_NOTE|KNOWLEDGE|JOURNAL|QUESTION",
                   "title": "...",
                   "body": "...",
+                  "tags": "tag1,tag2",
                   "priority": "LOW|NORMAL|HIGH|CRITICAL"
                 }
                 Верни ТОЛЬКО JSON-массив, без пояснений и markdown-обёртки.
                 Для PERSON_NOTE: title = имя человека, body = заметка о нём.
                 Заметки:
                 """ + notesList;
+    }
+
+    private String buildFilePrompt(List<CaptureService.CaptureFile> files, String dayContext) {
+        String notesJson = files.stream()
+                .map(file -> "{\"file\":\"" + escapeJson(file.file()) + "\",\"text\":\"" + escapeJson(file.text()) + "\"}")
+                .collect(Collectors.joining(",\n "));
+
+        return """
+                Классифицируй каждую заметку. Верни ТОЛЬКО JSON массив, без пояснений.
+
+                Типы классификации:
+                - TASK — действие которое нужно выполнить
+                - RISK — операционный риск или проблема
+                - NOTE — наблюдение, информация к сведению
+
+                Контекст дня:
+                %s
+
+                Заметки:
+                [%s]
+
+                Формат ответа:
+                [
+                  {"file": "10-32-00.md", "type": "TASK", "title": "...", "body": "...", "priority": "HIGH|NORMAL|LOW"},
+                  {"file": "14-15-00.md", "type": "RISK", "title": "...", "body": "..."},
+                  {"file": "16-40-00.md", "type": "NOTE", "title": "...", "body": "...", "tags": "risk,person"}
+                ]
+                """.formatted(dayContext, notesJson);
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        try {
+            String json = objectMapper.writeValueAsString(value);
+            return json.substring(1, json.length() - 1);
+        } catch (IOException e) {
+            return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        }
     }
 
     List<ClassifiedCapture> parseResponse(String output) throws IOException {

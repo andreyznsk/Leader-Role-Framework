@@ -41,7 +41,7 @@ class CaptureServiceTest {
     void save_defaultsSourceToCli() {
         Capture capture = captureService.save(new CaptureRequest("note without source", null));
 
-        assertThat(capture.source()).isEqualTo("cli");
+        assertThat(capture.source()).isEqualTo("manual");
     }
 
     @Test
@@ -52,7 +52,7 @@ class CaptureServiceTest {
         assertThat(dayDir).exists();
 
         boolean fileExists = Files.list(dayDir)
-                .anyMatch(p -> p.getFileName().toString().endsWith("-" + capture.id() + ".md"));
+                .anyMatch(p -> p.getFileName().toString().endsWith(".md"));
         assertThat(fileExists).isTrue();
     }
 
@@ -62,14 +62,31 @@ class CaptureServiceTest {
 
         Path dayDir = Path.of(inboxDirStr).resolve(LocalDate.now().toString());
         Path file = Files.list(dayDir)
-                .filter(p -> p.getFileName().toString().endsWith("-" + capture.id() + ".md"))
+                .filter(p -> {
+                    try {
+                        return Files.readString(p).contains("my important note");
+                    } catch (IOException e) {
+                        return false;
+                    }
+                })
                 .findFirst()
                 .orElseThrow();
 
         String content = Files.readString(file);
         assertThat(content)
+                .startsWith("---\n")
+                .contains("date: ")
                 .contains("my important note")
                 .contains("source: telegram");
+    }
+
+    @Test
+    void findTodayFiles_readsRawTextFromInbox() {
+        captureService.save(new CaptureRequest("raw text from file", "manual"));
+
+        List<CaptureService.CaptureFile> files = captureService.findTodayFiles();
+
+        assertThat(files).anySatisfy(file -> assertThat(file.text()).isEqualTo("raw text from file"));
     }
 
     @Test
