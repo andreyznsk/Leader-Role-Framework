@@ -18,7 +18,7 @@
 - Предоставляет Thymeleaf UI для просмотра и ручного редактирования данных
 - Предоставляет MCP-интерфейс для Claude Agent (чтение/запись задач, планов, инцидентов)
 - Принимает предложения задач от java-mail-agent (статус PENDING) и ждёт подтверждения через UI
-- Принимает raw capture-заметки в `capture-inbox/`, пакетно классифицирует их через `claude --print`
+- Принимает raw capture-заметки в `capture-inbox/`, пакетно классифицирует их через `AgentClient` из `common`
   и маршрутизирует в задачи, риски, заметки, вопросы, RAG inbox или daily journal
 
 ---
@@ -27,7 +27,7 @@
 
 | Компонент | Библиотека |
 |-----------|-----------|
-| Framework | Spring Boot 3.3.x |
+| Framework | Spring Boot 3.5.14 |
 | Web | Spring MVC (embedded Tomcat) |
 | UI | Thymeleaf + Bootstrap 5 CDN |
 | Data | Spring Data JDBC (без Hibernate, без JPA) |
@@ -36,6 +36,7 @@
 | DB test | H2 (in-memory, MODE=PostgreSQL) |
 | JSON | Jackson (встроен в Boot) |
 | MCP | spring-ai-starter-mcp-server-webmvc |
+| LLM client | common 1.0.0 (`AgentClient`) |
 | Тесты | JUnit 5, Spring Boot Test, MockMvc |
 | Build | Maven, fat JAR через spring-boot-maven-plugin |
 
@@ -56,6 +57,9 @@ spring:
     locations: classpath:db/migration
     schemas: memory
     default-schema: memory
+
+agent:
+  provider: mock
 ```
 
 ### `prod`
@@ -70,6 +74,16 @@ spring:
       maximum-pool-size: 5
   flyway:
     locations: classpath:db/migration
+
+agent:
+  provider: ${AGENT_PROVIDER:claude}
+```
+
+### `e2e`
+```yaml
+# application-e2e.yml
+agent:
+  provider: mock
 ```
 
 ### `test`
@@ -91,6 +105,9 @@ app:
     inbox-dir: ${java.io.tmpdir}/test-rag-inbox
   workspace:
     dir: ${java.io.tmpdir}/test-workspace
+
+agent:
+  provider: mock
 ```
 
 **Запуск** (из корня проекта `Leader-Role-Framework/`, как указано в ARCHITECTURE.md):
@@ -905,14 +922,14 @@ POST /api/capture/process-now
 
 1. Прочитать `capture-inbox/YYYY-MM-DD/*.md`.
 2. Построить day context через `ContextService`: текущие задачи и открытые риски.
-3. Передать весь батч в `CaptureClassifierAgent`, который вызывает `claude --print`.
+3. Передать весь батч в `CaptureClassifierAgent`, который вызывает `agentClient.complete(prompt)`.
 4. Получить JSON-массив `ClassifiedCapture`.
 5. Для каждого элемента вызвать `CaptureRouter`.
 6. Если route успешен, перенести файл в `capture-inbox/processed/YYYY-MM-DD/`.
 7. Если route упал, файл остаётся в очереди и попадёт в следующий запуск.
 
-`application-e2e.yml` включает `mock.capture-agent=true`: вместо `claude --print`
-используется `MockCaptureClassifierAgent`, который классифицирует по явным маркерам
+`application-e2e.yml` включает `agent.provider=mock`: вместо реального LLM
+используется `MockAgentClient` из `common`, который классифицирует по явным маркерам
 `TASK:`, `RISK:`, `NOTE:`, `QUESTION:`, `PERSON_NOTE:`, `KNOWLEDGE:`, `JOURNAL:`.
 
 ### Маршрутизация
@@ -1121,8 +1138,7 @@ JavaMemoryService/
     │   │   │   ├── PeopleService.java
     │   │   │   ├── CaptureService.java
     │   │   │   ├── CaptureProcessingService.java
-    │   │   │   ├── CaptureClassifierAgent.java
-    │   │   │   ├── MockCaptureClassifierAgent.java
+    │   │   │   ├── CaptureClassifierAgent.java    # inject AgentClient из common
     │   │   │   ├── CaptureRouter.java
     │   │   │   ├── CaptureScheduler.java
     │   │   │   ├── NoteService.java
@@ -1215,6 +1231,10 @@ JavaMemoryService/
 
 <dependencies>
     <dependency>
+        <groupId>ru.andreyz</groupId>
+        <artifactId>common</artifactId>
+    </dependency>
+    <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
@@ -1304,7 +1324,7 @@ JavaMemoryService/
 
 **CR-MEM-001/002 (Capture Bot):**
 19. `CaptureController`, `CaptureService`, `CaptureRepository`
-20. `CaptureClassifierAgent` + `MockCaptureClassifierAgent`
+20. `CaptureClassifierAgent` + `common.MockAgentClient` (`MockCaptureClassifierAgent` удалён)
 21. `CaptureProcessingService`, `CaptureRouter`, `CaptureScheduler`
 22. `NoteController`, `NoteService`, `QuestionService`, `PersonNameNoteRepository`
 23. `notes.html` + сценарии `10_capture_bot.md`, `11_capture_bot_improvements.md`, `12_capture_classification_mock.md`

@@ -204,38 +204,41 @@ public class MockAgentClient implements AgentClient {
     private static final Logger log = LoggerFactory.getLogger(MockAgentClient.class);
 
     /**
-     * Фиксированный ответ, возвращаемый mock-агентом.
-     * Каждый сервис задаёт своё значение в application-e2e.yml:
-     *
-     * JavaMailAgent:      agent.mock.response = {"type":"NOISE",...}
-     * JavaMemoryService:  agent.mock.response = [{"type":"NOTE",...}]
+     * Optional fixed response. If blank, MockAgentClient classifies supported
+     * mail/capture prompts with deterministic keyword-based rules.
      */
     private final String fixedResponse;
 
     public MockAgentClient(
-            @Value("${agent.mock.response:{\"type\":\"NOISE\",\"note\":\"mock\"}}") String fixedResponse) {
+            @Value("${agent.mock.response:}") String fixedResponse) {
         this.fixedResponse = fixedResponse;
     }
 
     @PostConstruct
     public void init() {
         log.warn("⚠️  AgentClient: MOCK — реальный LLM не вызывается");
-        log.warn("⚠️  agent.mock.response = {}", fixedResponse);
+        if (!fixedResponse.isBlank()) {
+            log.warn("agent.mock.response = {}", fixedResponse);
+        }
     }
 
     @Override
     public String complete(String prompt) {
-        log.debug("MockAgentClient returning fixed response");
-        return fixedResponse;
+        if (!fixedResponse.isBlank()) {
+            log.debug("MockAgentClient returning fixed response");
+            return fixedResponse;
+        }
+        // mail prompt -> AgentResponse JSON
+        // capture prompt -> ClassifiedCapture JSON array
+        return classifyPrompt(prompt);
     }
 }
 ```
 
-> **Важно:** `MockAgentClient` возвращает фиксированную строку из конфига.
-> Логика классификации по ключевым словам (текущие `MockClaudeRunner`,
-> `MockCaptureClassifierAgent`) **остаётся в каждом сервисе** как отдельный слой —
-> они вызывают `MockAgentClient` или переопределяют его поведение.
-> Это сознательное решение: mock-логика предметная, а не инфраструктурная.
+> **Важно:** `MockAgentClient` поддерживает два режима. Если задан
+> `agent.mock.response`, возвращается фиксированная строка. Если значение пустое,
+> mock классифицирует поддерживаемые prompt-ы по keyword-based правилам,
+> перенесённым из бывших `MockClaudeRunner` и `MockCaptureClassifierAgent`.
 
 ---
 
@@ -609,8 +612,6 @@ ru.andreyz.common.config.AgentClientConfig
 ```yaml
 agent:
   provider: mock
-  # mock.agent=true остаётся для совместимости MockClaudeRunner
-  # до полного рефактора по CR-COMMON-001
 ```
 
 ### JavaMailAgent — application-prod.yml

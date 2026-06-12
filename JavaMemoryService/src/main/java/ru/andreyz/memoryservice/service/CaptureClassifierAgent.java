@@ -2,60 +2,49 @@ package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import ru.andreyz.common.agent.AgentClient;
+import ru.andreyz.common.agent.AgentException;
 import ru.andreyz.memoryservice.domain.Capture;
 import ru.andreyz.memoryservice.dto.ClassifiedCapture;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
-@ConditionalOnProperty(name = "mock.capture-agent", havingValue = "false", matchIfMissing = true)
 public class CaptureClassifierAgent {
 
     private static final Logger log = LoggerFactory.getLogger(CaptureClassifierAgent.class);
 
+    private final AgentClient agentClient;
     private final ObjectMapper objectMapper;
 
-    public CaptureClassifierAgent(ObjectMapper objectMapper) {
+    public CaptureClassifierAgent(AgentClient agentClient, ObjectMapper objectMapper) {
+        this.agentClient = agentClient;
         this.objectMapper = objectMapper;
     }
 
-    public List<ClassifiedCapture> classify(List<Capture> captures) throws IOException, InterruptedException {
+    public List<ClassifiedCapture> classify(List<Capture> captures) {
         String prompt = buildPrompt(captures);
-        return runClaude(prompt);
+        return completeAndParse(prompt);
     }
 
-    public List<ClassifiedCapture> classifyFiles(List<CaptureService.CaptureFile> files, String dayContext)
-            throws IOException, InterruptedException {
+    public List<ClassifiedCapture> classifyFiles(List<CaptureService.CaptureFile> files, String dayContext) {
         String prompt = buildFilePrompt(files, dayContext);
-        return runClaude(prompt);
+        return completeAndParse(prompt);
     }
 
-    private List<ClassifiedCapture> runClaude(String prompt) throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder("claude", "--print");
-        pb.redirectErrorStream(false);
-        Process process = pb.start();
-
-        try (var stdin = process.getOutputStream()) {
-            stdin.write(prompt.getBytes(StandardCharsets.UTF_8));
+    private List<ClassifiedCapture> completeAndParse(String prompt) {
+        try {
+            String output = agentClient.complete(prompt);
+            log.debug("agent output:\n{}", output);
+            return parseResponse(output);
+        } catch (Exception e) {
+            throw new AgentException("Capture classification failed: " + e.getMessage(), e);
         }
-
-        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        boolean finished = process.waitFor(120, TimeUnit.SECONDS);
-        if (!finished) {
-            process.destroyForcibly();
-            throw new IOException("claude --print timed out after 120s");
-        }
-
-        log.debug("claude output:\n{}", output);
-        return parseResponse(output);
     }
 
     private String buildPrompt(List<Capture> captures) {

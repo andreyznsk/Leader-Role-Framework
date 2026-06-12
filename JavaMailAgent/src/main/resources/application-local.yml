@@ -15,5 +15,5 @@ memory:
   service:
     enabled: true
 
-mock:
-  agent: true
+agent:
+  provider: mock

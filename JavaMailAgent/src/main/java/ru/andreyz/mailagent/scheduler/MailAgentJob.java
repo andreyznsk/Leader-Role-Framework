@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import ru.andreyz.common.agent.AgentClient;
 import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.AgentResponse;
@@ -25,7 +26,7 @@ public class MailAgentJob {
 
     private final MailClient mailClient;
     private final PromptBuilder promptBuilder;
-    private final ClaudeRunner claudeRunner;
+    private final AgentClient agentClient;
     private final ActionExecutor actionExecutor;
     private final MailConfig.MailProperties mailProperties;
     private final MailConfig.PathProperties pathProperties;
@@ -36,7 +37,7 @@ public class MailAgentJob {
     public MailAgentJob(
         MailClient mailClient,
         PromptBuilder promptBuilder,
-        ClaudeRunner claudeRunner,
+        AgentClient agentClient,
         ActionExecutor actionExecutor,
         MailConfig.MailProperties mailProperties,
         MailConfig.PathProperties pathProperties,
@@ -46,7 +47,7 @@ public class MailAgentJob {
     ) {
         this.mailClient = mailClient;
         this.promptBuilder = promptBuilder;
-        this.claudeRunner = claudeRunner;
+        this.agentClient = agentClient;
         this.actionExecutor = actionExecutor;
         this.mailProperties = mailProperties;
         this.pathProperties = pathProperties;
@@ -115,7 +116,8 @@ public class MailAgentJob {
             email.id(), email.from(), email.subject(), email.folder());
         saveToInbox(email);
         String prompt = promptBuilder.build(email);
-        AgentResponse resp = claudeRunner.run(prompt);
+        String raw = agentClient.complete(prompt);
+        AgentResponse resp = parseAgentResponse(raw);
         log.info("Classified as {}{}", resp.type(),
             resp.priority() != null ? ", priority " + resp.priority() : "");
         actionExecutor.execute(resp);
@@ -124,6 +126,19 @@ public class MailAgentJob {
             log.info("Email {} marked as read (NOISE)", email.id());
         }
         return resp;
+    }
+
+    private AgentResponse parseAgentResponse(String raw) throws IOException {
+        String trimmed = raw.trim();
+        if (trimmed.startsWith("```")) {
+            trimmed = trimmed.replaceAll("(?s)```[a-z]*\\n?", "").replaceAll("```", "").trim();
+        }
+        int start = trimmed.indexOf('{');
+        int end = trimmed.lastIndexOf('}');
+        if (start < 0 || end <= start) {
+            throw new IOException("No JSON object in agent response: " + trimmed);
+        }
+        return objectMapper.readValue(trimmed.substring(start, end + 1), AgentResponse.class);
     }
 
     private void saveToInbox(Email email) throws IOException {

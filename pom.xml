@@ -10,10 +10,10 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>common</module>
         <module>JavaMailAgent</module>
         <module>JavaMemoryService</module>
         <module>JavaRagService</module>
-        <module>common</module>
     </modules>
 
     <!-- ===== All versions in one place ===== -->
@@ -25,6 +25,8 @@
 
         <spring-boot.version>3.5.14</spring-boot.version>
         <spring-ai.version>1.1.2</spring-ai.version>
+        <gigachat-spring-ai.version>1.0.6</gigachat-spring-ai.version>
+        <common.version>1.0.0</common.version>
 
         <ews-java-api.version>2.0</ews-java-api.version>
         <jakarta.mail.version>2.0.1</jakarta.mail.version>
@@ -61,8 +63,24 @@
                 <artifactId>jakarta.mail</artifactId>
                 <version>${jakarta.mail.version}</version>
             </dependency>
+            <dependency>
+                <groupId>ru.andreyz</groupId>
+                <artifactId>common</artifactId>
+                <version>${common.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <repositories>
+        <repository>
+            <id>gigachat</id>
+            <url>https://nexus.gigachat.ru/repository/maven-public/</url>
+        </repository>
+        <repository>
+            <id>spring-milestones</id>
+            <url>https://repo.spring.io/milestone</url>
+        </repository>
+    </repositories>
 
     <build>
         <pluginManagement>

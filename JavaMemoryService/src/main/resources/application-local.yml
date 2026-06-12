@@ -15,5 +15,5 @@ app:
   rag:
     inbox-dir: rag-inbox
 
-mock:
-  capture-agent: true
+agent:
+  provider: mock

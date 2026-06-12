@@ -14,3 +14,6 @@ app:
     inbox-dir: ${java.io.tmpdir}/test-rag-inbox
   workspace:
     dir: ${java.io.tmpdir}/test-workspace
+
+agent:
+  provider: mock

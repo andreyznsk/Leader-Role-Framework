@@ -45,5 +45,5 @@ memory:
     url: ${MEMORY_SERVICE_URL:http://localhost:8082}
     enabled: ${MEMORY_SERVICE_ENABLED:true}
 
-mock:
-  agent: ${MOCK_AGENT:false}
+agent:
+  provider: ${AGENT_PROVIDER:claude}
