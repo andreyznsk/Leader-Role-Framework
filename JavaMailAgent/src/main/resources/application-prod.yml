@@ -1,0 +1,49 @@
+spring:
+  datasource:
+    url: ${MAILAGENT_DB_URL:jdbc:postgresql://localhost:5432/leader_framework}
+    username: ${MAILAGENT_DB_USER:mailagent_user}
+    password: ${MAILAGENT_DB_PASSWORD}
+  flyway:
+    schemas: mailagent
+    default-schema: mailagent
+    locations: classpath:db/migration
+
+mail:
+  protocol: ews
+  username: ${MAIL_USERNAME}
+  password: ${MAIL_PASSWORD}
+  poll-interval-seconds: ${MAIL_POLL_INTERVAL_SECONDS:60}
+  fetch-limit: ${MAIL_FETCH_LIMIT:20}
+  folders:
+    exclude:
+      - Sent
+      - Drafts
+      - Trash
+      - Spam
+      - Archive
+      - Junk
+      - Deleted Items
+      - Inbox/CI
+      - Inbox/CI/CD
+      - Inbox/Jenkins
+      - Inbox/GitLab
+
+ews:
+  # Use direct URL for on-prem Exchange. Typical value:
+  # https://exchange.company.local/EWS/Exchange.asmx
+  url: ${EWS_URL:}
+  # Set true if the workplace Exchange supports Autodiscover.
+  autodiscover: ${EWS_AUTODISCOVER:false}
+  # Optional for DOMAIN\user auth. Leave empty for UPN auth user@company.com.
+  domain: ${EWS_DOMAIN:}
+  # EWS Java API 2.0 supports Exchange2007_SP1, Exchange2010, Exchange2010_SP1, Exchange2010_SP2.
+  version: ${EWS_VERSION:Exchange2010_SP2}
+  timeout-seconds: ${EWS_TIMEOUT_SECONDS:30}
+
+memory:
+  service:
+    url: ${MEMORY_SERVICE_URL:http://localhost:8082}
+    enabled: ${MEMORY_SERVICE_ENABLED:true}
+
+mock:
+  agent: ${MOCK_AGENT:false}

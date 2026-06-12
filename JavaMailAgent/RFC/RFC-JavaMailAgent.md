@@ -56,7 +56,8 @@ Spring Boot поддерживает профили через `application-{ENV
 ```
 src/main/resources/
 ├── application.yml              ← общие настройки (в git)
-└── application-local.yml        ← Maildev Docker (НЕ в git)
+├── application-local.yml        ← Maildev Docker
+└── application-prod.yml         ← Exchange/EWS placeholders
 
 корень проекта (примеры):
 ├── application-local.yml.example
@@ -64,7 +65,7 @@ src/main/resources/
 └── application-prod.yml.example
 ```
 
-В git — только `application.yml` и `*.example` шаблоны.
+В git не хранить реальные пароли. Для prod используются env placeholders.
 
 ### application.yml — общие настройки (в git)
 ```yaml
@@ -91,7 +92,14 @@ mail:
   poll-interval-seconds: 60
   fetch-limit: 20
   folders:
-    exclude: "Sent,Drafts,Trash,Spam,Archive,Junk,Deleted Items"
+    exclude:
+      - Sent
+      - Drafts
+      - Trash
+      - Spam
+      - Archive
+      - Junk
+      - Deleted Items
 
 agent:
   timeout-minutes: 5
@@ -162,24 +170,49 @@ imap:
   folder: INBOX
 ```
 
-### application-prod.yml.example — Exchange
+### application-prod.yml — Exchange
 ```yaml
+spring:
+  datasource:
+    url: ${MAILAGENT_DB_URL:jdbc:postgresql://localhost:5432/leader_framework}
+    username: ${MAILAGENT_DB_USER:mailagent_user}
+    password: ${MAILAGENT_DB_PASSWORD}
+
 mail:
   protocol: ews
-  username: user@company.com
-  password:
+  username: ${MAIL_USERNAME}
+  password: ${MAIL_PASSWORD}
+  poll-interval-seconds: ${MAIL_POLL_INTERVAL_SECONDS:60}
+  fetch-limit: ${MAIL_FETCH_LIMIT:20}
+  folders:
+    exclude:
+      - Sent
+      - Drafts
+      - Trash
+      - Spam
+      - Archive
+      - Junk
+      - Deleted Items
+      - Inbox/CI
+      - Inbox/CI/CD
+      - Inbox/Jenkins
+      - Inbox/GitLab
 
 ews:
-  url: https://mail.company.com/EWS/Exchange.asmx
-  autodiscover: false
-  domain:
+  url: ${EWS_URL:}
+  autodiscover: ${EWS_AUTODISCOVER:false}
+  domain: ${EWS_DOMAIN:}
+  version: ${EWS_VERSION:Exchange2010_SP2}
+  timeout-seconds: ${EWS_TIMEOUT_SECONDS:30}
 
-# SMTP — Future (отправка черновиков)
-smtp:
-  host: mail.company.com
-  port: 587
-  starttls: true
+memory:
+  service:
+    url: ${MEMORY_SERVICE_URL:http://localhost:8082}
+    enabled: ${MEMORY_SERVICE_ENABLED:true}
 ```
+
+`mail.folders.exclude` принимает имя папки (`Junk`) или полный путь от Inbox
+(`Inbox/CI/CD`). Если исключена родительская папка, её подпапки также не сканируются.
 
 ---
 
@@ -246,8 +279,8 @@ JavaMailAgent/
     │   │   │   ├── MailClient.java             ← интерфейс
     │   │   │   ├── MailException.java          ← checked exception для MailClient
     │   │   │   ├── MaildevClient.java          ← HTTP API (local) ✅ реализован
+    │   │   │   ├── EwsMailClient.java          ← Exchange/EWS (prod) ✅ реализован
     │   │   │   ├── ImapMailClient.java         ← IMAP (dev) 🔜 planned
-    │   │   │   └── EwsMailClient.java          ← Exchange (prod) 🔜 planned
     │   │   ├── model/
     │   │   │   ├── Email.java                  ← record (id, subject, from, body, receivedAt, folder)
     │   │   │   ├── AgentResponse.java          ← record (@JsonInclude NON_NULL)
@@ -569,7 +602,7 @@ public interface MailClient {
 `markAsRead` вызывается **только для NOISE** — `REQUEST` и `DRAFT` остаются
 непрочитанными в почте, повторная обработка предотвращается через `processed_emails`.
 
-### EwsMailClient — Exchange on-premise (🔜 planned)
+### EwsMailClient — Exchange on-premise ✅ реализован
 ```java
 ExchangeService service = new ExchangeService(ExchangeVersion.Exchange2010_SP2);
 service.setCredentials(new WebCredentials(username, password, domain));
@@ -580,9 +613,12 @@ if (config.isEwsAutodiscover()) {
     service.setUrl(new URI(config.getEwsUrl()));
 }
 ```
-- `listFolders` — `service.findFolders(WellKnownFolderName.Root, ...)`, фильтр excludeFolders
+- `listFolders` — рекурсивный обход `WellKnownFolderName.Inbox` и всех подпапок,
+  фильтр `mail.folders.exclude` по leaf-name или полному пути (`Inbox/Team/CI`)
 - `listUnread` — `FindItemsResults` + `IsRead = false`, `BodyType.Text`
 - `markAsRead` — `email.setIsRead(true); email.update(...)`
+- Внешний контракт папки — строковый путь (`Inbox/Subfolder`); внутри клиент держит
+  map `folderPath -> FolderId` между `listFolders` и `listUnread`
 
 ### ImapMailClient — IMAP (🔜 planned)
 ```java
@@ -881,17 +917,18 @@ SMTP нужен только для **отправки**. В MVP не реали
 6. `Email`, `AgentResponseType`, `AgentResponse`, `PendingTaskRequest`, `ProcessedEmail` — records
 7. `MailClient.java` — интерфейс + `MailException`
 8. `MaildevClient.java` — HTTP API + `@PostConstruct` connection check
-9. `PromptBuilder.java` — формирует промпт из `Email`
-10. `ClaudeRunnerImpl.java` — Process + waitFor + парсинг JSON
-11. `MockClaudeRunner.java` — мок с логикой по русским ключевым словам
-12. `MemoryServiceClient.java` — POST /api/tasks/pending + isHealthy()
-13. `ActionExecutor.java` — switch по enum + вызов MemoryServiceClient
-14. `MailAgentJob.java` — `@Scheduled(fixedDelay)`, мульти-папки, dedup через processed_emails
-15. `ProcessedEmailRepository.java` + `V1__create_processed_emails.sql`
-16. `StatusController.java` + `status.html` — Web UI
-17. `logback-spring.xml` — ротация логов по профилям
+9. `EwsMailClient.java` — Exchange/EWS, рекурсивный scan подпапок Inbox, exclude-фильтр
+10. `application-prod.yml` — prod placeholders для EWS и исключённых папок
+11. `PromptBuilder.java` — формирует промпт из `Email`
+12. `ClaudeRunnerImpl.java` — Process + waitFor + парсинг JSON
+13. `MockClaudeRunner.java` — мок с логикой по русским ключевым словам
+14. `MemoryServiceClient.java` — POST /api/tasks/pending + isHealthy()
+15. `ActionExecutor.java` — switch по enum + вызов MemoryServiceClient
+16. `MailAgentJob.java` — `@Scheduled(fixedDelay)`, мульти-папки, dedup через processed_emails
+17. `ProcessedEmailRepository.java` + `V1__create_processed_emails.sql`
+18. `StatusController.java` + `status.html` — Web UI
+19. `logback-spring.xml` — ротация логов по профилям
 
 ### Planned 🔜
-18. `ImapMailClient.java` — dev окружение (IMAP)
-19. `EwsMailClient.java` — prod окружение (Exchange)
-20. E2E тесты: письмо → Maildev → агент → `plans/today.md` + memory-service
+20. `ImapMailClient.java` — dev окружение (IMAP)
+21. E2E тесты: письмо → Maildev → агент → `plans/today.md` + memory-service

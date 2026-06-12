@@ -21,7 +21,14 @@ mail:
   poll-interval-seconds: 60
   fetch-limit: 20
   folders:
-    exclude: "Sent,Drafts,Trash,Spam,Archive,Junk,Deleted Items"
+    exclude:
+      - Sent
+      - Drafts
+      - Trash
+      - Spam
+      - Archive
+      - Junk
+      - Deleted Items
 
 agent:
   timeout-minutes: 5

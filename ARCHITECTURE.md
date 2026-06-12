@@ -56,7 +56,11 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 |---------|----------|--------|--------|
 | local | Maildev HTTP API | `MaildevClient` | ✅ реализован |
 | dev | IMAP | `ImapMailClient` | 🔜 planned |
-| prod | EWS (Exchange on-premise) | `EwsMailClient` | 🔜 planned |
+| prod | EWS (Exchange on-premise) | `EwsMailClient` | ✅ реализован |
+
+**Prod Exchange scan:** `EwsMailClient` рекурсивно сканирует `Inbox` и все подпапки.
+Исключения задаются в `mail.folders.exclude` по имени папки или полному пути
+от Inbox, например `Inbox/CI/CD`.
 
 **Классификация писем (enum AgentResponseType):**
 | Тип | Действие |
