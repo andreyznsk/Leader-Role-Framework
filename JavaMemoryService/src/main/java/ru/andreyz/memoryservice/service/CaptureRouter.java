@@ -93,7 +93,7 @@ public class CaptureRouter {
         try {
             Path capturesDir = ragInboxDir.resolve("captures");
             Files.createDirectories(capturesDir);
-            String filename = LocalDate.now() + "-" + c.captureId() + ".md";
+            String filename = LocalDate.now() + "-" + knowledgeFileStem(c) + ".md";
             String content = "# " + c.title() + "\n\n" + c.body() + "\n";
             Files.writeString(capturesDir.resolve(filename), content, StandardOpenOption.CREATE_NEW);
             return "rag-inbox/captures/" + filename;
@@ -101,6 +101,18 @@ public class CaptureRouter {
             log.error("Failed to write knowledge capture {}: {}", c.captureId(), e.getMessage());
             return "rag-inbox/captures/ERROR";
         }
+    }
+
+    private String knowledgeFileStem(ClassifiedCapture c) {
+        if (c.captureId() != null) {
+            return String.valueOf(c.captureId());
+        }
+        if (c.file() != null && !c.file().isBlank()) {
+            String filename = Path.of(c.file()).getFileName().toString();
+            int dot = filename.lastIndexOf('.');
+            return dot >= 0 ? filename.substring(0, dot) : filename;
+        }
+        return String.valueOf(System.currentTimeMillis());
     }
 
     private String routeJournal(ClassifiedCapture c) {

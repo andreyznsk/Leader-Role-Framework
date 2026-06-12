@@ -2,6 +2,7 @@ package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
+@ConditionalOnProperty(name = "mock.capture-agent", havingValue = "false", matchIfMissing = true)
 public class CaptureClassifierAgent {
 
     private static final Logger log = LoggerFactory.getLogger(CaptureClassifierAgent.class);

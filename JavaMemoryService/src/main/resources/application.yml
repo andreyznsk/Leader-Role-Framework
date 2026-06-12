@@ -43,3 +43,6 @@ app:
 capture:
   scheduler:
     cron: "0 0 * * * *"
+
+mock:
+  capture-agent: false

@@ -1,6 +1,6 @@
 # LeaderOS — Architecture - Мастер-Спека
 
-**Последнее обновление:** 2026-06-12  
+**Последнее обновление:** 2026-06-12
 **Статус:** Living document — обновлять при любом изменении контрактов между сервисами
 
 ---
@@ -40,15 +40,15 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 ## Сервисы
 
 ### JavaMailAgent
-**Порт:** 8080  
-**Тип:** Spring Boot 3, fat-jar, запускается из корня проекта  
-**RFC:** `JavaMailAgent/RFC/RFC-JavaMailAgent.md`  
+**Порт:** 8080
+**Тип:** Spring Boot 3, fat-jar, запускается из корня проекта
+**RFC:** `JavaMailAgent/RFC/RFC-JavaMailAgent.md`
 **Статус:** In Progress
 
 **Роль:** Читает входящую почту, запускает Claude-агента на каждое письмо,
 выполняет детерминированное действие по результату классификации.
 
-**База данных:** PostgreSQL, схема `mailagent`, владелец `mailagent_user`  
+**База данных:** PostgreSQL, схема `mailagent`, владелец `mailagent_user`
 **Миграции:** Flyway, `classpath:db/migration`, только схема `mailagent`
 
 **Протоколы подключения к почте:**
@@ -77,58 +77,96 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 ---
 
 ### JavaMemoryService
-**Порт:** 8082  
-**Тип:** Spring Boot 3, fat-jar  
-**RFC:** `JavaMemoryService/RFC-memory-service.md` *(создать)*  
+**Порт:** 8082
+**Тип:** Spring Boot 3, fat-jar
+**RFC:** `JavaMemoryService/RFC/RFC-memory-service.md`
 **Статус:** In Progress
 
 **Роль:** Операционная память техлида. Хранит быстро меняющиеся данные —
-задачи, планы, инциденты, состояние писем.
+задачи, планы, инциденты, риски, людей, заметки и raw captures.
+Даёт REST, Thymeleaf UI и MCP tools для Claude-агента.
 
 **База данных:** PostgreSQL, схема `memory`, владелец `memory_user`
 
 **Схемы PostgreSQL:**
 ```
 БД: leader_framework
-├── schema: mailagent   ← JavaMailAgent   (owner: mailagent_user)
-└── schema: memory      ← JavaMemoryService (owner: memory_user)
+├── schema: mailagent   ← JavaMailAgent        (owner: mailagent_user)
+├── schema: memory      ← JavaMemoryService    (owner: memory_user)
+└── schema: rag         ← JavaRagService       (owner: rag_user)
 ```
-Каждый сервис управляет только своей схемой через Flyway.  
+Каждый сервис управляет только своей схемой через Flyway.
 Инициализация: `infra/postgres/init.sql` — схемы, пользователи, права.
 
 **Ключевые endpoint-ы:**
 | Метод | Путь | Описание |
 |-------|------|----------|
+| `GET` | `/api/context` | Контекст сессии: today/tomorrow, open incidents/risks, recent people notes |
+| `POST` | `/api/tasks` | Создать подтверждённую задачу |
 | `POST` | `/api/tasks/pending` | Создать задачу со статусом PENDING |
-| `GET` | `/api/tasks/today` | Задачи на сегодня |
+| `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `DELETED` по умолчанию |
 | `PATCH` | `/api/tasks/{id}/status` | Изменить статус задачи |
+| `POST` | `/api/capture` | Сохранить raw capture в БД и `capture-inbox/` |
+| `POST` | `/api/capture/process-now` | Ручной запуск классификации capture-файлов |
+| `GET/POST` | `/api/notes` | Лента заметок |
+| `GET/POST/PUT/DELETE` | `/api/incidents`, `/api/risks`, `/api/people` | CRUD/soft delete рабочих сущностей |
 | `GET` | `/ui/today` | Web UI: план дня |
+| `GET` | `/ui/notes` | Web UI: лента заметок |
 
 **Статусы задачи:** `PENDING → TODO → IN_PROGRESS → DONE` / `DELETED`
 
-**Входящие вызовы от:** JavaMailAgent
+**Capture Bot:** `POST /api/capture` сохраняет заметку без интерпретации.
+`CaptureScheduler` по `capture.scheduler.cron` пакетно читает `capture-inbox/YYYY-MM-DD/*.md`,
+добавляет контекст дня, вызывает `claude --print` и маршрутизирует результат:
+`TASK → tasks/pending`, `RISK → risks`, `NOTE → notes`, `QUESTION → questions`,
+`PERSON_NOTE → person_notes`, `KNOWLEDGE → JavaRagService/rag-inbox/captures`,
+`JOURNAL → workspace/08_daily_journal`.
+После успешной обработки файл переносится в `capture-inbox/processed/YYYY-MM-DD/`.
+
+**MCP tools:** `getContext`, `getTasks`, `createTask`, `markTaskDone`, `moveTask`,
+`updateTaskStatus`, `getTaskDescription`, `setTaskDescription`, `createIncident`,
+`resolveIncident`, `addRisk`, `updateRisk`, `addPeopleNote`, `searchPeople`.
+
+**Входящие вызовы от:** JavaMailAgent, Claude-агент, CLI/user scripts
 
 ---
 
 ### JavaRagService
-**Порт:** 8081  
-**Тип:** Spring Boot 3 / lightweight Java, fat-jar  
-**RFC:** `JavaRagService/RFC-rag-service.md` *(создать)*  
+**Порт:** 8081
+**Тип:** Spring Boot 3, fat-jar
+**RFC:** `JavaRagService/RFC/RFC-rag-service.md` ✅
 **Статус:** In Progress
 
-**Роль:** RAG (Retrieval-Augmented Generation) — поиск по базе знаний команды.
+**Роль:** RAG (Retrieval-Augmented Generation) — семантическая база знаний техлида.
+Хранит стабильные Markdown-документы: ADR, process, glossary, service-cards.
 
 **Зависимости:**
-- OpenSearch (Docker) — векторное хранилище, порт 9200
-- Ollama (локально) — эмбеддинги через `mxbai-embed-large`, порт 11434
+- OpenSearch (Docker) — векторное хранилище, порт 9200 (`172.80.2.1:9200` в local профиле)
+- Ollama (локально, не Docker) — эмбеддинги `mxbai-embed-large` (1024 dim), порт 11434
+- PostgreSQL (Docker, схема `rag`) — трекинг проиндексированных документов
 
-**Ключевые endpoint-ы:**
+**База данных:** PostgreSQL, схема `rag`, владелец `rag_user`
+**Миграции:** Flyway V1 (таблица `indexed_documents`), V2 (поле `error_message`)
+
+**REST API (`RagRestController`):**
 | Метод | Путь | Описание |
 |-------|------|----------|
-| `POST` | `/api/search` | Векторный поиск по запросу |
-| `POST` | `/api/index` | Индексировать документ |
+| `POST` | `/api/rag/index` | Индексировать файл → `{chunksAdded, status, filePath}` |
+| `POST` | `/api/rag/index-directory` | Batch-индексация → `{indexed, skipped, failed, invalid, message}` |
+| `POST` | `/api/search` | Векторный поиск → `[{text, source, score, chunkIndex}]` |
+| `GET` | `/api/rag/status` | Список всех документов из PostgreSQL |
 
-**Входящие вызовы от:** Claude-агент (через MCP или напрямую)
+**MCP tools (Spring AI):** `rag_index`, `rag_index_directory`, `rag_search`, `rag_status`
+
+**Валидация документов (DocumentValidator):** обязательный YAML frontmatter (`type:`, `updated:`)
+и обязательные секции по типу (ADR, SERVICE_CARD, PROCESS, GLOSSARY).
+Невалидные документы получают статус `invalid` без попадания в OpenSearch.
+
+**Статусы документа:** `indexed` | `invalid` | `failed` | `outdated`
+
+**Scheduler:** `scheduleWithFixedDelay` каждые ~60 сек, сканирует `rag-inbox/`, идемпотентен по hash
+
+**Входящие вызовы от:** Claude-агент (через MCP или REST API)
 
 ---
 
@@ -146,8 +184,9 @@ services:
     #               JavaMemoryService (schema: memory)
 
   opensearch:
-    image: opensearchproject/opensearch:2
+    image: opensearchproject/opensearch:3.5.0
     ports: ["9200:9200"]
+    # Доступен как 172.80.2.1:9200 с хоста (bridge IP) в local профиле
 
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2
@@ -164,7 +203,7 @@ services:
       - "1025:1025"   # SMTP
 ```
 
-**Ollama** — нативно, не в Docker.  
+**Ollama** — нативно, не в Docker.
 Модель эмбеддингов: `mxbai-embed-large`
 
 ---
@@ -178,14 +217,22 @@ Leader-Role-Framework/
 ├── drafts/             ← черновики ответов от агента
 ├── plans/
 │   └── today.md        ← план дня
-├── capture-inbox/      ← Capture Bot складывает сырые заметки (NEW)
-│   └── YYYY-MM-DD/
-│       └── HH-MM-SS.md
+├── capture-inbox/      ← Capture Bot складывает сырые заметки
+│   ├── YYYY-MM-DD/
+│   │   └── HH-MM-SS.md
+│   └── processed/
+│       └── YYYY-MM-DD/
+│           └── HH-MM-SS.md
 ├── workspace/
-│   └── tasks/          ← файлы задач по id (NEW)
-│       ├── TASK-001.md
-│       └── TASK-002.md
-└── cr/                 ← CR для ARCHITECTURE.md и CLAUDE.md (NEW)
+│   ├── tasks/          ← файлы задач по id
+│   │   ├── TASK-001.md
+│   │   └── TASK-002.md
+│   └── 08_daily_journal/
+│       └── YYYY-MM-DD.md
+├── JavaRagService/
+│   └── rag-inbox/
+│       └── captures/   ← KNOWLEDGE captures для индексации
+└── cr/                 ← CR для ARCHITECTURE.md и CLAUDE.md
     ├── CR-ARCH-001-master-update.md
     └── CR-CLAUDE-001-handoff.md
 ```
@@ -249,7 +296,8 @@ SPRING_PROFILES_ACTIVE=local java -jar JavaMailAgent/target/mail-agent.jar
 ```
 JavaMailAgent  ──POST /api/tasks/pending──→  JavaMemoryService
 JavaMailAgent  ──запускает──→  claude --print
-JavaMemoryService ──GET /api/calendar/today──→  JavaMailAgent  (NEW — идея 8)
+JavaMemoryService ──capture KNOWLEDGE файл──→  JavaRagService/rag-inbox/captures
+JavaMemoryService ──claude --print──→  CaptureClassifierAgent
 claude --print ──читает──→  JavaRagService (через MCP или HTTP /api/search)
 ```
 
@@ -258,8 +306,7 @@ claude --print ──читает──→  JavaRagService (через MCP ил�
 ## Что ещё планируется (Future)
 
 - **SMTP отправка** — тип `SEND`
-- **Capture Bot** (CR-MEM-001) — модуль приёма заметок в java-memory-service
-- **Task File Storage** (CR-MEM-002) — файлы задач workspace/tasks/TASK-{id}.md
+- **Capture Bot UI** — расширить ручное управление captures и переклассификацию
 - **Calendar Endpoint** (CR-MAIL-001) — GET /api/calendar/today из EWS
 - **Weekly Routine Manager** (идея 8) — UI routines + briefing по расписанию
 - **End of Day Summary** (идея 9) — git diff + резюме + EOD коммит
@@ -318,7 +365,10 @@ JavaMemoryService/
 
 JavaRagService/
 └── cr/
-    └── (пусто)
+    ├── CR-RAG-001-postgres-schema.md         (Done)
+    ├── CR-RAG-002-document-validation.md     (Approved)
+    ├── CR-RAG-BUGFIX-002-rest-api.md         (Approved)
+    └── CR-RAG-E2E-001.md                     (Done, 2026-06-12)
 
 JavaMailAgent/
 └── cr/
@@ -458,7 +508,7 @@ docker compose up -d
 | `MAILDEV_SMTP` | Maildev SMTP | `172.80.2.1:1025` |
 | `MS_URL` | JavaMemoryService | `http://localhost:8082` |
 | `MA_URL` | JavaMailAgent | `http://localhost:8080` |
-| `OPENSEARCH_URL` | OpenSearch | `http://localhost:9200` |
+| `OPENSEARCH_URL` | OpenSearch | `http://172.80.2.1:9200` (local/Docker bridge) |
 | `OLLAMA_URL` | Ollama | `http://localhost:11434` |
 | `PGPASSWORD` | PostgreSQL пароль | `mailagent_password` |
 
@@ -496,14 +546,17 @@ docker compose up -d
 
 #### JavaRagService (`test_e2e/`)
 
+Статус прогона: **2026-06-12 — 44 PASS / 0 FAIL / 0 SKIP**
+
 | Файл | Приоритет | Что проверяет |
 |------|-----------|--------------|
-| `01_health_check.md` | CRITICAL | сервис, OpenSearch, Ollama, PostgreSQL |
-| `02_index_single_document.md` | HIGH | rag_index + idempotency + OpenSearch чанки |
-| `03_semantic_search.md` | HIGH | семантический поиск на кириллице |
-| `04_scheduler_auto_index.md` | HIGH | file watcher → авто-индексация ≤90 сек |
-| `05_index_directory.md` | MEDIUM | rag_index_directory + паттерн *.md |
-| `06_reindex_on_change.md` | MEDIUM | старые чанки удаляются, новые приходят |
+| `01_health_check.md` | CRITICAL | сервис, OpenSearch (`/_cluster/health`), Ollama, PostgreSQL |
+| `02_index_and_search.md` | HIGH | базовый цикл: создать → POST /api/rag/index → POST /api/search |
+| `02_index_single_document.md` | HIGH | полный цикл с проверкой PostgreSQL и OpenSearch чанков |
+| `03_semantic_search.md` | HIGH | семантический поиск на кириллице, top_k, релевантность |
+| `04_scheduler_auto_index.md` | HIGH | file watcher → авто-индексация ≤90 сек, переиндексация |
+| `05_index_directory.md` | MEDIUM | POST /api/rag/index-directory, паттерн *.md, invalid=0 |
+| `06_reindex_on_change.md` | MEDIUM | старые чанки удаляются при переиндексации, hash обновляется |
 
 #### Интеграционные (`e2e-integration/`)
 

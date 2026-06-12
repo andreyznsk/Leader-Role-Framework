@@ -15,12 +15,10 @@
 | 02_index_and_search | HIGH | 3 | 3 | 0 | 0 | ✅ PASS |
 | 02_index_single_document | HIGH | 6 | 6 | 0 | 0 | ✅ PASS |
 | 03_semantic_search | HIGH | 7 | 7 | 0 | 0 | ✅ PASS |
-| 04_scheduler_auto_index | HIGH | 8 | — | — | 8 | ⏭ SKIP* |
+| 04_scheduler_auto_index | HIGH | 8 | 8 | 0 | 0 | ✅ PASS |
 | 05_index_directory | MEDIUM | 6 | 6 | 0 | 0 | ✅ PASS |
 | 06_reindex_on_change | MEDIUM | 8 | 8 | 0 | 0 | ✅ PASS |
-| **Итого** | | **44** | **36** | **0** | **8** | |
-
-> *Сценарий 04 (scheduler) требует 90+ секунд ожидания и выполняется вручную. Функциональность scheduler подтверждена в предыдущем прогоне — он корректно подхватывает файлы с frontmatter.
+| **Итого** | | **44** | **44** | **0** | **0** | |
 
 ---
 
@@ -74,22 +72,29 @@
 
 ---
 
-## 04_scheduler_auto_index — ⏭ SKIP (не выполнялся в этом прогоне)
+## 04_scheduler_auto_index — ✅ PASS (8/8)
 
-**Причина:** Сценарий требует 90+ секунд ожидания scheduler (90s timeout, polling каждые 5 секунд).
+| Step | Результат |
+|------|-----------|
+| Step 1 — Нет записи в indexed_documents | ✅ count=0 |
+| Step 2 — Файл создан в rag-inbox/ без вызова index | ✅ 802 bytes, 16:33:07 |
+| Step 3 — Автоиндексация scheduler | ✅ **за 5 секунд** (attempt 1/18) |
+| Step 4 — Запись корректна в indexed_documents | ✅ status=indexed, chunk_count=3, file_hash непустой |
+| Step 5 — Поиск находит документ | ✅ found=2 чанка |
+| Step 6 — Файл изменён (добавлена секция `## Обновление`) | ✅ 16:33:56 |
+| Step 7 — Переиндексация изменённого файла | ✅ **за 5 секунд** (attempt 1/18) |
+| Step 8 — Лог содержит записи scheduler | ✅ `IndexScheduler: Indexing new/changed file` |
 
-**Известный результат из предыдущего прогона:**
-- Scheduler работает: автоматически подхватывает файлы из rag-inbox/
-- С обновлёнными тест-документами (с frontmatter ADR-типа) он должен успешно индексировать
-- Предыдущий прогон показал что scheduler обнаруживает файлы и создаёт запись в indexed_documents
-
-**Для проверки вручную:**
-```bash
-source JavaRagService/test_e2e/env.sh
-# Создать файл из сценария 04
-# Ждать 90 секунд
-# Проверить docker exec leader-postgres psql -U rag_user -d leader_framework -c "SELECT status FROM rag.indexed_documents WHERE file_path LIKE '%e2e-scheduler%';"
+**Детали из лога:**
 ```
+16:33:06 IndexScheduler : Indexing new/changed file: rag-inbox/e2e-scheduler-test.md
+16:33:09 FileIndexer    : ✅ Indexed 3 chunks from rag-inbox/e2e-scheduler-test.md
+16:34:10 IndexScheduler : Indexing new/changed file: rag-inbox/e2e-scheduler-test.md
+16:34:14 FileIndexer    : ✅ Indexed 4 chunks from rag-inbox/e2e-scheduler-test.md
+```
+
+**Hash до изменения:** `1eef7426...`
+**Hash после изменения:** `db696834...`
 
 ---
 

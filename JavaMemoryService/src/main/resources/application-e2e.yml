@@ -1,0 +1,14 @@
+app:
+  capture:
+    inbox-dir: capture-inbox
+  rag:
+    inbox-dir: JavaRagService/rag-inbox
+  workspace:
+    dir: workspace
+
+capture:
+  scheduler:
+    cron: "0 */1 * * * *"
+
+mock:
+  capture-agent: true
