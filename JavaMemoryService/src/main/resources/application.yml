@@ -35,8 +35,11 @@ management:
 app:
   capture:
     inbox-dir: capture-inbox
-    process-cron: "0 0 * * * *"
   rag:
     inbox-dir: ../JavaRagService/rag-inbox
   workspace:
     dir: workspace
+
+capture:
+  scheduler:
+    cron: "0 0 * * * *"

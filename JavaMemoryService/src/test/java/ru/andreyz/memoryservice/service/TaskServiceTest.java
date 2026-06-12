@@ -20,12 +20,14 @@ class TaskServiceTest {
 
     @Test
     void createPending_hasCorrectStatus() {
-        Task task = taskService.createPending("Pending task", null, "msg-test", "sender@test.com", "HIGH");
+        LocalDate dueDate = LocalDate.now().plusDays(2);
+        Task task = taskService.createPending("Pending task", null, "msg-test", "sender@test.com", "HIGH", dueDate);
 
         assertThat(task.id()).isNotNull();
         assertThat(task.status()).isEqualTo("PENDING");
         assertThat(task.source()).isEqualTo("EMAIL");
         assertThat(task.emailId()).isEqualTo("msg-test");
+        assertThat(task.dueDate()).isEqualTo(dueDate);
     }
 
     @Test

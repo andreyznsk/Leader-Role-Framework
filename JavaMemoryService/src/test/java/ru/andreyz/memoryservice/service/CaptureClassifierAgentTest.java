@@ -102,6 +102,21 @@ class CaptureClassifierAgentTest {
     }
 
     @Test
+    void buildFilePrompt_includesDayContextAndNoDuplicateGuidance() {
+        String prompt = agent.buildFilePrompt(
+                List.of(new CaptureService.CaptureFile("10-32-00.md", "нужно обновить runbook")),
+                "Задачи: [\"Обсудить архитектуру payments\"]\nОткрытые риски: [\"Только один человек знает деплой\"]");
+
+        assertThat(prompt)
+                .contains("Контекст дня (уже существуют, не дублируй):")
+                .contains("Обсудить архитектуру payments")
+                .contains("Только один человек знает деплой")
+                .contains("не дублируй существующие задачи")
+                .contains("не дублируй существующие риски")
+                .contains("\"file\":\"10-32-00.md\"");
+    }
+
+    @Test
     void parseResponse_personNoteType() throws IOException {
         String response = """
                 [{"captureId":7,"type":"PERSON_NOTE","title":"Петр","body":"Хочет перейти в другую команду","priority":"NORMAL"}]

@@ -78,7 +78,7 @@ public class TaskController {
     @PostMapping("/pending")
     public ResponseEntity<Task> createPending(@RequestBody CreatePendingTaskRequest req) {
         Task task = taskService.createPending(
-                req.title(), req.description(), req.emailId(), req.sender(), req.priority());
+                req.title(), req.description(), req.emailId(), req.sender(), req.priority(), req.dueDate());
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 

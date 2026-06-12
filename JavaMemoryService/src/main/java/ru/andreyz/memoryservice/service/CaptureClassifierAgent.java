@@ -78,7 +78,7 @@ public class CaptureClassifierAgent {
                 """ + notesList;
     }
 
-    private String buildFilePrompt(List<CaptureService.CaptureFile> files, String dayContext) {
+    String buildFilePrompt(List<CaptureService.CaptureFile> files, String dayContext) {
         String notesJson = files.stream()
                 .map(file -> "{\"file\":\"" + escapeJson(file.file()) + "\",\"text\":\"" + escapeJson(file.text()) + "\"}")
                 .collect(Collectors.joining(",\n "));
@@ -86,13 +86,13 @@ public class CaptureClassifierAgent {
         return """
                 Классифицируй каждую заметку. Верни ТОЛЬКО JSON массив, без пояснений.
 
-                Типы классификации:
-                - TASK — действие которое нужно выполнить
-                - RISK — операционный риск или проблема
-                - NOTE — наблюдение, информация к сведению
-
-                Контекст дня:
+                Контекст дня (уже существуют, не дублируй):
                 %s
+
+                Типы классификации:
+                - TASK — действие которое нужно выполнить (не дублируй существующие задачи)
+                - RISK — операционный риск или проблема (не дублируй существующие риски)
+                - NOTE — наблюдение, информация к сведению
 
                 Заметки:
                 [%s]

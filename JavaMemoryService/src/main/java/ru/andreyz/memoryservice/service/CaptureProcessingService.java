@@ -1,14 +1,16 @@
 package ru.andreyz.memoryservice.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import ru.andreyz.memoryservice.domain.Risk;
+import ru.andreyz.memoryservice.domain.Task;
+import ru.andreyz.memoryservice.dto.ContextDto;
 import ru.andreyz.memoryservice.dto.ClassifiedCapture;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class CaptureProcessingService {
@@ -19,18 +21,15 @@ public class CaptureProcessingService {
     private final CaptureClassifierAgent classifierAgent;
     private final CaptureRouter captureRouter;
     private final ContextService contextService;
-    private final ObjectMapper objectMapper;
 
     public CaptureProcessingService(CaptureService captureService,
                                      CaptureClassifierAgent classifierAgent,
                                      CaptureRouter captureRouter,
-                                     ContextService contextService,
-                                     ObjectMapper objectMapper) {
+                                     ContextService contextService) {
         this.captureService = captureService;
         this.classifierAgent = classifierAgent;
         this.captureRouter = captureRouter;
         this.contextService = contextService;
-        this.objectMapper = objectMapper;
     }
 
     public ProcessResult processToday() {
@@ -73,12 +72,21 @@ public class CaptureProcessingService {
     }
 
     private String buildDayContext() {
-        try {
-            return objectMapper.writeValueAsString(contextService.buildContext());
-        } catch (JsonProcessingException e) {
-            log.warn("Failed to serialize day context: {}", e.getMessage());
-            return "{}";
-        }
+        ContextDto context = contextService.buildContext();
+        List<String> taskTitles = context.todayPlan().tasks().stream()
+                .map(Task::title)
+                .toList();
+        List<String> riskTitles = context.openRisks().stream()
+                .map(Risk::title)
+                .toList();
+        return "Задачи: " + formatList(taskTitles) + "\n" +
+                "Открытые риски: " + formatList(riskTitles);
+    }
+
+    private String formatList(List<String> values) {
+        return values.stream()
+                .map(value -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+                .collect(Collectors.joining(", ", "[", "]"));
     }
 
     private String captureRef(ClassifiedCapture c) {
