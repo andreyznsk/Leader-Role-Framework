@@ -14,11 +14,7 @@
 
 ## Переменные окружения
 ```bash
-export OPENSEARCH_URL="${OPENSEARCH_URL:-http://localhost:9200}"
-export PGPASSWORD="${PGPASSWORD:-rag_password}"
-export PGHOST="${PGHOST:-localhost}"
-export PGUSER="${PGUSER:-rag_user}"
-export PGDATABASE="${PGDATABASE:-leader_framework}"
+source JavaRagService/test_e2e/env.sh
 ```
 
 ## Steps
@@ -27,24 +23,40 @@ export PGDATABASE="${PGDATABASE:-leader_framework}"
 ```bash
 mkdir -p rag-inbox
 cat > rag-inbox/e2e-reindex-test.md <<'EOF'
-# Документ версии V1
+---
+type: ADR
+title: Reindex Test V1
+status: active
+updated: 2026-06-12
+---
+# ADR-REINDEX: Документ версии V1
 
+## Статус
+Active
+
+## Контекст
 Содержимое первой версии документа.
 Уникальная фраза для поиска: ZEBRA-UNIQUE-V1-PHRASE.
 Этот текст должен быть найден до переиндексации.
+
+## Решение
+Первоначальное решение V1.
+
+## Последствия
+Будет заменено версией V2 в ходе теста.
 EOF
 
-curl -s -X POST http://localhost:8081/mcp \
+curl -s --max-time 30 -X POST http://localhost:8081/api/rag/index \
   -H "Content-Type: application/json" \
-  -d '{"method":"rag_index","params":{"file_path":"rag-inbox/e2e-reindex-test.md"}}' \
-  | jq '{chunks_added, status}'
+  -d '{"file_path":"rag-inbox/e2e-reindex-test.md"}' \
+  | jq '{chunksAdded, status}'
 ```
-**Expected:** `chunks_added` > 0
+**Expected:** `chunksAdded` > 0, `status` = `indexed`
 
 ### Step 2 — Поиск находит V1 контент
 ```bash
 sleep 2
-curl -s -X POST http://localhost:8081/api/search \
+curl -s --max-time 15 -X POST http://localhost:8081/api/search \
   -H "Content-Type: application/json" \
   -d '{"query":"ZEBRA-UNIQUE-V1-PHRASE первая версия","top_k":3}' \
   | jq '[.[] | select(.source | contains("e2e-reindex-test")) | .text[:100]]'
@@ -53,10 +65,10 @@ curl -s -X POST http://localhost:8081/api/search \
 
 ### Step 3 — Запомнить hash V1
 ```bash
-HASH_V1=$(PGPASSWORD=$PGPASSWORD psql -h $PGHOST -U $PGUSER -d $PGDATABASE -t \
+HASH_V1=$(docker exec leader-postgres psql -U rag_user -d leader_framework -t \
   -c "SELECT file_hash FROM rag.indexed_documents WHERE file_path LIKE '%e2e-reindex-test%';" \
   | tr -d ' \n')
-CHUNKS_V1=$(PGPASSWORD=$PGPASSWORD psql -h $PGHOST -U $PGUSER -d $PGDATABASE -t \
+CHUNKS_V1=$(docker exec leader-postgres psql -U rag_user -d leader_framework -t \
   -c "SELECT chunk_count FROM rag.indexed_documents WHERE file_path LIKE '%e2e-reindex-test%';" \
   | tr -d ' \n')
 echo "V1 hash: $HASH_V1 | chunks: $CHUNKS_V1"
@@ -66,28 +78,44 @@ echo "V1 hash: $HASH_V1 | chunks: $CHUNKS_V1"
 ### Step 4 — Заменить содержимое файла на V2 (новый уникальный текст)
 ```bash
 cat > rag-inbox/e2e-reindex-test.md <<'EOF'
-# Документ версии V2
+---
+type: ADR
+title: Reindex Test V2
+status: active
+updated: 2026-06-12
+---
+# ADR-REINDEX: Документ версии V2
 
+## Статус
+Active
+
+## Контекст
 Содержимое второй версии документа — полностью заменено.
 Уникальная фраза для поиска: ELEPHANT-UNIQUE-V2-PHRASE.
 Первой версии больше нет — старые чанки должны быть удалены.
+
+## Решение
+Обновлённое решение V2 с новыми данными.
+
+## Последствия
+Только V2 чанки должны присутствовать в OpenSearch после переиндексации.
 EOF
 echo "File updated to V2"
 ```
 **Expected:** файл обновлён
 
-### Step 5 — Переиндексировать через rag_index
+### Step 5 — Переиндексировать через /api/rag/index
 ```bash
-RESPONSE=$(curl -s -X POST http://localhost:8081/mcp \
+RESPONSE=$(curl -s --max-time 30 -X POST http://localhost:8081/api/rag/index \
   -H "Content-Type: application/json" \
-  -d '{"method":"rag_index","params":{"file_path":"rag-inbox/e2e-reindex-test.md"}}')
-echo "$RESPONSE" | jq '{chunks_added, status}'
+  -d '{"file_path":"rag-inbox/e2e-reindex-test.md"}')
+echo "$RESPONSE" | jq '{chunksAdded, status}'
 ```
-**Expected:** `chunks_added` > 0 (не 0 — файл изменился), `status` = `indexed`
+**Expected:** `chunksAdded` > 0 (не 0 — файл изменился), `status` = `indexed`
 
 ### Step 6 — Hash обновился в PostgreSQL
 ```bash
-HASH_V2=$(PGPASSWORD=$PGPASSWORD psql -h $PGHOST -U $PGUSER -d $PGDATABASE -t \
+HASH_V2=$(docker exec leader-postgres psql -U rag_user -d leader_framework -t \
   -c "SELECT file_hash FROM rag.indexed_documents WHERE file_path LIKE '%e2e-reindex-test%';" \
   | tr -d ' \n')
 echo "V1 hash: $HASH_V1"
@@ -99,7 +127,7 @@ echo "V2 hash: $HASH_V2"
 ### Step 7 — Поиск находит V2 контент
 ```bash
 sleep 2
-curl -s -X POST http://localhost:8081/api/search \
+curl -s --max-time 15 -X POST http://localhost:8081/api/search \
   -H "Content-Type: application/json" \
   -d '{"query":"ELEPHANT-UNIQUE-V2-PHRASE вторая версия","top_k":3}' \
   | jq '[.[] | select(.source | contains("e2e-reindex-test")) | .text[:120]]'
@@ -108,13 +136,13 @@ curl -s -X POST http://localhost:8081/api/search \
 
 ### Step 8 — Старый V1 контент больше не находится
 ```bash
-RESULTS=$(curl -s -X POST http://localhost:8081/api/search \
+RESULTS=$(curl -s --max-time 15 -X POST http://localhost:8081/api/search \
   -H "Content-Type: application/json" \
   -d '{"query":"ZEBRA-UNIQUE-V1-PHRASE","top_k":3}')
-V1_COUNT=$(echo "$RESULTS" | jq '[.[] | select(.source | contains("e2e-reindex-test"))] | length')
-echo "V1 results from reindex doc: $V1_COUNT"
+V1_COUNT=$(echo "$RESULTS" | jq '[.[] | select(.source | contains("e2e-reindex-test")) | select(.text | contains("ZEBRA-UNIQUE-V1-PHRASE"))] | length')
+echo "V1 chunks still in index: $V1_COUNT"
 ```
-**Expected:** `0` — старые чанки удалены при переиндексации
+**Expected:** `0` — старые чанки удалены при переиндексации, ZEBRA-фраза не содержится ни в одном оставшемся чанке из этого документа
 
 ## Cleanup
 ```bash

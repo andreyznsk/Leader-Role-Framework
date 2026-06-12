@@ -50,7 +50,7 @@ public class RagMcpTools {
             @ToolParam(description = "File pattern, default '*.md'", required = false) String pattern) {
         Path dir = Path.of(dirPath);
         if (!Files.isDirectory(dir)) {
-            return new DirectoryIndexResult(0, 0, 0, "directory not found: " + dirPath);
+            return new DirectoryIndexResult(0, 0, 0, 0, "directory not found: " + dirPath);
         }
 
         String suffix = (pattern != null && pattern.startsWith("*.")) ? pattern.substring(1) : ".md";
@@ -60,10 +60,10 @@ public class RagMcpTools {
                     .filter(p -> p.toString().endsWith(suffix))
                     .toList();
         } catch (IOException e) {
-            return new DirectoryIndexResult(0, 0, 0, "scan error: " + e.getMessage());
+            return new DirectoryIndexResult(0, 0, 0, 0, "scan error: " + e.getMessage());
         }
 
-        int indexed = 0, skipped = 0, failed = 0;
+        int indexed = 0, skipped = 0, failed = 0, invalid = 0;
         for (Path file : files) {
             String fp = file.toString();
             try {
@@ -78,12 +78,13 @@ public class RagMcpTools {
                 }
                 IndexResult r = fileIndexer.indexFile(fp);
                 if (r.status().startsWith("error")) failed++;
+                else if ("invalid".equals(r.status())) invalid++;
                 else indexed++;
             } catch (Exception e) {
                 failed++;
             }
         }
-        return new DirectoryIndexResult(indexed, skipped, failed, "done");
+        return new DirectoryIndexResult(indexed, skipped, failed, invalid, "done");
     }
 
     @Tool(description = "Semantic search in the RAG knowledge base. Returns top-K most relevant text chunks.")
@@ -108,5 +109,5 @@ public class RagMcpTools {
         }
     }
 
-    public record DirectoryIndexResult(int indexed, int skipped, int failed, String message) {}
+    public record DirectoryIndexResult(int indexed, int skipped, int failed, int invalid, String message) {}
 }

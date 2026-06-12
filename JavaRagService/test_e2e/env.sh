@@ -1,7 +1,7 @@
 # JavaRagService E2E — конфигурация окружения
 # Загрузить перед запуском: source JavaRagService/test_e2e/env.sh
 
-export OPENSEARCH_URL="http://localhost:9200"
+export OPENSEARCH_URL="http://172.80.2.1:9200"
 export OLLAMA_URL="http://localhost:11434"
 
 export PGPASSWORD="rag_password"
