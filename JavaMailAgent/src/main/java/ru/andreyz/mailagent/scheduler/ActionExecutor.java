@@ -57,6 +57,14 @@ public class ActionExecutor {
                 moveToProcessed(inbox, processed);
                 log.info("NOISE: {}", response.note());
             }
+            case CAPTURE -> {
+                String text = response.captureText() != null && !response.captureText().isBlank()
+                    ? response.captureText()
+                    : (response.note() != null ? response.note() : "");
+                memoryServiceClient.createCapture(text, "email");
+                moveToProcessed(inbox, processed);
+                log.info("CAPTURE → memory-service: {}", text);
+            }
         }
     }
 

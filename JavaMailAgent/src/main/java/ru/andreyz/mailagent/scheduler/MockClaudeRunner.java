@@ -44,6 +44,7 @@ public class MockClaudeRunner implements ClaudeRunner {
                 "Mock task title",
                 priority,
                 extractSender(prompt),
+                null,
                 null
             );
             case DRAFT -> new AgentResponse(
@@ -51,19 +52,27 @@ public class MockClaudeRunner implements ClaudeRunner {
                 emailId,
                 "Mock: classified as DRAFT by keyword",
                 null, null, null, null,
-                "drafts/" + emailId + "-draft.md"
+                "drafts/" + emailId + "-draft.md",
+                null
             );
             case NOISE -> new AgentResponse(
                 type,
                 emailId,
                 "Mock: classified as NOISE (default or keyword)",
-                null, null, null, null, null
+                null, null, null, null, null, null
+            );
+            case CAPTURE -> new AgentResponse(
+                type,
+                emailId,
+                "Mock: classified as CAPTURE by keyword",
+                null, null, null, null, null,
+                "Mock capture: " + firstNonBlankLine(emailSection)
             );
         };
     }
 
     // Extract only the email header+body section, before the JSON template instructions.
-    // Fixes: PromptBuilder always includes keywords REQUEST/DRAFT/NOISE/CRITICAL/HIGH
+    // Fixes: PromptBuilder always includes keywords REQUEST/DRAFT/NOISE/CAPTURE/CRITICAL/HIGH
     // in the template text, which polluted the full-prompt keyword search.
     private String extractEmailSection(String prompt) {
         int idx = prompt.indexOf("Верни JSON");
@@ -79,6 +88,11 @@ public class MockClaudeRunner implements ClaudeRunner {
         if (upper.contains("BUILD") || upper.contains("PIPELINE") ||
             upper.contains("PASSED") || upper.contains("SUCCESS") || upper.contains("DURATION:"))
             return AgentResponseType.NOISE;
+        // CAPTURE: useful information without an immediate action
+        if (upper.contains("FYI") || upper.contains("К СВЕДЕНИЮ") ||
+            upper.contains("ИНФО:") || upper.contains("НАПОМИНАНИЕ:") ||
+            upper.contains("CAPTURE"))
+            return AgentResponseType.CAPTURE;
         return AgentResponseType.REQUEST;
     }
 
@@ -117,5 +131,13 @@ public class MockClaudeRunner implements ClaudeRunner {
             }
         }
         return "unknown@mock.local";
+    }
+
+    private String firstNonBlankLine(String text) {
+        return text.lines()
+            .map(String::trim)
+            .filter(line -> !line.isBlank())
+            .findFirst()
+            .orElse("(no text)");
     }
 }

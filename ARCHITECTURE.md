@@ -68,6 +68,7 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 | `REQUEST` | Добавить в `plans/today.md` + POST `/api/tasks/pending` в JavaMemoryService |
 | `DRAFT` | Сохранить черновик в `drafts/` |
 | `NOISE` | Пометить прочитанным на сервере, переместить в `processed/` |
+| `CAPTURE` | POST `/api/capture` в JavaMemoryService, переместить файл в `processed/` |
 
 **Трекинг обработанных писем:** таблица `mailagent.processed_emails`
 - `REQUEST` и `DRAFT` — письмо остаётся непрочитанным на сервере
@@ -251,13 +252,14 @@ claude --print "<промпт с текстом письма>"
 
 ```json
 {
-  "type": "REQUEST|DRAFT|NOISE",
+  "type": "REQUEST|DRAFT|NOISE|CAPTURE",
   "emailId": "...",
   "taskLine": "- [ ] [P1] ...",
   "taskTitle": "...",
   "priority": "LOW|NORMAL|HIGH|CRITICAL",
   "sender": "...",
   "draftPath": "...",
+  "captureText": "...",
   "note": "..."
 }
 ```

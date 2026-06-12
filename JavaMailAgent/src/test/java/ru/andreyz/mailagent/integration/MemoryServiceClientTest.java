@@ -25,6 +25,17 @@ class MemoryServiceClientTest {
     }
 
     @Test
+    void createCaptureSkippedWhenDisabled() {
+        MailConfig.MemoryServiceProperties props = new MailConfig.MemoryServiceProperties();
+        props.setUrl("http://localhost:19999");
+        props.setEnabled(false);
+
+        MemoryServiceClient client = new MemoryServiceClient(new ObjectMapper(), props);
+
+        assertDoesNotThrow(() -> client.createCapture("FYI text", "email"));
+    }
+
+    @Test
     void isHealthyReturnsFalseWhenDisabled() {
         MailConfig.MemoryServiceProperties props = new MailConfig.MemoryServiceProperties();
         props.setUrl("http://localhost:19999");

@@ -71,7 +71,7 @@ public class MailAgentJob {
         log.info("Poll started — scanning {} folder(s): {}", folders.size(), folders);
 
         int total = 0, errors = 0;
-        int[] counts = {0, 0, 0}; // REQUEST, DRAFT, NOISE
+        int[] counts = {0, 0, 0, 0}; // REQUEST, DRAFT, NOISE, CAPTURE
 
         for (String folder : folders) {
             List<Email> emails;
@@ -96,6 +96,7 @@ public class MailAgentJob {
                         case REQUEST -> counts[0]++;
                         case DRAFT   -> counts[1]++;
                         case NOISE   -> counts[2]++;
+                        case CAPTURE -> counts[3]++;
                     }
                     processedEmailRepository.save(ProcessedEmail.of(email, resp.type().name()));
                 } catch (Exception e) {
@@ -105,8 +106,8 @@ public class MailAgentJob {
             }
         }
 
-        log.info("Poll finished: {} processed ({} REQUEST, {} DRAFT, {} NOISE, {} errors)",
-            total - errors, counts[0], counts[1], counts[2], errors);
+        log.info("Poll finished: {} processed ({} REQUEST, {} DRAFT, {} NOISE, {} CAPTURE, {} errors)",
+            total - errors, counts[0], counts[1], counts[2], counts[3], errors);
     }
 
     private AgentResponse processEmail(Email email) throws Exception {

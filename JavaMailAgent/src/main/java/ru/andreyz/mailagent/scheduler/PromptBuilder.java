@@ -18,20 +18,24 @@ public class PromptBuilder {
 
             Верни JSON строго в следующем формате (только JSON, без пояснений):
             {
-              "type": "<REQUEST|DRAFT|NOISE>",
+              "type": "<REQUEST|DRAFT|NOISE|CAPTURE>",
               "emailId": "%s",
               "note": "<краткое объяснение решения>",
               "taskLine": "<строка для plans/today.md, только для REQUEST, иначе null>",
               "taskTitle": "<заголовок задачи, только для REQUEST, иначе null>",
               "priority": "<LOW|NORMAL|HIGH|CRITICAL, только для REQUEST, иначе null>",
               "sender": "<email отправителя, только для REQUEST, иначе null>",
-              "draftPath": "<путь к черновику drafts/..., только для DRAFT, иначе null>"
+              "draftPath": "<путь к черновику drafts/..., только для DRAFT, иначе null>",
+              "captureText": "<суть письма 1-2 предложения, только для CAPTURE, иначе null>"
             }
 
             Типы:
             - REQUEST: письмо требует действия от Tech Lead
             - DRAFT: требует ответного письма, нужен черновик
             - NOISE: CI/CD уведомление, реклама, автоматика — не требует действия
+            - CAPTURE: письмо содержит полезную информацию или знание, но не требует срочного действия.
+              Примеры: FYI, архитектурные решения, аналитика, плановые работы, новости команды.
+              captureText = краткое изложение сути в 1-2 предложения.
 
             Приоритет (только для REQUEST):
             - CRITICAL: "срочно", "asap", "до сегодня"
