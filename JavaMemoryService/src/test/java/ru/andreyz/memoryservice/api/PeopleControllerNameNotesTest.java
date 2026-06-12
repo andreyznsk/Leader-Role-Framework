@@ -27,7 +27,7 @@ class PeopleControllerNameNotesTest {
                         .content("""
                                 {"note": "Хочет перейти в другую команду"}
                                 """))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.personName").value("Петр"))
                 .andExpect(jsonPath("$.note").value("Хочет перейти в другую команду"))
@@ -43,7 +43,7 @@ class PeopleControllerNameNotesTest {
                 .content("""
                         {"note": "first note about this person"}
                         """))
-                .andExpect(status().isOk());
+                .andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/people/name/" + uniqueName + "/notes"))
                 .andExpect(status().isOk())
@@ -58,7 +58,7 @@ class PeopleControllerNameNotesTest {
                 .content("""
                         {"note": "case insensitive note"}
                         """))
-                .andExpect(status().isOk());
+                .andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/people/name/иван/notes"))
                 .andExpect(status().isOk())
@@ -80,12 +80,12 @@ class PeopleControllerNameNotesTest {
         mockMvc.perform(post("/api/people/name/" + person + "/notes")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"note\": \"note one\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/people/name/" + person + "/notes")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"note\": \"note two\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/people/name/" + person + "/notes"))
                 .andExpect(status().isOk())

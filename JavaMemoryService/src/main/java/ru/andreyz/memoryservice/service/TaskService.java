@@ -35,10 +35,16 @@ public class TaskService {
 
     public Task createPending(String title, String description,
                               String emailId, String sender, String priority) {
+        return createPending(title, description, emailId, sender, priority, null);
+    }
+
+    public Task createPending(String title, String description,
+                              String emailId, String sender, String priority,
+                              LocalDate dueDate) {
         String desc = description != null ? description : (sender != null ? "От: " + sender : null);
         Task task = new Task(null, null, title, desc,
                 "PENDING", priority != null ? priority : "NORMAL",
-                null, "EMAIL", emailId,
+                dueDate, "EMAIL", emailId,
                 0, Instant.now(), Instant.now());
         return taskRepository.save(task);
     }
@@ -149,14 +155,16 @@ public class TaskService {
 
     public List<Task> findByDate(LocalDate date) {
         return planRepository.findByPlanDate(date)
-                .map(plan -> taskRepository.findByPlanIdOrderBySortOrder(plan.id()))
+                .map(plan -> taskRepository.findByPlanIdAndStatusNotOrderBySortOrder(plan.id(), "DELETED"))
                 .orElse(List.of());
     }
 
     public List<Task> findByDateAndStatus(LocalDate date, String status) {
-        return findByDate(date).stream()
-                .filter(t -> t.status().equalsIgnoreCase(status))
-                .toList();
+        return planRepository.findByPlanDate(date)
+                .map(plan -> taskRepository.findByPlanIdOrderBySortOrder(plan.id()).stream()
+                        .filter(t -> t.status().equalsIgnoreCase(status))
+                        .toList())
+                .orElse(List.of());
     }
 
     public List<Task> findPending() {

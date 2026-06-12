@@ -2,6 +2,7 @@ package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
+@ConditionalOnProperty(name = "mock.capture-agent", havingValue = "false", matchIfMissing = true)
 public class CaptureClassifierAgent {
 
     private static final Logger log = LoggerFactory.getLogger(CaptureClassifierAgent.class);
@@ -27,7 +29,16 @@ public class CaptureClassifierAgent {
 
     public List<ClassifiedCapture> classify(List<Capture> captures) throws IOException, InterruptedException {
         String prompt = buildPrompt(captures);
+        return runClaude(prompt);
+    }
 
+    public List<ClassifiedCapture> classifyFiles(List<CaptureService.CaptureFile> files, String dayContext)
+            throws IOException, InterruptedException {
+        String prompt = buildFilePrompt(files, dayContext);
+        return runClaude(prompt);
+    }
+
+    private List<ClassifiedCapture> runClaude(String prompt) throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder("claude", "--print");
         pb.redirectErrorStream(false);
         Process process = pb.start();
@@ -57,15 +68,56 @@ public class CaptureClassifierAgent {
                 Для каждой заметки верни JSON-объект в массиве:
                 {
                   "captureId": <число>,
-                  "type": "TASK|RISK|PERSON_NOTE|KNOWLEDGE|JOURNAL|QUESTION",
+                  "type": "TASK|RISK|NOTE|PERSON_NOTE|KNOWLEDGE|JOURNAL|QUESTION",
                   "title": "...",
                   "body": "...",
+                  "tags": "tag1,tag2",
                   "priority": "LOW|NORMAL|HIGH|CRITICAL"
                 }
                 Верни ТОЛЬКО JSON-массив, без пояснений и markdown-обёртки.
                 Для PERSON_NOTE: title = имя человека, body = заметка о нём.
                 Заметки:
                 """ + notesList;
+    }
+
+    String buildFilePrompt(List<CaptureService.CaptureFile> files, String dayContext) {
+        String notesJson = files.stream()
+                .map(file -> "{\"file\":\"" + escapeJson(file.file()) + "\",\"text\":\"" + escapeJson(file.text()) + "\"}")
+                .collect(Collectors.joining(",\n "));
+
+        return """
+                Классифицируй каждую заметку. Верни ТОЛЬКО JSON массив, без пояснений.
+
+                Контекст дня (уже существуют, не дублируй):
+                %s
+
+                Типы классификации:
+                - TASK — действие которое нужно выполнить (не дублируй существующие задачи)
+                - RISK — операционный риск или проблема (не дублируй существующие риски)
+                - NOTE — наблюдение, информация к сведению
+
+                Заметки:
+                [%s]
+
+                Формат ответа:
+                [
+                  {"file": "10-32-00.md", "type": "TASK", "title": "...", "body": "...", "priority": "HIGH|NORMAL|LOW"},
+                  {"file": "14-15-00.md", "type": "RISK", "title": "...", "body": "..."},
+                  {"file": "16-40-00.md", "type": "NOTE", "title": "...", "body": "...", "tags": "risk,person"}
+                ]
+                """.formatted(dayContext, notesJson);
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        try {
+            String json = objectMapper.writeValueAsString(value);
+            return json.substring(1, json.length() - 1);
+        } catch (IOException e) {
+            return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        }
     }
 
     List<ClassifiedCapture> parseResponse(String output) throws IOException {

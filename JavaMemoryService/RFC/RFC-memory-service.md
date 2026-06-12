@@ -1,9 +1,9 @@
 # RFC: java-memory-service
 
-**Статус:** Draft  
-**Автор:** Андрей Зайцев  
-**Дата:** 2026-06-08  
-**Порт:** 8082  
+**Статус:** Living document
+**Автор:** Андрей Зайцев
+**Дата:** 2026-06-12
+**Порт:** 8082
 
 ---
 
@@ -14,10 +14,12 @@
 
 `java-memory-service` — локальный Spring Boot 3 процесс (Java 21), который:
 
-- Хранит оперативный контекст Tech Lead в PostgreSQL (prod) / H2 (local/test)
+- Хранит оперативный контекст Tech Lead в PostgreSQL (local/prod) / H2 (test)
 - Предоставляет Thymeleaf UI для просмотра и ручного редактирования данных
 - Предоставляет MCP-интерфейс для Claude Agent (чтение/запись задач, планов, инцидентов)
 - Принимает предложения задач от java-mail-agent (статус PENDING) и ждёт подтверждения через UI
+- Принимает raw capture-заметки в `capture-inbox/`, пакетно классифицирует их через `claude --print`
+  и маршрутизирует в задачи, риски, заметки, вопросы, RAG inbox или daily journal
 
 ---
 
@@ -30,10 +32,10 @@
 | UI | Thymeleaf + Bootstrap 5 CDN |
 | Data | Spring Data JDBC (без Hibernate, без JPA) |
 | Миграции | Flyway |
-| DB prod | PostgreSQL 15 (Docker) |
-| DB local/test | H2 (in-memory, MODE=PostgreSQL) |
+| DB local/prod | PostgreSQL (Docker/local) |
+| DB test | H2 (in-memory, MODE=PostgreSQL) |
 | JSON | Jackson (встроен в Boot) |
-| MCP | spring-ai-mcp-server-spring-boot-starter |
+| MCP | spring-ai-starter-mcp-server-webmvc |
 | Тесты | JUnit 5, Spring Boot Test, MockMvc |
 | Build | Maven, fat JAR через spring-boot-maven-plugin |
 
@@ -42,41 +44,58 @@
 ## 3. Профили
 
 ### `local` (default при разработке)
-```properties
-# application-local.properties
-spring.profiles.active=local
-spring.datasource.url=jdbc:h2:mem:techlead;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
-spring.datasource.driver-class-name=org.h2.Driver
-spring.datasource.username=sa
-spring.datasource.password=
-spring.h2.console.enabled=true
-spring.h2.console.path=/h2-console
-spring.flyway.locations=classpath:db/migration,classpath:db/migration-h2
+```yaml
+# application-local.yml
+spring:
+  datasource:
+    url: "jdbc:postgresql://172.80.2.1:5432/leader_framework?sslmode=disable"
+    driver-class-name: org.postgresql.Driver
+    username: memory_user
+    password: memory_password
+  flyway:
+    locations: classpath:db/migration
+    schemas: memory
+    default-schema: memory
 ```
 
 ### `prod`
-```properties
-# application-prod.properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/techlead
-spring.datasource.username=techlead
-spring.datasource.password=techlead
-spring.datasource.hikari.maximum-pool-size=5
-spring.flyway.locations=classpath:db/migration
+```yaml
+# application-prod.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/techlead
+    username: techlead
+    password: ${POSTGRES_MEMORY_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+  flyway:
+    locations: classpath:db/migration
 ```
 
 ### `test`
-```properties
-# application-test.properties
-spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
-spring.datasource.driver-class-name=org.h2.Driver
-spring.datasource.username=sa
-spring.datasource.password=
-spring.flyway.locations=classpath:db/migration,classpath:db/migration-h2
+```yaml
+# src/test/resources/application-test.yml
+spring:
+  datasource:
+    url: "jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;CASE_INSENSITIVE_IDENTIFIERS=TRUE"
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  flyway:
+    locations: classpath:db/migration,classpath:db/migration-h2
+
+app:
+  capture:
+    inbox-dir: ${java.io.tmpdir}/test-capture-inbox
+  rag:
+    inbox-dir: ${java.io.tmpdir}/test-rag-inbox
+  workspace:
+    dir: ${java.io.tmpdir}/test-workspace
 ```
 
 **Запуск** (из корня проекта `Leader-Role-Framework/`, как указано в ARCHITECTURE.md):
 ```bash
-# local (H2)
+# local (PostgreSQL schema memory)
 SPRING_PROFILES_ACTIVE=local java -jar JavaMemoryService/target/memory-service.jar
 
 # prod (PostgreSQL)
@@ -96,8 +115,8 @@ CREATE TABLE daily_plans (
     plan_date  DATE         NOT NULL UNIQUE,
     summary    TEXT,
     status     VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',  -- ACTIVE | DONE | CANCELLED
-    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 -- Задачи
@@ -111,8 +130,8 @@ CREATE TABLE tasks (
     due_date    DATE,
     source      VARCHAR(20)  NOT NULL DEFAULT 'MANUAL',  -- MANUAL | EMAIL | AGENT
     email_id    VARCHAR(500),                            -- ссылка на письмо если source=EMAIL
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 -- Инциденты
@@ -120,13 +139,13 @@ CREATE TABLE incidents (
     id           BIGSERIAL PRIMARY KEY,
     title        VARCHAR(500) NOT NULL,
     severity     VARCHAR(10)  NOT NULL,                  -- P1 | P2 | P3
-    status       VARCHAR(20)  NOT NULL DEFAULT 'OPEN',   -- OPEN | INVESTIGATING | RESOLVED
+    status       VARCHAR(20)  NOT NULL DEFAULT 'OPEN',   -- OPEN | INVESTIGATING | RESOLVED | CLOSED
     description  TEXT,
     root_cause   TEXT,
     action_items TEXT,
-    started_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    resolved_at  TIMESTAMPTZ,
-    created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    started_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
+    resolved_at  TIMESTAMP,
+    created_at   TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 -- Риски
@@ -138,8 +157,8 @@ CREATE TABLE risks (
     impact      VARCHAR(10)  NOT NULL DEFAULT 'MEDIUM',  -- LOW | MEDIUM | HIGH
     status      VARCHAR(20)  NOT NULL DEFAULT 'OPEN',    -- OPEN | MITIGATED | ACCEPTED | CLOSED
     mitigation  TEXT,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 -- Люди (карточки членов команды и стейкхолдеров)
@@ -155,8 +174,8 @@ CREATE TABLE people (
     capacity_month   INT,
     capacity_quarter INT,
     notes            TEXT,          -- общие заметки
-    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    created_at       TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 -- Хронологические заметки по людям
@@ -165,7 +184,7 @@ CREATE TABLE people_notes (
     person_id   BIGINT       REFERENCES people(id) ON DELETE CASCADE,
     note        TEXT         NOT NULL,
     tags        VARCHAR(500),   -- через запятую: trust,blocker,key-person
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 -- Состояние входящей почты
@@ -174,11 +193,11 @@ CREATE TABLE email_state (
     message_id     VARCHAR(500) UNIQUE NOT NULL,
     subject        VARCHAR(1000),
     sender         VARCHAR(500),
-    received_at    TIMESTAMPTZ,
+    received_at    TIMESTAMP,
     classification VARCHAR(20),   -- DRAFT | REQUEST | NOISE
     status         VARCHAR(20)  NOT NULL DEFAULT 'NEW',  -- NEW | PROCESSED | IGNORED
     summary        TEXT,
-    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    created_at     TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 -- Индексы
@@ -193,8 +212,9 @@ CREATE INDEX idx_people_notes_person ON people_notes(person_id);
 
 ### 4.2 H2 compatibility (V1_1__h2_compat.sql)
 
-H2 в режиме `MODE=PostgreSQL` поддерживает `BIGSERIAL`, `TIMESTAMPTZ`, `BIGINT REFERENCES`.
-Файл создаётся пустым — заполняется по мере обнаружения несовместимостей.
+H2 используется только в тестах. `application-test.yml` включает `MODE=PostgreSQL`
+и `CASE_INSENSITIVE_IDENTIFIERS=TRUE`; файл `V1_1__h2_compat.sql` остаётся
+точкой для H2-only патчей.
 
 ### 4.3 Миграции структура
 
@@ -202,7 +222,9 @@ H2 в режиме `MODE=PostgreSQL` поддерживает `BIGSERIAL`, `TIME
 src/main/resources/db/
 ├── migration/           # PostgreSQL (prod)
 │   ├── V1__init_schema.sql
-│   └── V3__add_task_sort_order.sql
+│   ├── V2__add_capture_tables.sql
+│   ├── V3__add_task_sort_order.sql
+│   └── V4__add_notes_and_capture.sql
 └── migration-h2/        # H2 патчи (local/test)
     └── V1_1__h2_compat.sql
 ```
@@ -214,6 +236,46 @@ CREATE INDEX idx_tasks_sort_order ON tasks(plan_id, sort_order);
 ```
 
 При создании задачи `sort_order = MAX(sort_order) + 1` в рамках `plan_id`.
+
+`V2__add_capture_tables.sql`:
+```sql
+CREATE TABLE captures (
+    id           BIGSERIAL PRIMARY KEY,
+    raw_text     TEXT        NOT NULL,
+    source       VARCHAR(50) NOT NULL DEFAULT 'cli',
+    status       VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    classified   VARCHAR(20),
+    routed_to    VARCHAR(100),
+    captured_at  TIMESTAMP   NOT NULL DEFAULT NOW(),
+    processed_at TIMESTAMP
+);
+
+CREATE TABLE questions (
+    id         BIGSERIAL PRIMARY KEY,
+    title      VARCHAR(500) NOT NULL,
+    context    TEXT,
+    status     VARCHAR(20)  NOT NULL DEFAULT 'OPEN',
+    created_at TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE person_notes (
+    id          BIGSERIAL PRIMARY KEY,
+    person_name VARCHAR(100) NOT NULL,
+    note        TEXT NOT NULL,
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+```
+
+`V4__add_notes_and_capture.sql`:
+```sql
+CREATE TABLE notes (
+    id         BIGSERIAL PRIMARY KEY,
+    text       TEXT         NOT NULL,
+    tags       VARCHAR(500),
+    source     VARCHAR(50)  NOT NULL DEFAULT 'agent',
+    created_at TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+```
 
 ---
 
@@ -302,6 +364,44 @@ public record PeopleNote(
     String tags,
     Instant createdAt
 ) {}
+
+@Table("captures")
+public record Capture(
+    @Id Long id,
+    String rawText,
+    String source,
+    String status,      // PENDING | PROCESSED
+    String classified,  // TASK | RISK | NOTE | PERSON_NOTE | KNOWLEDGE | JOURNAL | QUESTION
+    String routedTo,
+    Instant capturedAt,
+    Instant processedAt
+) {}
+
+@Table("notes")
+public record Note(
+    @Id Long id,
+    String text,
+    String tags,
+    String source,
+    Instant createdAt
+) {}
+
+@Table("questions")
+public record Question(
+    @Id Long id,
+    String title,
+    String context,
+    String status,
+    Instant createdAt
+) {}
+
+@Table("person_notes")
+public record PersonNameNote(
+    @Id Long id,
+    String personName,
+    String note,
+    Instant createdAt
+) {}
 ```
 
 ---
@@ -314,11 +414,12 @@ public interface DailyPlanRepository extends CrudRepository<DailyPlan, Long> {
 }
 
 public interface TaskRepository extends CrudRepository<Task, Long> {
-    List<Task> findByPlanId(Long planId);
     List<Task> findByPlanIdOrderBySortOrder(Long planId);
+    List<Task> findByPlanIdAndStatusNotOrderBySortOrder(Long planId, String status);
     List<Task> findByStatus(String status);          // для PENDING очереди
     List<Task> findByDueDate(LocalDate date);
-    Optional<Task> findTopByPlanIdOrderBySortOrderDesc(Long planId);
+    @Query("SELECT COALESCE(MAX(sort_order), -1) FROM tasks WHERE plan_id = :planId")
+    int findMaxSortOrderByPlanId(Long planId);
 }
 
 public interface IncidentRepository extends CrudRepository<Incident, Long> {
@@ -337,6 +438,25 @@ public interface PeopleNoteRepository extends CrudRepository<PeopleNote, Long> {
     List<PeopleNote> findByPersonIdOrderByCreatedAtDesc(Long personId);
     List<PeopleNote> findTop10ByOrderByCreatedAtDesc();
 }
+
+public interface CaptureRepository extends CrudRepository<Capture, Long> {
+    List<Capture> findByStatus(String status);
+    List<Capture> findByStatusAndDay(String status, Instant from, Instant to);
+    List<Capture> findByDay(Instant from, Instant to);
+    List<Capture> findRecent();
+}
+
+public interface NoteRepository extends CrudRepository<Note, Long> {
+    List<Note> findTop200ByOrderByCreatedAtDesc();
+}
+
+public interface QuestionRepository extends CrudRepository<Question, Long> {
+    List<Question> findByStatus(String status);
+}
+
+public interface PersonNameNoteRepository extends CrudRepository<PersonNameNote, Long> {
+    List<PersonNameNote> findByPersonNameIgnoreCase(String personName);
+}
 ```
 
 ---
@@ -348,12 +468,11 @@ public interface PeopleNoteRepository extends CrudRepository<PeopleNote, Long> {
 @Service
 public class ContextService {
     public ContextDto buildContext() {
-        // today plan + tasks (status != DELETED)
-        // tomorrow plan + tasks
-        // open incidents (status != RESOLVED)
-        // open/high risks
+        // today plan + tasks (status != DELETED && status != PENDING)
+        // tomorrow plan + tasks (status != DELETED && status != PENDING)
+        // open incidents (status == OPEN)
+        // open risks (status == OPEN)
         // recent people notes (last 10)
-        // НЕ включает PENDING задачи — они отдельный поток
     }
 }
 
@@ -381,6 +500,15 @@ public class TaskService {
     public Task markDone(Long id);
     public Task moveToDate(Long id, LocalDate toDate);
     public Task updateStatus(Long id, String status);
+    public Task reorder(Long id, String direction, Integer position);
+    public List<Task> findByDate(LocalDate date); // без DELETED, с сортировкой sort_order
+}
+
+@Service
+public class CaptureProcessingService {
+    // Берёт файлы capture-inbox/YYYY-MM-DD/*.md, классифицирует батчем,
+    // маршрутизирует и переносит успешно обработанные файлы в processed/YYYY-MM-DD/.
+    public ProcessResult processToday();
 }
 ```
 
@@ -402,6 +530,7 @@ POST /api/plans
 GET  /api/tasks?date=2026-06-08&status=TODO
 POST /api/tasks                          # создать подтверждённую задачу (агент после confirm)
 PUT  /api/tasks/{id}
+PATCH /api/tasks/{id}/status             body: { "status": "TODO|IN_PROGRESS|BLOCKED|DONE" }
 POST /api/tasks/{id}/done
 POST /api/tasks/{id}/move                body: { "toDate": "2026-06-09" }
 POST /api/tasks/{id}/reorder             body: { "direction": "up"|"down" } | { "position": N }
@@ -419,22 +548,43 @@ POST /api/tasks/{id}/reject              # PENDING → DELETED
 
 # Инциденты
 GET  /api/incidents?status=OPEN
+GET  /api/incidents/{id}
 POST /api/incidents
 PUT  /api/incidents/{id}
+DELETE /api/incidents/{id}               # soft delete: status → CLOSED
 POST /api/incidents/{id}/resolve         body: { "rootCause": "...", "actionItems": "..." }
 
 # Риски
 GET  /api/risks?status=OPEN
+GET  /api/risks/{id}
 POST /api/risks
 PUT  /api/risks/{id}
+DELETE /api/risks/{id}                   # soft delete: status → CLOSED
 
 # Люди
 GET  /api/people
 GET  /api/people?name=Иван
+GET  /api/people/{id}
 POST /api/people
 PUT  /api/people/{id}
+DELETE /api/people/{id}                  # hard delete, people_notes cascade
 GET  /api/people/{id}/notes
 POST /api/people/{id}/notes
+GET  /api/people/name/{name}/notes
+POST /api/people/name/{name}/notes
+
+# Capture Bot
+POST /api/capture                        # 200, сохранить raw заметку в БД + capture-inbox
+GET  /api/capture/today
+GET  /api/capture/recent                 # последние 20
+POST /api/capture/process-today          # batch classify + route
+POST /api/capture/process-now            # alias process-today
+
+# Notes / Questions
+GET  /api/notes?tags=risk,person&limit=50
+POST /api/notes
+GET  /api/questions?status=OPEN
+POST /api/questions
 
 # Health
 GET  /actuator/health
@@ -521,11 +671,22 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 - Хронологические заметки под каждой карточкой
 - Форма добавить заметку
 
+**`/ui/notes`** — Лента заметок
+- Список notes из PostgreSQL, сортировка от новых к старым
+- Фильтр по тегам через `GET /api/notes?tags=...`
+- Кнопка "в задачу" создаёт PENDING задачу через `POST /api/tasks/pending`
+
+**Capture UI / ручной запуск**
+- Capture сохраняется через REST `POST /api/capture`
+- Ручной запуск обработки: `POST /api/capture/process-now`
+- Плановый запуск: `CaptureScheduler` по cron `capture.scheduler.cron`
+
 ### Технические требования UI
-- Bootstrap 5 CDN — никакого кастомного CSS
+- Bootstrap 5 CDN + `static/style.css`
 - Thymeleaf fragments: `fragments/layout.html` (nav + head)
 - Формы через POST (не AJAX) — проще и надёжнее для MVP
-- H2 Console на `/h2-console` в профиле `local`
+- Для PUT из HTML-форм включён `spring.mvc.hiddenmethod.filter.enabled=true`
+  и используется hidden input `_method=PUT`
 
 ---
 
@@ -535,7 +696,7 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 ```xml
 <dependency>
     <groupId>org.springframework.ai</groupId>
-    <artifactId>spring-ai-mcp-server-spring-boot-starter</artifactId>
+    <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
 </dependency>
 ```
 
@@ -544,6 +705,7 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 spring.ai.mcp.server.name=java-memory-service
 spring.ai.mcp.server.version=1.0.0
 spring.ai.mcp.server.type=SYNC
+spring.ai.mcp.server.sse-endpoint=/mcp/sse
 spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 ```
 
@@ -558,6 +720,7 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 | `moveTask` | Перенести задачу на дату | "Перенеси задачу X на завтра" |
 | `updateTaskStatus` | Изменить статус задачи | Любое изменение статуса |
 | `getTaskDescription` | Читать Markdown-описание задачи из файловой шины | "Покажи детали задачи X" |
+| `setTaskDescription` | Записать Markdown-описание задачи в файловую шину | "Обнови детали задачи X" |
 | `createIncident` | Зафиксировать инцидент | После подтверждения пользователем |
 | `resolveIncident` | Закрыть инцидент с root cause | После подтверждения пользователем |
 | `addRisk` | Добавить риск | После подтверждения пользователем |
@@ -633,6 +796,11 @@ public class TaskTools {
     @Tool(description = "Get task description from file bus. Returns empty string if no file.")
     public String getTaskDescription(
         @ToolParam(description = "Task ID") Long id) { }
+
+    @Tool(description = "Write or update task description in file bus.")
+    public void setTaskDescription(
+        @ToolParam(description = "Task ID") Long id,
+        @ToolParam(description = "Markdown content") String content) { }
 }
 ```
 
@@ -673,7 +841,95 @@ Leader-Role-Framework/
 
 ---
 
-## 12. Интеграция с java-mail-agent
+## 12. Capture Bot
+
+Capture Bot реализует поток `capture now, classify later`.
+
+### Приём заметки
+
+```
+POST /api/capture
+Content-Type: application/json
+
+{
+  "text": "Риск: только один человек знает деплой",
+  "source": "manual"
+}
+```
+
+Ответ текущего контроллера:
+```json
+{
+  "file": "capture-inbox/2026-06-12/14-32-07.md",
+  "saved": true,
+  "captureId": 42,
+  "savedAt": "2026-06-12T07:32:07Z"
+}
+```
+
+HTTP status: `200 OK`. Сохранение создаёт запись `captures(status=PENDING)` и файл:
+
+```
+capture-inbox/YYYY-MM-DD/HH-MM-SS.md
+```
+
+Формат файла:
+```markdown
+---
+date: YYYY-MM-DD HH:MM:SS
+source: manual
+---
+<raw text>
+```
+
+Если имя занято, добавляется суффикс `-1`, `-2` и т.д.
+
+### Обработка
+
+`CaptureScheduler` запускает `CaptureProcessingService.processToday()` по cron:
+
+```yaml
+capture:
+  scheduler:
+    cron: "0 0 * * * *"
+```
+
+Также доступны ручные endpoints:
+
+```
+POST /api/capture/process-today
+POST /api/capture/process-now
+```
+
+Алгоритм:
+
+1. Прочитать `capture-inbox/YYYY-MM-DD/*.md`.
+2. Построить day context через `ContextService`: текущие задачи и открытые риски.
+3. Передать весь батч в `CaptureClassifierAgent`, который вызывает `claude --print`.
+4. Получить JSON-массив `ClassifiedCapture`.
+5. Для каждого элемента вызвать `CaptureRouter`.
+6. Если route успешен, перенести файл в `capture-inbox/processed/YYYY-MM-DD/`.
+7. Если route упал, файл остаётся в очереди и попадёт в следующий запуск.
+
+`application-e2e.yml` включает `mock.capture-agent=true`: вместо `claude --print`
+используется `MockCaptureClassifierAgent`, который классифицирует по явным маркерам
+`TASK:`, `RISK:`, `NOTE:`, `QUESTION:`, `PERSON_NOTE:`, `KNOWLEDGE:`, `JOURNAL:`.
+
+### Маршрутизация
+
+| Type | Действие |
+|------|----------|
+| `TASK` | `TaskService.createPending(...)`, статус `PENDING`, подтверждение в `/ui/today` |
+| `RISK` | `RiskService.create(...)`, probability/impact по умолчанию `MEDIUM` |
+| `NOTE` | `NoteService.create(..., source="capture")` |
+| `QUESTION` | `QuestionService.create(...)` |
+| `PERSON_NOTE` | `person_notes` по имени через `PersonNameNoteRepository` |
+| `KNOWLEDGE` | Markdown-файл в `${app.rag.inbox-dir}/captures/` |
+| `JOURNAL` | append в `${app.workspace.dir}/08_daily_journal/YYYY-MM-DD.md` |
+
+---
+
+## 13. Интеграция с java-mail-agent
 
 Когда mail-agent классифицировал письмо как `REQUEST` и извлёк задачу:
 
@@ -697,7 +953,7 @@ Content-Type: application/json
 
 ---
 
-## 13. Тесты
+## 14. Тесты
 
 ### Структура
 
@@ -825,7 +1081,7 @@ class McpContextToolTest extends BaseMcpTest {
 
 ---
 
-## 14. Структура проекта
+## 15. Структура проекта
 
 ```
 JavaMemoryService/
@@ -840,21 +1096,37 @@ JavaMemoryService/
     │   │   │   ├── Incident.java
     │   │   │   ├── Risk.java
     │   │   │   ├── Person.java
-    │   │   │   └── PeopleNote.java
+    │   │   │   ├── PeopleNote.java
+    │   │   │   ├── Capture.java
+    │   │   │   ├── Note.java
+    │   │   │   ├── Question.java
+    │   │   │   └── PersonNameNote.java
     │   │   ├── repository/
     │   │   │   ├── DailyPlanRepository.java
     │   │   │   ├── TaskRepository.java
     │   │   │   ├── IncidentRepository.java
     │   │   │   ├── RiskRepository.java
     │   │   │   ├── PersonRepository.java
-    │   │   │   └── PeopleNoteRepository.java
+    │   │   │   ├── PeopleNoteRepository.java
+    │   │   │   ├── CaptureRepository.java
+    │   │   │   ├── NoteRepository.java
+    │   │   │   ├── QuestionRepository.java
+    │   │   │   └── PersonNameNoteRepository.java
     │   │   ├── service/
     │   │   │   ├── ContextService.java
     │   │   │   ├── TaskService.java
     │   │   │   ├── TaskFileService.java            # read/write workspace/tasks/TASK-{id}.md
     │   │   │   ├── IncidentService.java
     │   │   │   ├── RiskService.java
-    │   │   │   └── PeopleService.java
+    │   │   │   ├── PeopleService.java
+    │   │   │   ├── CaptureService.java
+    │   │   │   ├── CaptureProcessingService.java
+    │   │   │   ├── CaptureClassifierAgent.java
+    │   │   │   ├── MockCaptureClassifierAgent.java
+    │   │   │   ├── CaptureRouter.java
+    │   │   │   ├── CaptureScheduler.java
+    │   │   │   ├── NoteService.java
+    │   │   │   └── QuestionService.java
     │   │   ├── api/
     │   │   │   ├── ContextController.java
     │   │   │   ├── TaskController.java          # включает /pending, /reorder, /delete endpoints
@@ -862,13 +1134,17 @@ JavaMemoryService/
     │   │   │   ├── PlanController.java
     │   │   │   ├── IncidentController.java
     │   │   │   ├── RiskController.java
-    │   │   │   └── PeopleController.java
+    │   │   │   ├── PeopleController.java
+    │   │   │   ├── CaptureController.java
+    │   │   │   ├── NoteController.java
+    │   │   │   └── QuestionController.java
     │   │   ├── ui/
     │   │   │   ├── TodayViewController.java
     │   │   │   ├── TaskEditController.java         # GET/POST /ui/tasks/{id}/edit
     │   │   │   ├── IncidentViewController.java
     │   │   │   ├── RiskViewController.java
-    │   │   │   └── PeopleViewController.java
+    │   │   │   ├── PeopleViewController.java
+    │   │   │   └── NotesViewController.java
     │   │   ├── mcp/
     │   │   │   ├── McpConfig.java
     │   │   │   ├── ContextTools.java
@@ -883,15 +1159,23 @@ JavaMemoryService/
     │   │       ├── EditTaskRequest.java
     │   │       ├── MoveTaskRequest.java
     │   │       ├── ReorderTaskRequest.java          # { direction, position }
-    │   │       └── ResolveIncidentRequest.java
+    │   │       ├── ResolveIncidentRequest.java
+    │   │       ├── CaptureRequest.java
+    │   │       ├── CaptureResponse.java
+    │   │       ├── ClassifiedCapture.java
+    │   │       ├── CreateNoteRequest.java
+    │   │       └── UpdateTaskStatusRequest.java
     │   └── resources/
-    │       ├── application.properties
-    │       ├── application-local.properties
-    │       ├── application-prod.properties
+    │       ├── application.yml
+    │       ├── application-local.yml
+    │       ├── application-prod.yml
+    │       ├── application-e2e.yml
     │       ├── db/
     │       │   ├── migration/
     │       │   │   ├── V1__init_schema.sql
-    │       │   │   └── V3__add_task_sort_order.sql
+    │       │   │   ├── V2__add_capture_tables.sql
+    │       │   │   ├── V3__add_task_sort_order.sql
+    │       │   │   └── V4__add_notes_and_capture.sql
     │       │   └── migration-h2/
     │       │       └── V1_1__h2_compat.sql
     │       ├── templates/
@@ -900,22 +1184,22 @@ JavaMemoryService/
     │       │   ├── task-edit.html                  # форма редактирования с MD-редактором
     │       │   ├── incidents.html
     │       │   ├── risks.html
-    │       │   └── people.html
+    │       │   ├── people.html
+    │       │   └── notes.html
     │       └── static/
     └── test/
-        ├── java/ru/zaytsev/memory/
-        │   ├── BaseMcpTest.java
-        │   ├── repository/
+        ├── java/ru/andreyz/memoryservice/
         │   ├── service/
         │   ├── api/
+        │   ├── ui/
         │   └── mcp/
         └── resources/
-            └── application-test.properties
+            └── application-test.yml
 ```
 
 ---
 
-## 14. pom.xml (ключевые зависимости)
+## 16. pom.xml (ключевые зависимости)
 
 ```xml
 <groupId>ru.andreyz.memoryservice</groupId>
@@ -923,9 +1207,10 @@ JavaMemoryService/
 <version>1.0.0-SNAPSHOT</version>
 
 <parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.3.5</version>
+    <groupId>ru.andreyz</groupId>
+    <artifactId>leader-role-framework</artifactId>
+    <version>1.0.0</version>
+    <relativePath>../pom.xml</relativePath>
 </parent>
 
 <dependencies>
@@ -946,6 +1231,10 @@ JavaMemoryService/
         <artifactId>flyway-core</artifactId>
     </dependency>
     <dependency>
+        <groupId>org.flywaydb</groupId>
+        <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
         <groupId>org.postgresql</groupId>
         <artifactId>postgresql</artifactId>
         <scope>runtime</scope>
@@ -961,7 +1250,7 @@ JavaMemoryService/
     </dependency>
     <dependency>
         <groupId>org.springframework.ai</groupId>
-        <artifactId>spring-ai-mcp-server-spring-boot-starter</artifactId>
+        <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
     </dependency>
     <dependency>
         <groupId>org.springframework.boot</groupId>
@@ -970,22 +1259,11 @@ JavaMemoryService/
     </dependency>
 </dependencies>
 
-<dependencyManagement>
-    <dependencies>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-bom</artifactId>
-            <version>1.0.0</version>
-            <type>pom</type>
-            <scope>import</scope>
-        </dependency>
-    </dependencies>
-</dependencyManagement>
 ```
 
 ---
 
-## 15. Интеграция с `.mcp.json`
+## 17. Интеграция с `.mcp.json`
 
 ```json
 {
@@ -1000,12 +1278,12 @@ JavaMemoryService/
 
 ---
 
-## 16. Порядок реализации для Claude Code
+## 18. Порядок реализации для Claude Code
 
 **Базовый сервис:**
 1. `pom.xml` + `MemoryServiceApplication.java`
-2. `application.properties` (все три профиля)
-3. `V1__init_schema.sql` + `V1_1__h2_compat.sql`
+2. `application.yml` + профили `local`, `prod`, `test`, `e2e`
+3. `V1__init_schema.sql` + `V2__add_capture_tables.sql` + `V3__add_task_sort_order.sql` + `V4__add_notes_and_capture.sql`
 4. Domain records
 5. Repository interfaces
 6. DTO классы
@@ -1024,18 +1302,25 @@ JavaMemoryService/
 17. Обновить `today.html`: sort_order, drag handle, стрелки, иконки карандаш/корзина, inline add
 18. `getTaskDescription` MCP tool в `TaskTools`
 
+**CR-MEM-001/002 (Capture Bot):**
+19. `CaptureController`, `CaptureService`, `CaptureRepository`
+20. `CaptureClassifierAgent` + `MockCaptureClassifierAgent`
+21. `CaptureProcessingService`, `CaptureRouter`, `CaptureScheduler`
+22. `NoteController`, `NoteService`, `QuestionService`, `PersonNameNoteRepository`
+23. `notes.html` + сценарии `10_capture_bot.md`, `11_capture_bot_improvements.md`, `12_capture_classification_mock.md`
+
 ---
 
-## 17. Известные нюансы Spring Data JDBC
+## 19. Известные нюансы Spring Data JDBC
 
 - `@MappedCollection(idColumn = "plan_id")` — owned collection Task внутри DailyPlan
 - При save DailyPlan Spring Data JDBC делает DELETE+INSERT для tasks → обновлять задачи через `TaskRepository` напрямую
 - Records + Spring Boot 3 — конструктор определяется автоматически через `@PersistenceCreator`
-- H2 MODE=PostgreSQL: если `TIMESTAMPTZ` не поддерживается — заменить на `TIMESTAMP` в `V1_1__h2_compat.sql`
+- H2 MODE=PostgreSQL используется только в тестовом профиле; основные миграции используют `TIMESTAMP`
 
 ---
 
-## 18. Известные проблемы при сборке и запуске
+## 20. Известные проблемы при сборке и запуске
 
 ### 1. Spring AI BOM версия не резолвится
 
@@ -1058,20 +1343,16 @@ JavaMemoryService/
 </repositories>
 ```
 
-### 2. Flyway падает на TIMESTAMPTZ в H2
+### 2. H2 тесты и регистр идентификаторов
 
-**Симптом:** при старте с профилем `local` или `test` Flyway бросает ошибку на `V1__init_schema.sql`.
+**Симптом:** тесты на H2 не находят таблицы/колонки, хотя Flyway применил миграции.
 
-**Решение:** добавить в `V1_1__h2_compat.sql` переопределение типов:
-```sql
--- H2 не всегда принимает TIMESTAMPTZ даже в MODE=PostgreSQL
--- Этот файл применяется только для профилей local/test
-ALTER TABLE daily_plans ALTER COLUMN created_at TIMESTAMP;
-ALTER TABLE daily_plans ALTER COLUMN updated_at TIMESTAMP;
--- ... аналогично для всех таблиц
+**Решение:** тестовый профиль должен включать:
+```yaml
+spring:
+  datasource:
+    url: "jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;CASE_INSENSITIVE_IDENTIFIERS=TRUE"
 ```
-
-Либо сразу писать `TIMESTAMP` вместо `TIMESTAMPTZ` в основной миграции и не использовать `V1_1__h2_compat.sql`.
 
 ### 3. Spring Data JDBC + records + @PersistenceCreator
 
@@ -1103,6 +1384,6 @@ curl -X POST http://localhost:8082/mcp/message \
 # health check
 curl http://localhost:8082/actuator/health
 
-# H2 Console (только профиль local)
-open http://localhost:8082/h2-console
+# capture health smoke
+curl http://localhost:8082/api/capture/recent
 ```

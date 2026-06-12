@@ -62,7 +62,8 @@ public class PeopleViewController {
                        @RequestParam(required = false) String domain,
                        @RequestParam(required = false) String currentTask,
                        @RequestParam(required = false) String notes) {
-        Person existing = peopleService.findById(id);
+        Person existing = peopleService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Person not found: " + id));
         Person updated = new Person(existing.id(), fullName, login, email,
                 existing.phone(), domain, currentTask,
                 existing.capacitySprint(), existing.capacityMonth(), existing.capacityQuarter(),

@@ -34,6 +34,8 @@ class CaptureControllerTest {
                                 {"text": "Ivan doesn't know rollback", "source": "cli"}
                                 """))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.file").isString())
+                .andExpect(jsonPath("$.saved").value(true))
                 .andExpect(jsonPath("$.captureId").isNumber())
                 .andExpect(jsonPath("$.savedAt").isString());
     }
@@ -46,6 +48,8 @@ class CaptureControllerTest {
                                 {"text": "note without source"}
                                 """))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.file").isString())
+                .andExpect(jsonPath("$.saved").value(true))
                 .andExpect(jsonPath("$.captureId").isNumber());
     }
 
@@ -106,5 +110,16 @@ class CaptureControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(0))
                 .andExpect(jsonPath("$.routed").value(0));
+    }
+
+    @Test
+    void postProcessNow_aliasReturnsTotalAndRouted() throws Exception {
+        when(processingService.processToday())
+                .thenReturn(new CaptureProcessingService.ProcessResult(2, 1));
+
+        mockMvc.perform(post("/api/capture/process-now"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(2))
+                .andExpect(jsonPath("$.routed").value(1));
     }
 }

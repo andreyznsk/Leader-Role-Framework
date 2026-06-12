@@ -40,7 +40,8 @@ public class RiskViewController {
     public String edit(@PathVariable Long id,
                        @RequestParam(required = false) String status,
                        @RequestParam(required = false) String mitigation) {
-        Risk existing = riskService.findById(id);
+        Risk existing = riskService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Risk not found: " + id));
         Risk updated = new Risk(existing.id(), existing.title(), existing.description(),
                 existing.probability(), existing.impact(),
                 status != null ? status : existing.status(),

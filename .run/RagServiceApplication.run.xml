@@ -1,5 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="RagServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+    <option name="ACTIVE_PROFILES" value="local" />
     <module name="rag-service" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="ru.andreyz.ragservice.RagServiceApplication" />
     <method v="2">

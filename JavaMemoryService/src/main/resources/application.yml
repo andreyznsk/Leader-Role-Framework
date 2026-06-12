@@ -1,5 +1,13 @@
 server:
   port: 8082
+  tomcat:
+    relaxed-query-chars: "|,{,},[,]"
+    uri-encoding: UTF-8
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
 
 spring:
   application:
@@ -31,3 +39,10 @@ app:
     inbox-dir: ../JavaRagService/rag-inbox
   workspace:
     dir: workspace
+
+capture:
+  scheduler:
+    cron: "0 0 * * * *"
+
+mock:
+  capture-agent: false

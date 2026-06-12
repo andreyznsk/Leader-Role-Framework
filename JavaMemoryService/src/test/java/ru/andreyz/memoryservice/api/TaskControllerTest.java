@@ -30,7 +30,7 @@ class TaskControllerTest {
                         .content("""
                                 {"title":"Test task","date":"%s","priority":"HIGH","source":"MANUAL"}
                                 """.formatted(today)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Test task"))
                 .andExpect(jsonPath("$.status").value("TODO"));
 
@@ -41,14 +41,17 @@ class TaskControllerTest {
 
     @Test
     void createPendingTask() throws Exception {
+        String dueDate = LocalDate.now().plusDays(3).toString();
+
         mockMvc.perform(post("/api/tasks/pending")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"Email task","emailId":"msg-123","sender":"test@test.com","priority":"NORMAL"}
-                                """))
-                .andExpect(status().isOk())
+                                {"title":"Email task","emailId":"msg-123","sender":"test@test.com","priority":"NORMAL","dueDate":"%s"}
+                """.formatted(dueDate)))
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.source").value("EMAIL"));
+                .andExpect(jsonPath("$.source").value("EMAIL"))
+                .andExpect(jsonPath("$.dueDate").value(dueDate));
     }
 
     @Test

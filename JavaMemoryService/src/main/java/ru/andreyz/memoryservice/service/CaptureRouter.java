@@ -24,6 +24,7 @@ public class CaptureRouter {
     private final TaskService taskService;
     private final RiskService riskService;
     private final QuestionService questionService;
+    private final NoteService noteService;
     private final PersonNameNoteRepository personNameNoteRepository;
     private final Path ragInboxDir;
     private final Path workspaceDir;
@@ -32,12 +33,14 @@ public class CaptureRouter {
             TaskService taskService,
             RiskService riskService,
             QuestionService questionService,
+            NoteService noteService,
             PersonNameNoteRepository personNameNoteRepository,
             @Value("${app.rag.inbox-dir:../JavaRagService/rag-inbox}") String ragInboxDir,
             @Value("${app.workspace.dir:../workspace}") String workspaceDir) {
         this.taskService = taskService;
         this.riskService = riskService;
         this.questionService = questionService;
+        this.noteService = noteService;
         this.personNameNoteRepository = personNameNoteRepository;
         this.ragInboxDir = Path.of(ragInboxDir);
         this.workspaceDir = Path.of(workspaceDir);
@@ -47,6 +50,7 @@ public class CaptureRouter {
         return switch (c.type()) {
             case "TASK" -> routeTask(c);
             case "RISK" -> routeRisk(c);
+            case "NOTE" -> routeNote(c);
             case "QUESTION" -> routeQuestion(c);
             case "PERSON_NOTE" -> routePersonNote(c);
             case "KNOWLEDGE" -> routeKnowledge(c);
@@ -64,9 +68,14 @@ public class CaptureRouter {
     }
 
     private String routeRisk(ClassifiedCapture c) {
-        String impact = mapPriority(c.priority());
-        riskService.create(c.title(), c.body(), "MEDIUM", impact);
+        riskService.create(c.title(), c.body(), "MEDIUM", "MEDIUM");
         return "risks";
+    }
+
+    private String routeNote(ClassifiedCapture c) {
+        String text = c.body() != null && !c.body().isBlank() ? c.body() : c.title();
+        noteService.create(text, c.tags(), "capture");
+        return "notes";
     }
 
     private String routeQuestion(ClassifiedCapture c) {
@@ -84,7 +93,7 @@ public class CaptureRouter {
         try {
             Path capturesDir = ragInboxDir.resolve("captures");
             Files.createDirectories(capturesDir);
-            String filename = LocalDate.now() + "-" + c.captureId() + ".md";
+            String filename = LocalDate.now() + "-" + knowledgeFileStem(c) + ".md";
             String content = "# " + c.title() + "\n\n" + c.body() + "\n";
             Files.writeString(capturesDir.resolve(filename), content, StandardOpenOption.CREATE_NEW);
             return "rag-inbox/captures/" + filename;
@@ -92,6 +101,18 @@ public class CaptureRouter {
             log.error("Failed to write knowledge capture {}: {}", c.captureId(), e.getMessage());
             return "rag-inbox/captures/ERROR";
         }
+    }
+
+    private String knowledgeFileStem(ClassifiedCapture c) {
+        if (c.captureId() != null) {
+            return String.valueOf(c.captureId());
+        }
+        if (c.file() != null && !c.file().isBlank()) {
+            String filename = Path.of(c.file()).getFileName().toString();
+            int dot = filename.lastIndexOf('.');
+            return dot >= 0 ? filename.substring(0, dot) : filename;
+        }
+        return String.valueOf(System.currentTimeMillis());
     }
 
     private String routeJournal(ClassifiedCapture c) {
@@ -111,11 +132,4 @@ public class CaptureRouter {
         }
     }
 
-    private String mapPriority(String priority) {
-        return switch (priority != null ? priority : "NORMAL") {
-            case "CRITICAL", "HIGH" -> "HIGH";
-            case "LOW" -> "LOW";
-            default -> "MEDIUM";
-        };
-    }
 }
