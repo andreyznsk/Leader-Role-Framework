@@ -13,7 +13,7 @@ maildev:
 
 memory:
   service:
-    enabled: false
+    enabled: true
 
 mock:
   agent: true

@@ -22,6 +22,11 @@ public enum DocSchema {
     ADR(DocType.ADR,
             List.of(DocField.TYPE, DocField.UPDATED),
             List.of("## Статус", "## Контекст", "## Решение", "## Последствия")
+    ),
+
+    KNOWLEDGE(DocType.KNOWLEDGE,
+            List.of(DocField.TYPE),
+            List.of()
     );
 
     private final DocType docType;

@@ -4,5 +4,6 @@ public enum DocType {
     SERVICE_CARD,
     PROCESS,
     GLOSSARY,
-    ADR
+    ADR,
+    KNOWLEDGE
 }

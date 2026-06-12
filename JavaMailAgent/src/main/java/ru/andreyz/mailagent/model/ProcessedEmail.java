@@ -5,7 +5,7 @@ import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.LocalDateTime;
 
-@Table("mailagent.processed_emails")
+@Table(schema = "mailagent", value = "processed_emails")
 public record ProcessedEmail(
     @Id Long id,
     String emailId,

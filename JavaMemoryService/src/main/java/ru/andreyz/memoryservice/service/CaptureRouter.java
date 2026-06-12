@@ -94,7 +94,7 @@ public class CaptureRouter {
             Path capturesDir = ragInboxDir.resolve("captures");
             Files.createDirectories(capturesDir);
             String filename = LocalDate.now() + "-" + knowledgeFileStem(c) + ".md";
-            String content = "# " + c.title() + "\n\n" + c.body() + "\n";
+            String content = "---\ntype: knowledge\nupdated: " + LocalDate.now() + "\n---\n\n# " + c.title() + "\n\n" + c.body() + "\n";
             Files.writeString(capturesDir.resolve(filename), content, StandardOpenOption.CREATE_NEW);
             return "rag-inbox/captures/" + filename;
         } catch (IOException e) {

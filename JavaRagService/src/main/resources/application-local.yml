@@ -16,6 +16,15 @@ opensearch:
   url: http://172.80.2.1:9200
   index: rag-knowledge
 
+app:
+  capture:
+    inbox-dir: capture-inbox
+  rag:
+    inbox-dir: rag-inbox
+  workspace:
+    dir: workspace
+
+
 rag:
   inbox:
     path: rag-inbox

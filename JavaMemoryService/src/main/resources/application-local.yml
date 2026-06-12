@@ -8,3 +8,12 @@ spring:
     locations: classpath:db/migration
     schemas: memory
     default-schema: memory
+
+app:
+  capture:
+    inbox-dir: capture-inbox
+  rag:
+    inbox-dir: rag-inbox
+
+mock:
+  capture-agent: true

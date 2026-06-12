@@ -13,6 +13,7 @@
         <module>JavaMailAgent</module>
         <module>JavaMemoryService</module>
         <module>JavaRagService</module>
+        <module>common</module>
     </modules>
 
     <!-- ===== All versions in one place ===== -->
