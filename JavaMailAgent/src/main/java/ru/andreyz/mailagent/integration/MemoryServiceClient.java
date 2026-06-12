@@ -12,6 +12,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Map;
 
 @Component
 public class MemoryServiceClient {
@@ -53,6 +54,35 @@ public class MemoryServiceClient {
         } catch (Exception e) {
             // Не останавливаем обработку почты если memory-service недоступен
             log.warn("Failed to reach memory-service: {}", e.getMessage());
+        }
+    }
+
+    public void createCapture(String text, String source) {
+        if (!enabled) {
+            log.debug("memory-service disabled, skipping capture");
+            return;
+        }
+        try {
+            String body = objectMapper.writeValueAsString(Map.of(
+                "text", text,
+                "source", source
+            ));
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/api/capture"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .timeout(Duration.ofSeconds(5))
+                .build();
+
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                log.info("Capture saved to memory-service");
+            } else {
+                log.warn("memory-service /api/capture returned {}: {}", response.statusCode(), response.body());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to save capture to memory-service: {}", e.getMessage());
         }
     }
 

@@ -14,24 +14,24 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 ┌─────────────────────────────────────────────────────────────────┐
 │                          LeaderOS                                │
 │                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                    common :library                        │   │
+│  │  AgentClient: claude | mock | ollama | gigachat           │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│        ↑ использует         ↑ использует         ↑ depends       │
 │  ┌─────────────────┐        ┌──────────────────────────────┐    │
 │  │  JavaMailAgent  │──────→ │      JavaMemoryService       │    │
 │  │  :8080          │  HTTP  │      :8082                   │    │
 │  │  schema:        │        │  schema: memory              │    │
 │  │  mailagent      │        │  PostgreSQL (Docker :5432)   │    │
-│  └────────┬────────┘        └──────────────────────────────┘    │
-│           │ запускает                                            │
-│           ↓                                                      │
+│  └─────────────────┘        └──────────────────────────────┘    │
+│                                                                  │
 │  ┌─────────────────┐        ┌──────────────────────────────┐    │
-│  │  claude --print │        │      JavaRagService          │    │
-│  │  (Claude Code)  │        │      :8081                   │    │
-│  └─────────────────┘        │  OpenSearch (Docker :9200)   │    │
-│                              │  Ollama (local :11434)       │    │
-│  ┌─────────────────┐        └──────────────────────────────┘    │
-│  │  Maildev        │                                             │
-│  │  Docker :18080  │   ← только local окружение                 │
-│  │  SMTP   :1025   │                                             │
-│  └─────────────────┘                                             │
+│  │  Maildev        │        │      JavaRagService          │    │
+│  │  Docker :18080  │        │      :8081                   │    │
+│  │  SMTP   :1025   │        │  OpenSearch (Docker :9200)   │    │
+│  │  local only     │        │  Ollama (local :11434)       │    │
+│  └─────────────────┘        └──────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -39,13 +39,38 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 
 ## Сервисы
 
+### common
+**Тип:** plain JAR, не Spring Boot app, не fat-jar
+**RFC:** `common/RFC/RFC-common.md`
+**Статус:** Implemented
+
+**Роль:** Общая инфраструктура LeaderOS. Содержит единый внешний контракт
+`AgentClient` для вызова LLM из сервисов.
+
+**Интерфейс:**
+| Класс | Описание |
+|-------|----------|
+| `AgentClient` | `String complete(String prompt)` |
+| `AgentException` | RuntimeException для ошибок LLM |
+| `ClaudeProcessAgentClient` | `claude --print` subprocess |
+| `MockAgentClient` | deterministic mock, включая keyword-based mail/capture классификацию |
+| `OllamaAgentClient` | Spring AI → Ollama |
+| `GigaChatAgentClient` | Spring AI → GigaChat |
+| `AgentClientConfig` | auto-configuration, выбор по `agent.provider` |
+
+**Переключение провайдера:**
+```yaml
+agent:
+  provider: claude   # claude | mock | ollama | gigachat
+```
+
 ### JavaMailAgent
 **Порт:** 8080
 **Тип:** Spring Boot 3, fat-jar, запускается из корня проекта
 **RFC:** `JavaMailAgent/RFC/RFC-JavaMailAgent.md`
 **Статус:** In Progress
 
-**Роль:** Читает входящую почту, запускает Claude-агента на каждое письмо,
+**Роль:** Читает входящую почту, вызывает LLM через `AgentClient` на каждое письмо,
 выполняет детерминированное действие по результату классификации.
 
 **База данных:** PostgreSQL, схема `mailagent`, владелец `mailagent_user`
@@ -56,7 +81,11 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 |---------|----------|--------|--------|
 | local | Maildev HTTP API | `MaildevClient` | ✅ реализован |
 | dev | IMAP | `ImapMailClient` | 🔜 planned |
-| prod | EWS (Exchange on-premise) | `EwsMailClient` | 🔜 planned |
+| prod | EWS (Exchange on-premise) | `EwsMailClient` | ✅ реализован |
+
+**Prod Exchange scan:** `EwsMailClient` рекурсивно сканирует `Inbox` и все подпапки.
+Исключения задаются в `mail.folders.exclude` по имени папки или полному пути
+от Inbox, например `Inbox/CI/CD`.
 
 **Классификация писем (enum AgentResponseType):**
 | Тип | Действие |
@@ -64,6 +93,7 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 | `REQUEST` | Добавить в `plans/today.md` + POST `/api/tasks/pending` в JavaMemoryService |
 | `DRAFT` | Сохранить черновик в `drafts/` |
 | `NOISE` | Пометить прочитанным на сервере, переместить в `processed/` |
+| `CAPTURE` | POST `/api/capture` в JavaMemoryService, переместить файл в `processed/` |
 
 **Трекинг обработанных писем:** таблица `mailagent.processed_emails`
 - `REQUEST` и `DRAFT` — письмо остаётся непрочитанным на сервере
@@ -117,7 +147,7 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 
 **Capture Bot:** `POST /api/capture` сохраняет заметку без интерпретации.
 `CaptureScheduler` по `capture.scheduler.cron` пакетно читает `capture-inbox/YYYY-MM-DD/*.md`,
-добавляет контекст дня, вызывает `claude --print` и маршрутизирует результат:
+добавляет контекст дня, вызывает `AgentClient` из `common` и маршрутизирует результат:
 `TASK → tasks/pending`, `RISK → risks`, `NOTE → notes`, `QUESTION → questions`,
 `PERSON_NOTE → person_notes`, `KNOWLEDGE → JavaRagService/rag-inbox/captures`,
 `JOURNAL → workspace/08_daily_journal`.
@@ -239,24 +269,20 @@ Leader-Role-Framework/
 
 ---
 
-## Claude-агент
+## Claude-агент / LLM-агент
 
-```bash
-claude --print "<промпт с текстом письма>"
-```
+Сервисы вызывают LLM через `AgentClient` из модуля `common`.
+Провайдер выбирается через `agent.provider` в `application.yml`.
 
-```json
-{
-  "type": "REQUEST|DRAFT|NOISE",
-  "emailId": "...",
-  "taskLine": "- [ ] [P1] ...",
-  "taskTitle": "...",
-  "priority": "LOW|NORMAL|HIGH|CRITICAL",
-  "sender": "...",
-  "draftPath": "...",
-  "note": "..."
-}
-```
+| Провайдер | Реализация | Когда использовать |
+|-----------|------------|-------------------|
+| `claude` | `claude --print` subprocess | prod/default |
+| `mock` | `MockAgentClient` | local/e2e тесты |
+| `ollama` | Spring AI → Ollama | local без Claude CLI |
+| `gigachat` | Spring AI → GigaChat | корпоративный стенд |
+
+Промпт-билдеры и парсинг ответа остаются в сервисах, потому что формат ответа
+является предметной логикой.
 
 ---
 
@@ -295,10 +321,11 @@ SPRING_PROFILES_ACTIVE=local java -jar JavaMailAgent/target/mail-agent.jar
 
 ```
 JavaMailAgent  ──POST /api/tasks/pending──→  JavaMemoryService
-JavaMailAgent  ──запускает──→  claude --print
+JavaMailAgent  ──AgentClient──→  common
 JavaMemoryService ──capture KNOWLEDGE файл──→  JavaRagService/rag-inbox/captures
-JavaMemoryService ──claude --print──→  CaptureClassifierAgent
-claude --print ──читает──→  JavaRagService (через MCP или HTTP /api/search)
+JavaMemoryService ──AgentClient──→  common
+JavaRagService ──depends on──→  common (future LLM features)
+LLM provider ──читает──→  JavaRagService (через MCP или HTTP /api/search)
 ```
 
 ---
@@ -312,6 +339,7 @@ claude --print ──читает──→  JavaRagService (через MCP ил�
 - **End of Day Summary** (идея 9) — git diff + резюме + EOD коммит
 - **LeaderOS Daily Cycle** — суточный цикл фреймворка (отдельный RFC)
 - **Grafana** — capacity из Jira + PostgreSQL (идея 3)
+- **common** — реализован, сервисы мигрированы (CR-COMMON-001)
 
 ---
 
@@ -319,6 +347,7 @@ claude --print ──читает──→  JavaRagService (через MCP ил�
 
 | Сервис | groupId | artifactId |
 |--------|---------|------------|
+| common | `ru.andreyz` | `common` |
 | JavaMailAgent | `ru.andreyz.mailagent` | `mail-agent` |
 | JavaMemoryService | `ru.andreyz.memoryservice` | `memory-service` |
 | JavaRagService | `ru.andreyz.ragservice` | `rag-service` |
@@ -329,6 +358,7 @@ claude --print ──читает──→  JavaRagService (через MCP ил�
 
 | Сервис | RFC | Статус |
 |--------|-----|--------|
+| common | `common/RFC/RFC-common.md` | Draft |
 | JavaMailAgent | `JavaMailAgent/RFC/RFC-JavaMailAgent.md` | ✅ Ready |
 | JavaMemoryService | `JavaMemoryService/RFC/RFC-memory-service.md` | ✅ Ready |
 | JavaRagService | `JavaRagService/RFC/RFC-rag-service.md` | ✅ Ready |
@@ -346,6 +376,7 @@ claude --print ──читает──→  JavaRagService (через MCP ил�
 | `MEM` | JavaMemoryService |
 | `RAG` | JavaRagService |
 | `MAIL` | JavaMailAgent |
+| `COMMON` | common модуль |
 | `CLAUDE` | CLAUDE.md |
 | `ARCH` | ARCHITECTURE.md |
 | `TEST` | test-runner / E2E сценарии |

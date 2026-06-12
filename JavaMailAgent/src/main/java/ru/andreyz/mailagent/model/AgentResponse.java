@@ -11,5 +11,6 @@ public record AgentResponse(
     String taskTitle,
     String priority,
     String sender,
-    String draftPath
+    String draftPath,
+    String captureText
 ) {}

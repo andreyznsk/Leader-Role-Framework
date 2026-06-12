@@ -10,5 +10,5 @@ capture:
   scheduler:
     cron: "0 */1 * * * *"
 
-mock:
-  capture-agent: true
+agent:
+  provider: mock

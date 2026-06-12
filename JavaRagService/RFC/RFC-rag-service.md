@@ -1,6 +1,6 @@
 # RFC: JavaRagService
 
-**Версия:** 1.3
+**Версия:** 1.4
 **Дата:** 2026-06-12
 **Статус:** Active
 **Автор:** Андрей Зайцев
@@ -16,6 +16,7 @@
 | 1.1 | 2026-06-11 | CR-RAG-001 | PostgreSQL схема `rag`, Flyway миграции, профиль `local` |
 | 1.2 | 2026-06-11 | CR-RAG-002 | DocumentValidator, `invalid` статус, `error_message` в таблице |
 | 1.3 | 2026-06-12 | CR-RAG-BUGFIX-002, CR-RAG-E2E-001 | REST API (`RagRestController`), поле `invalid` в DirectoryIndexResult, актуальные URL |
+| 1.4 | 2026-06-12 | CR-ARCH-003 | Добавлена зависимость `common` для будущих AgentClient-сценариев |
 
 ---
 
@@ -59,9 +60,10 @@ Claude-агент  ──REST API────────→  JavaRagService :80
 JavaRagService ──embeddings──→  Ollama :11434
 JavaRagService ──index/search──→  OpenSearch :9200 (172.80.2.1 в local)
 JavaRagService ──track docs──→  PostgreSQL :5432 (схема: rag)
+JavaRagService ──depends on──→  common 1.0.0 (future AgentClient features)
 ```
 
-Прямых вызовов с JavaMailAgent и JavaMemoryService нет.
+Прямых runtime-вызовов с JavaMailAgent и JavaMemoryService нет.
 Сервис полностью независим — запускается и останавливается отдельно.
 
 ---
@@ -404,6 +406,12 @@ logging:
 
 **Ключевые зависимости:**
 ```xml
+<!-- Common LeaderOS infrastructure -->
+<dependency>
+    <groupId>ru.andreyz</groupId>
+    <artifactId>common</artifactId>
+</dependency>
+
 <!-- Spring Boot -->
 <dependency>
     <groupId>org.springframework.boot</groupId>
@@ -413,14 +421,10 @@ logging:
 <!-- Spring AI MCP -->
 <dependency>
     <groupId>org.springframework.ai</groupId>
-    <artifactId>spring-ai-mcp-server-spring-boot-starter</artifactId>
+    <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
 </dependency>
 
-<!-- OpenSearch -->
-<dependency>
-    <groupId>org.opensearch.client</groupId>
-    <artifactId>opensearch-rest-high-level-client</artifactId>
-</dependency>
+<!-- OpenSearch HTTP client is implemented with java.net.http.HttpClient -->
 
 <!-- PostgreSQL + Flyway -->
 <dependency>
@@ -522,3 +526,4 @@ curl -X POST http://localhost:8081/api/search \
 - Метрики индексации в Grafana (количество документов, latency)
 - OpenSearch Dashboards — визуализация базы знаний
 - Swagger UI (`/swagger-ui`) для REST API
+- AgentClient интеграция — генерация структурированных service-card через LLM при индексации

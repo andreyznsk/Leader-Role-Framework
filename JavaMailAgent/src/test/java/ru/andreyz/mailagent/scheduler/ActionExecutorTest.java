@@ -14,6 +14,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class ActionExecutorTest {
 
@@ -21,6 +22,7 @@ class ActionExecutorTest {
     Path tempDir;
 
     ActionExecutor executor;
+    MemoryServiceClient memoryServiceClient;
 
     @BeforeEach
     void setUp() {
@@ -30,7 +32,8 @@ class ActionExecutorTest {
         paths.setDrafts(tempDir.resolve("drafts").toString());
         paths.setPlan(tempDir.resolve("plans/today.md").toString());
 
-        executor = new ActionExecutor(mock(MemoryServiceClient.class), paths);
+        memoryServiceClient = mock(MemoryServiceClient.class);
+        executor = new ActionExecutor(memoryServiceClient, paths);
     }
 
     @Test
@@ -41,7 +44,7 @@ class ActionExecutorTest {
         Files.writeString(inbox.resolve(emailId + ".json"), "{}");
 
         AgentResponse response = new AgentResponse(
-            AgentResponseType.NOISE, emailId, "CI notification", null, null, null, null, null
+            AgentResponseType.NOISE, emailId, "CI notification", null, null, null, null, null, null
         );
 
         executor.execute(response);
@@ -64,6 +67,7 @@ class ActionExecutorTest {
             "Review PR #42",
             "HIGH",
             "ivanov@test.com",
+            null,
             null
         );
 
@@ -73,6 +77,27 @@ class ActionExecutorTest {
         assertTrue(Files.exists(planFile));
         String content = Files.readString(planFile);
         assertTrue(content.contains("Review PR #42"));
+    }
+
+    @Test
+    void captureCreatesMemoryCaptureAndMovesEmailToProcessed() throws IOException {
+        Path inbox = tempDir.resolve("inbox");
+        Files.createDirectories(inbox);
+        String emailId = "test-capture-001";
+        Files.writeString(inbox.resolve(emailId + ".json"), "{}");
+
+        AgentResponse response = new AgentResponse(
+            AgentResponseType.CAPTURE, emailId,
+            "Useful FYI",
+            null, null, null, null, null,
+            "К сведению: переезд на новый кластер с 1 июля"
+        );
+
+        executor.execute(response);
+
+        verify(memoryServiceClient).createCapture("К сведению: переезд на новый кластер с 1 июля", "email");
+        assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
+        assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
     }
 
     @Test

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
+import ru.andreyz.common.agent.AgentException;
 import ru.andreyz.memoryservice.domain.Capture;
 import ru.andreyz.memoryservice.dto.CaptureRequest;
 import ru.andreyz.memoryservice.dto.ClassifiedCapture;
@@ -123,7 +124,7 @@ class CaptureProcessingServiceTest {
         captureService.save(new CaptureRequest("will fail classification", "cli"));
 
         when(classifierAgent.classifyFiles(anyList(), anyString()))
-                .thenThrow(new IOException("claude not found"));
+                .thenThrow(new AgentException("claude not found"));
 
         CaptureProcessingService.ProcessResult result = processingService.processToday();
 

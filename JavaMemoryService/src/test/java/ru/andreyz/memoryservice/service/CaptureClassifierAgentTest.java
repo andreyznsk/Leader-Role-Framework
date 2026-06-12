@@ -2,6 +2,7 @@ package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import ru.andreyz.common.agent.AgentClient;
 import ru.andreyz.memoryservice.dto.ClassifiedCapture;
 
 import java.io.IOException;
@@ -12,7 +13,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CaptureClassifierAgentTest {
 
-    private final CaptureClassifierAgent agent = new CaptureClassifierAgent(new ObjectMapper());
+    private final AgentClient agentClient = prompt -> "[]";
+    private final CaptureClassifierAgent agent = new CaptureClassifierAgent(agentClient, new ObjectMapper());
 
     @Test
     void parseResponse_plainJsonArray() throws IOException {

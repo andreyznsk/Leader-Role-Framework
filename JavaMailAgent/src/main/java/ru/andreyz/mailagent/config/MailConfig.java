@@ -97,6 +97,8 @@ public class MailConfig {
         private String url;
         private boolean autodiscover = false;
         private String domain;
+        private String version = "Exchange2010_SP2";
+        private int timeoutSeconds = 30;
 
         public String getUrl() { return url; }
         public void setUrl(String v) { this.url = v; }
@@ -104,6 +106,10 @@ public class MailConfig {
         public void setAutodiscover(boolean v) { this.autodiscover = v; }
         public String getDomain() { return domain; }
         public void setDomain(String v) { this.domain = v; }
+        public String getVersion() { return version; }
+        public void setVersion(String v) { this.version = v; }
+        public int getTimeoutSeconds() { return timeoutSeconds; }
+        public void setTimeoutSeconds(int v) { this.timeoutSeconds = v; }
     }
 
     @ConfigurationProperties(prefix = "agent")

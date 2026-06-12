@@ -13,7 +13,7 @@
 ## 1. Обзор
 
 Spring Boot 3 приложение. Подключается к корпоративному почтовому серверу,
-читает новые письма, для каждого запускает Claude-агента, выполняет
+читает новые письма, для каждого вызывает LLM через `AgentClient` из `common`, выполняет
 детерминированное действие по результату. Интегрируется с `java-memory-service`
 для хранения задач. Имеет минимальный Web UI для просмотра статуса.
 
@@ -26,18 +26,19 @@ Spring Boot 3 приложение. Подключается к корпорат
 | Что | Версия | Зачем |
 |-----|--------|-------|
 | Java | 21 | Records, sealed classes, switch expressions |
-| Spring Boot | 3.3 | Scheduling, Web UI, конфиг, логи |
-| Spring Web | 3.3 | Thymeleaf UI + REST endpoints |
-| Spring Scheduling | 3.3 | `@Scheduled` вместо ScheduledExecutorService |
+| Spring Boot | 3.5.14 | Scheduling, Web UI, конфиг, логи |
+| Spring Web | 3.5.x | Thymeleaf UI + REST endpoints |
+| Spring Scheduling | 3.5.x | `@Scheduled` вместо ScheduledExecutorService |
 | Thymeleaf | 3.1 | Шаблоны для Web UI |
 | EWS Java API | 2.0 | Microsoft Exchange on-premise |
 | Jakarta Mail | 2.0.1 | IMAP |
 | Jackson Databind | 2.17 | JSON: AgentResponse, Email → файл |
 | Logback | 1.5 | Структурированные логи в файл с ротацией (через Spring Boot) |
-| Spring Data JDBC | 3.3 | ORM для таблицы `processed_emails` (dedup) |
+| Spring Data JDBC | 3.5.x | ORM для таблицы `processed_emails` (dedup) |
 | Flyway | 10 | Миграции схемы `mailagent` |
 | PostgreSQL JDBC | 42 | Драйвер БД |
-| maven-shade-plugin | 3.5 | Fat-jar |
+| common | 1.0.0 | `AgentClient` — вызов LLM через единый интерфейс |
+| spring-boot-maven-plugin | 3.5.x | Fat-jar |
 
 **БД** — mail-agent хранит обработанные письма в собственной схеме `mailagent`
 (таблица `processed_emails`) для дедупликации между перезапусками.
@@ -56,7 +57,8 @@ Spring Boot поддерживает профили через `application-{ENV
 ```
 src/main/resources/
 ├── application.yml              ← общие настройки (в git)
-└── application-local.yml        ← Maildev Docker (НЕ в git)
+├── application-local.yml        ← Maildev Docker
+└── application-prod.yml         ← Exchange/EWS placeholders
 
 корень проекта (примеры):
 ├── application-local.yml.example
@@ -64,7 +66,7 @@ src/main/resources/
 └── application-prod.yml.example
 ```
 
-В git — только `application.yml` и `*.example` шаблоны.
+В git не хранить реальные пароли. Для prod используются env placeholders.
 
 ### application.yml — общие настройки (в git)
 ```yaml
@@ -91,9 +93,17 @@ mail:
   poll-interval-seconds: 60
   fetch-limit: 20
   folders:
-    exclude: "Sent,Drafts,Trash,Spam,Archive,Junk,Deleted Items"
+    exclude:
+      - Sent
+      - Drafts
+      - Trash
+      - Spam
+      - Archive
+      - Junk
+      - Deleted Items
 
 agent:
+  provider: claude
   timeout-minutes: 5
 
 path:
@@ -106,9 +116,6 @@ memory:
   service:
     url: http://localhost:8082
     enabled: true
-
-mock:
-  agent: false
 
 logging:
   file:
@@ -144,8 +151,8 @@ memory:
   service:
     enabled: false
 
-mock:
-  agent: true
+agent:
+  provider: mock
 ```
 
 ### application-dev.yml.example — IMAP стенд
@@ -162,24 +169,52 @@ imap:
   folder: INBOX
 ```
 
-### application-prod.yml.example — Exchange
+### application-prod.yml — Exchange
 ```yaml
+spring:
+  datasource:
+    url: ${MAILAGENT_DB_URL:jdbc:postgresql://localhost:5432/leader_framework}
+    username: ${MAILAGENT_DB_USER:mailagent_user}
+    password: ${MAILAGENT_DB_PASSWORD}
+
 mail:
   protocol: ews
-  username: user@company.com
-  password:
+  username: ${MAIL_USERNAME}
+  password: ${MAIL_PASSWORD}
+  poll-interval-seconds: ${MAIL_POLL_INTERVAL_SECONDS:60}
+  fetch-limit: ${MAIL_FETCH_LIMIT:20}
+  folders:
+    exclude:
+      - Sent
+      - Drafts
+      - Trash
+      - Spam
+      - Archive
+      - Junk
+      - Deleted Items
+      - Inbox/CI
+      - Inbox/CI/CD
+      - Inbox/Jenkins
+      - Inbox/GitLab
 
 ews:
-  url: https://mail.company.com/EWS/Exchange.asmx
-  autodiscover: false
-  domain:
+  url: ${EWS_URL:}
+  autodiscover: ${EWS_AUTODISCOVER:false}
+  domain: ${EWS_DOMAIN:}
+  version: ${EWS_VERSION:Exchange2010_SP2}
+  timeout-seconds: ${EWS_TIMEOUT_SECONDS:30}
 
-# SMTP — Future (отправка черновиков)
-smtp:
-  host: mail.company.com
-  port: 587
-  starttls: true
+memory:
+  service:
+    url: ${MEMORY_SERVICE_URL:http://localhost:8082}
+    enabled: ${MEMORY_SERVICE_ENABLED:true}
+
+agent:
+  provider: ${AGENT_PROVIDER:claude}
 ```
+
+`mail.folders.exclude` принимает имя папки (`Junk`) или полный путь от Inbox
+(`Inbox/CI/CD`). Если исключена родительская папка, её подпапки также не сканируются.
 
 ---
 
@@ -246,12 +281,12 @@ JavaMailAgent/
     │   │   │   ├── MailClient.java             ← интерфейс
     │   │   │   ├── MailException.java          ← checked exception для MailClient
     │   │   │   ├── MaildevClient.java          ← HTTP API (local) ✅ реализован
+    │   │   │   ├── EwsMailClient.java          ← Exchange/EWS (prod) ✅ реализован
     │   │   │   ├── ImapMailClient.java         ← IMAP (dev) 🔜 planned
-    │   │   │   └── EwsMailClient.java          ← Exchange (prod) 🔜 planned
     │   │   ├── model/
     │   │   │   ├── Email.java                  ← record (id, subject, from, body, receivedAt, folder)
     │   │   │   ├── AgentResponse.java          ← record (@JsonInclude NON_NULL)
-    │   │   │   ├── AgentResponseType.java      ← enum: REQUEST/DRAFT/NOISE
+    │   │   │   ├── AgentResponseType.java      ← enum: REQUEST/DRAFT/NOISE/CAPTURE
     │   │   │   ├── PendingTaskRequest.java     ← record, payload для memory-service
     │   │   │   └── ProcessedEmail.java         ← Spring Data JDBC record (@Table mailagent.processed_emails)
     │   │   ├── repository/
@@ -259,9 +294,6 @@ JavaMailAgent/
     │   │   ├── scheduler/
     │   │   │   ├── MailAgentJob.java           ← @Scheduled(fixedDelay), главный цикл
     │   │   │   ├── PromptBuilder.java          ← формирует промпт для Claude
-    │   │   │   ├── ClaudeRunner.java           ← интерфейс (run prompt → AgentResponse)
-    │   │   │   ├── ClaudeRunnerImpl.java       ← запуск claude --print (@ConditionalOnProperty mock.agent=false)
-    │   │   │   ├── MockClaudeRunner.java       ← мок (@ConditionalOnProperty mock.agent=true)
     │   │   │   └── ActionExecutor.java         ← switch по AgentResponseType
     │   │   ├── integration/
     │   │   │   └── MemoryServiceClient.java    ← POST /api/tasks/pending + isHealthy()
@@ -309,7 +341,7 @@ logs/
 10:32:17 INFO  MailAgentJob        - Classified as NOISE
 10:32:17 INFO  ActionExecutor      - NOISE: CI уведомление, пропускаем
 10:32:17 INFO  MailAgentJob        - Email AAMk-456 marked as read (NOISE)
-10:32:18 INFO  MailAgentJob        - Poll finished: 2 processed (1 REQUEST, 0 DRAFT, 1 NOISE, 0 errors)
+10:32:18 INFO  MailAgentJob        - Poll finished: 2 processed (1 REQUEST, 0 DRAFT, 1 NOISE, 0 CAPTURE, 0 errors)
 10:32:18 WARN  MailAgentJob        - Email AAMk-789 failed: Claude timed out after 5 minutes, will retry next poll
 ```
 
@@ -354,7 +386,7 @@ logs/
 2. Для каждой папки — получить непрочитанные письма (`listUnread(folder, limit)`)
 3. Пропустить письма, уже записанные в `processed_emails` (dedup по `emailId`)
 4. Обработать: Claude → ActionExecutor → записать в `processed_emails`
-5. `markAsRead` — **только для NOISE** (`REQUEST`/`DRAFT` остаются непрочитанными)
+5. `markAsRead` — **только для NOISE** (`REQUEST`/`DRAFT`/`CAPTURE` остаются непрочитанными)
 
 ```java
 // fixedDelay — следующий тик только после завершения предыдущего
@@ -404,6 +436,21 @@ java-memory-service сохраняет со статусом PENDING
 ```
 
 Агент **не участвует** в подтверждении. Подтверждение — только через UI.
+
+### Поток CAPTURE → Capture Bot
+
+```
+MailAgentJob (классифицировал как CAPTURE)
+        ↓
+POST http://localhost:8082/api/capture
+        ↓
+JavaMemoryService сохраняет capture(source=email)
+        ↓
+CaptureScheduler классифицирует письмо вместе с заметками дня
+```
+
+CAPTURE используется для писем с полезной информацией без немедленного действия:
+FYI, архитектурные решения, аналитика, плановые работы, новости команды.
 
 ### PendingTaskRequest.java — record
 ```java
@@ -473,6 +520,30 @@ public class MemoryServiceClient {
         }
     }
 
+    public void createCapture(String text, String source) {
+        if (!enabled) {
+            log.debug("memory-service disabled, skipping capture");
+            return;
+        }
+        try {
+            String body = objectMapper.writeValueAsString(Map.of("text", text, "source", source));
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/api/capture"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .timeout(Duration.ofSeconds(5))
+                .build();
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                log.info("Capture saved to memory-service");
+            } else {
+                log.warn("memory-service /api/capture returned {}: {}", response.statusCode(), response.body());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to save capture to memory-service: {}", e.getMessage());
+        }
+    }
+
     // Используется StatusController для пинга на /ui/status
     public boolean isHealthy() {
         if (!enabled) return false;
@@ -530,6 +601,14 @@ public class ActionExecutor {
                 Files.move(inbox, processed, StandardCopyOption.REPLACE_EXISTING);
                 log.info("NOISE: {}", response.note());
             }
+            case CAPTURE -> {
+                String text = response.captureText() != null && !response.captureText().isBlank()
+                    ? response.captureText()
+                    : response.note();
+                memoryServiceClient.createCapture(text, "email");
+                Files.move(inbox, processed, StandardCopyOption.REPLACE_EXISTING);
+                log.info("CAPTURE → memory-service: {}", text);
+            }
         }
     }
 }
@@ -548,7 +627,8 @@ public record AgentResponse(
     String taskTitle,    // заголовок задачи для memory-service (только REQUEST)
     String priority,     // LOW|NORMAL|HIGH|CRITICAL (только REQUEST)
     String sender,       // email отправителя (только REQUEST)
-    String draftPath     // путь к черновику (только DRAFT)
+    String draftPath,    // путь к черновику (только DRAFT)
+    String captureText   // краткое изложение письма (только CAPTURE)
 ) {}
 ```
 
@@ -566,10 +646,10 @@ public interface MailClient {
 }
 ```
 
-`markAsRead` вызывается **только для NOISE** — `REQUEST` и `DRAFT` остаются
+`markAsRead` вызывается **только для NOISE** — `REQUEST`, `DRAFT` и `CAPTURE` остаются
 непрочитанными в почте, повторная обработка предотвращается через `processed_emails`.
 
-### EwsMailClient — Exchange on-premise (🔜 planned)
+### EwsMailClient — Exchange on-premise ✅ реализован
 ```java
 ExchangeService service = new ExchangeService(ExchangeVersion.Exchange2010_SP2);
 service.setCredentials(new WebCredentials(username, password, domain));
@@ -580,9 +660,12 @@ if (config.isEwsAutodiscover()) {
     service.setUrl(new URI(config.getEwsUrl()));
 }
 ```
-- `listFolders` — `service.findFolders(WellKnownFolderName.Root, ...)`, фильтр excludeFolders
+- `listFolders` — рекурсивный обход `WellKnownFolderName.Inbox` и всех подпапок,
+  фильтр `mail.folders.exclude` по leaf-name или полному пути (`Inbox/Team/CI`)
 - `listUnread` — `FindItemsResults` + `IsRead = false`, `BodyType.Text`
 - `markAsRead` — `email.setIsRead(true); email.update(...)`
+- Внешний контракт папки — строковый путь (`Inbox/Subfolder`); внутри клиент держит
+  map `folderPath -> FolderId` между `listFolders` и `listUnread`
 
 ### ImapMailClient — IMAP (🔜 planned)
 ```java
@@ -607,72 +690,33 @@ if (config.isEwsAutodiscover()) {
 ```
 INFO  MaildevClient - ✅ Maildev connection OK — http://172.80.2.1:18080
 ERROR EwsMailClient - ❌ EWS connection FAILED — https://mail.company.com/EWS/Exchange.asmx: Connection refused
-WARN  MockClaudeRunner - ⚠️  MOCK ClaudeRunner is active — real Claude agent will NOT be called
+WARN  MockAgentClient - AgentClient: MOCK - real LLM will not be called
 ```
 Ошибка не бросает исключение — приложение стартует, проблема будет воспроизводиться в каждом цикле поллинга.
 
 ---
 
-## 11a. ClaudeRunner — запуск агента
+## 11a. AgentClient — запуск LLM-агента
 
-### ClaudeRunner.java — интерфейс
-```java
-public interface ClaudeRunner {
-    AgentResponse run(String prompt) throws IOException, InterruptedException;
-}
-```
-
-### ClaudeRunnerImpl.java — реальный запуск (`mock.agent=false`)
-```java
-@Component
-@ConditionalOnProperty(name = "mock.agent", havingValue = "false", matchIfMissing = true)
-public class ClaudeRunnerImpl implements ClaudeRunner {
-    // Запускает: ProcessBuilder("claude", "--print")
-    // Передаёт промпт через stdin, ждёт waitFor(timeoutMinutes, MINUTES)
-    // Парсит JSON из stdout: ищет первый { ... } в ответе
-}
-```
-
-### MockClaudeRunner.java — мок (`mock.agent=true`)
-
-Реальная логика (отличается от CR-001, доработана по результатам тестов):
+`JavaMailAgent` больше не запускает `claude --print` напрямую. `MailAgentJob`
+инжектит `AgentClient` из модуля `common`, передаёт готовый prompt и парсит
+предметный JSON в `AgentResponse`.
 
 ```java
-@Component
-@ConditionalOnProperty(name = "mock.agent", havingValue = "true")
-public class MockClaudeRunner implements ClaudeRunner {
-
-    // Извлекает секцию письма ДО строки "Верни JSON" из промпта
-    // (иначе ключевые слова REQUEST/DRAFT/NOISE из шаблона мешают классификации)
-    private String extractEmailSection(String prompt) {
-        int idx = prompt.indexOf("Верни JSON");
-        return idx >= 0 ? prompt.substring(0, idx) : prompt;
-    }
-
-    // Классификация по русским сигналам в тексте письма
-    private AgentResponseType detectType(String emailSection) {
-        String upper = emailSection.toUpperCase();
-        if (upper.contains("ОТВЕТН") || upper.contains("ЧЕРНОВИК"))
-            return AgentResponseType.DRAFT;
-        if (upper.contains("BUILD") || upper.contains("PIPELINE") ||
-            upper.contains("PASSED") || upper.contains("SUCCESS") || upper.contains("DURATION:"))
-            return AgentResponseType.NOISE;
-        return AgentResponseType.REQUEST;  // default
-    }
-
-    // Приоритет по русским сигналам
-    private String detectPriority(String emailSection) {
-        String upper = emailSection.toUpperCase();
-        if (upper.contains("СРОЧНО") || upper.contains("ASAP") || upper.contains("P1 ИНЦИДЕНТ")) return "CRITICAL";
-        if (upper.contains("ДО ЗАВТРА") || upper.contains("ВАЖНО") || upper.contains("ДЕДЛАЙН")) return "HIGH";
-        if (upper.contains("КОГДА БУДЕТ ВРЕМЯ")) return "LOW";
-        return "NORMAL";
-    }
-
-    // emailId: парсится regex "emailId": "actual-id" из промпта
-    private static final Pattern EMAIL_ID_PATTERN = Pattern.compile("\"emailId\":\\s*\"([^\"]+)\"");
-}
+String prompt = promptBuilder.build(email);
+String raw = agentClient.complete(prompt);
+AgentResponse resp = parseAgentResponse(raw);
 ```
+
+Провайдер выбирается через конфиг:
+
+```yaml
+agent:
+  provider: claude   # claude | mock | ollama | gigachat
+```
+
+`MockAgentClient` в `common` содержит keyword-based классификацию, перенесённую
+из бывшего `MockClaudeRunner`, и возвращает JSON, совместимый с `AgentResponse`.
 
 ---
 
@@ -695,7 +739,7 @@ CREATE TABLE mailagent.processed_emails (
     folder        VARCHAR(255),
     sender        VARCHAR(255),
     subject       VARCHAR(512),
-    agent_type    VARCHAR(16) NOT NULL,   -- REQUEST | DRAFT | NOISE
+    agent_type    VARCHAR(16) NOT NULL,   -- REQUEST | DRAFT | NOISE | CAPTURE
     processed_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
 ```
@@ -874,24 +918,25 @@ SMTP нужен только для **отправки**. В MVP не реали
 
 ### Реализовано ✅
 1. `JavaMailAgent/docker-compose.yml` — Maildev (порт 18080)
-2. `pom.xml` — Spring Boot 3.3, Jakarta Mail, Logback, Spring Data JDBC, Flyway
+2. `pom.xml` — Spring Boot 3.5.14, Jakarta Mail, Logback, Spring Data JDBC, Flyway
 3. `application.yml` + `application-local.yml`
 4. `MailAgentApplication.java` — `@SpringBootApplication` + `@EnableScheduling`
 5. `MailConfig.java` — `@ConfigurationProperties` (вложенные static классы)
 6. `Email`, `AgentResponseType`, `AgentResponse`, `PendingTaskRequest`, `ProcessedEmail` — records
 7. `MailClient.java` — интерфейс + `MailException`
 8. `MaildevClient.java` — HTTP API + `@PostConstruct` connection check
-9. `PromptBuilder.java` — формирует промпт из `Email`
-10. `ClaudeRunnerImpl.java` — Process + waitFor + парсинг JSON
-11. `MockClaudeRunner.java` — мок с логикой по русским ключевым словам
-12. `MemoryServiceClient.java` — POST /api/tasks/pending + isHealthy()
-13. `ActionExecutor.java` — switch по enum + вызов MemoryServiceClient
-14. `MailAgentJob.java` — `@Scheduled(fixedDelay)`, мульти-папки, dedup через processed_emails
-15. `ProcessedEmailRepository.java` + `V1__create_processed_emails.sql`
-16. `StatusController.java` + `status.html` — Web UI
-17. `logback-spring.xml` — ротация логов по профилям
+9. `EwsMailClient.java` — Exchange/EWS, рекурсивный scan подпапок Inbox, exclude-фильтр
+10. `application-prod.yml` — prod placeholders для EWS и исключённых папок
+11. `PromptBuilder.java` — формирует промпт из `Email`
+12. `common.AgentClient` — единый вызов LLM; `ClaudeRunnerImpl` удалён
+13. `common.MockAgentClient` — mock с логикой по русским ключевым словам; `MockClaudeRunner` удалён
+14. `MemoryServiceClient.java` — POST /api/tasks/pending + isHealthy()
+15. `ActionExecutor.java` — switch по enum + вызов MemoryServiceClient
+16. `MailAgentJob.java` — `@Scheduled(fixedDelay)`, мульти-папки, dedup через processed_emails
+17. `ProcessedEmailRepository.java` + `V1__create_processed_emails.sql`
+18. `StatusController.java` + `status.html` — Web UI
+19. `logback-spring.xml` — ротация логов по профилям
 
 ### Planned 🔜
-18. `ImapMailClient.java` — dev окружение (IMAP)
-19. `EwsMailClient.java` — prod окружение (Exchange)
-20. E2E тесты: письмо → Maildev → агент → `plans/today.md` + memory-service
+20. `ImapMailClient.java` — dev окружение (IMAP)
+21. E2E тесты: письмо → Maildev → агент → `plans/today.md` + memory-service
