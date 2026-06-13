@@ -33,7 +33,8 @@ public class CaptureController {
         String savedAt = saved.capturedAt()
                 .atOffset(ZoneOffset.UTC)
                 .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-        return ResponseEntity.ok(new CaptureResponse(result.file().toString(), true, saved.id(), savedAt));
+        String filePath = result.file() != null ? result.file().toString() : null;
+        return ResponseEntity.ok(new CaptureResponse(filePath, true, saved.id(), savedAt));
     }
 
     @GetMapping("/today")

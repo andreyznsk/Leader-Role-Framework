@@ -50,14 +50,7 @@ echo "RUN_ID=$RUN_ID | PENDING before: $PENDING_BEFORE"
 ### Step 3 — Отправить REQUEST письмо
 ```bash
 TMPFILE=$(mktemp)
-cat > "$TMPFILE" <<EOF
-Subject: $RUN_ID Нужна ревью архитектуры — дедлайн завтра
-From: boss@company.ru
-To: me@test.com
-
-Привет, нужно ревью архитектурного решения.
-Дедлайн — завтра утром. Это важно для релиза.
-EOF
+printf "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nSubject: $RUN_ID Нужна ревью архитектуры — дедлайн завтра\r\nFrom: boss@company.ru\r\nTo: me@test.com\r\n\r\nПривет, нужно ревью архитектурного решения.\r\nДедлайн — завтра утром. Это важно для релиза.\r\n" > "$TMPFILE"
 
 curl -s --url "smtp://$MAILDEV_SMTP" \
   --mail-from "boss@company.ru" \

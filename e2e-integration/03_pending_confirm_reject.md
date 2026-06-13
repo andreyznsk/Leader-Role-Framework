@@ -27,50 +27,49 @@ echo "PENDING before: $PENDING_BEFORE"
 
 ### Step 2 — Отправить два REQUEST письма
 ```bash
-curl -s --url "smtp://$MAILDEV_SMTP" \
-  --mail-from "confirm-sender@company.ru" \
-  --mail-rcpt "me@test.com" \
-  --upload-file - <<'EOF'
-Subject: Задача для подтверждения — дедлайн
-From: confirm-sender@company.ru
-To: me@test.com
+TMP1=$(mktemp)
+printf "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nSubject: Задача для подтверждения — дедлайн\r\nFrom: confirm-sender@company.ru\r\nTo: me@test.com\r\n\r\nНужно сделать важное. Дедлайн завтра.\r\n" > "$TMP1"
+curl -s -o /dev/null -w "Email-1 SMTP: %{http_code}\n" --url "smtp://$MAILDEV_SMTP" \
+  --mail-from "confirm-sender@company.ru" --mail-rcpt "me@test.com" --upload-file "$TMP1"
+rm "$TMP1"
+sleep 1
 
-Нужно сделать важное. Дедлайн завтра.
-EOF
+TMP2=$(mktemp)
+printf "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nSubject: Задача для отклонения — дедлайн\r\nFrom: reject-sender@company.ru\r\nTo: me@test.com\r\n\r\nНужно сделать неважное. Дедлайн завтра.\r\n" > "$TMP2"
+curl -s -o /dev/null -w "Email-2 SMTP: %{http_code}\n" --url "smtp://$MAILDEV_SMTP" \
+  --mail-from "reject-sender@company.ru" --mail-rcpt "me@test.com" --upload-file "$TMP2"
+rm "$TMP2"
+sleep 2
+# Извлекаем ID по from-адресу — sort_by(.id) нельзя, Maildev ID строковые
+MAIL_ID_1=$(curl -s $MAILDEV_URL/email | jq -r '[.[] | select(.from[0].address == "confirm-sender@company.ru")] | last | .id')
+MAIL_ID_2=$(curl -s $MAILDEV_URL/email | jq -r '[.[] | select(.from[0].address == "reject-sender@company.ru")] | last | .id')
 
-curl -s --url "smtp://$MAILDEV_SMTP" \
-  --mail-from "reject-sender@company.ru" \
-  --mail-rcpt "me@test.com" \
-  --upload-file - <<'EOF'
-Subject: Задача для отклонения — дедлайн
-From: reject-sender@company.ru
-To: me@test.com
-
-Нужно сделать неважное. Дедлайн завтра.
-EOF
-echo "Both emails sent"
+echo "Both emails sent | MAIL_ID_1=$MAIL_ID_1 | MAIL_ID_2=$MAIL_ID_2"
 ```
-**Expected:** exit code 0
+**Expected:** оба SMTP 250
+**Extract:** `$MAIL_ID_1`, `$MAIL_ID_2`
 
 ### Step 3 — Дождаться обработки обоих писем (до 90 сек)
 ```bash
+LOG_BEFORE=$(wc -l < logs/JavaMailAgent.log)
 for i in $(seq 1 18); do
   sleep 5
-  COUNT=$(psql -h $PGHOST -U $PGUSER -d $PGDATABASE -t \
-    -c "SELECT COUNT(*) FROM mailagent.processed_emails WHERE sender IN ('confirm-sender@company.ru','reject-sender@company.ru');" \
-    2>/dev/null | tr -d ' ')
-  echo "  Attempt $i/18: processed=$COUNT/2"
-  [ "$COUNT" -ge 2 ] 2>/dev/null && echo "  ✅ Both processed" && break
+  PENDING_NOW=$(curl -s $MS_URL/api/tasks/pending | jq 'length')
+  NEW=$((PENDING_NOW - PENDING_BEFORE))
+  echo "  Attempt $i/18: PENDING=$PENDING_NOW (new=$NEW/2)"
+  [ "$NEW" -ge 2 ] && echo "  ✅ Both tasks in PENDING" && break
 done
 ```
-**Expected:** count = 2
+**Expected:** PENDING вырос на 2
 
-### Step 4 — Извлечь ID задач из PENDING
+> Заменяет `psql`-проверку — использует опрос `/api/tasks/pending`.
+
+### Step 4 — Извлечь ID задач из PENDING по emailId
 ```bash
 TASK_CONFIRM=$(curl -s $MS_URL/api/tasks/pending \
-  | jq '[.[] | select(.sender == "confirm-sender@company.ru")] | last | .id')
+  | jq --arg mid "$MAIL_ID_1" '[.[] | select(.emailId == $mid)] | last | .id')
 TASK_REJECT=$(curl -s $MS_URL/api/tasks/pending \
-  | jq '[.[] | select(.sender == "reject-sender@company.ru")] | last | .id')
+  | jq --arg mid "$MAIL_ID_2" '[.[] | select(.emailId == $mid)] | last | .id')
 echo "Confirm task: $TASK_CONFIRM | Reject task: $TASK_REJECT"
 ```
 **Expected:** оба числовые ID
@@ -102,6 +101,6 @@ echo "Rejected in plan: $REJECT_IN_PLAN (expected 0)"
 ## Cleanup
 ```bash
 curl -s -X DELETE $MAILDEV_URL/email/all > /dev/null
-curl -s -X POST "$MS_URL/api/tasks/$TASK_CONFIRM/delete" > /dev/null 2>&1 || true
+curl -s -X DELETE "$MS_URL/api/tasks/$TASK_CONFIRM" > /dev/null 2>&1 || true
 echo "IT-03 cleanup done"
 ```

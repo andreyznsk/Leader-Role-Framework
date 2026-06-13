@@ -149,7 +149,8 @@ public class MockAgentClient implements AgentClient {
 
     private MailType detectMailType(String emailSection) {
         String upper = emailSection.toUpperCase(Locale.ROOT);
-        if (upper.contains("ОТВЕТН") || upper.contains("ЧЕРНОВИК")) {
+        if (upper.contains("ОТВЕТН") || upper.contains("ЧЕРНОВИК")
+                || upper.contains("DRAFT:") || upper.contains("REPLY:")) {
             return MailType.DRAFT;
         }
         if (upper.contains("BUILD") || upper.contains("PIPELINE")
