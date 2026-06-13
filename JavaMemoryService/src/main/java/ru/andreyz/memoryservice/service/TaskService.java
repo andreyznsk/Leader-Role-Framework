@@ -171,6 +171,10 @@ public class TaskService {
         return taskRepository.findByStatus("PENDING");
     }
 
+    public List<Task> findCurrentTasks() {
+        return taskRepository.findCurrentTasks();
+    }
+
     public Task findById(Long id) {
         return taskRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found: " + id));

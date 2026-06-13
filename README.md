@@ -1,23 +1,173 @@
-# 🧠 Tech Lead Agent Framework
+# LeaderOS — AI-powered Tech Lead Framework
 
-Проект для входа в роль Tech Lead с помощью Claude Code.
+> Персональный фреймворк для автоматизации рутины технического лидера.
+> Обработка почты, ведение плана дня, управление знаниями, мониторинг команды.
 
-## Быстрый старт
+---
 
-```bash
-# 1. Установи Claude Code если ещё нет
-npm install -g @anthropic-ai/claude-code
+## Что это такое
 
-# 2. Перейди в папку проекта
-cd techlead-workspace
+LeaderOS — система из трёх Java-сервисов, оркестрируемых Claude AI агентом.
+Фреймворк берёт на себя операционную рутину: читает почту, классифицирует задачи,
+ведёт базу знаний, и позволяет сосредоточиться на архитектурных и командных решениях.
 
-# 3. Настрой токены в .mcp.json (замени YOUR_* на реальные значения)
-# Получить токен Confluence/Jira: https://id.atlassian.com/manage-profile/security/api-tokens
-# Получить GitHub токен: https://github.com/settings/tokens
+---
 
-# 4. Запусти
-claude
+## Архитектура
+
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│                          LeaderOS                                │
+│                                                                  │
+│  ┌─────────────────┐  HTTP   ┌──────────────────────────────┐   │
+│  │  JavaMailAgent  │────────→│      JavaMemoryService       │   │
+│  │  :8080          │         │      :8082                   │   │
+│  └────────┬────────┘         └──────────────────────────────┘   │
+│           │ claude --print                                       │
+│           ↓                                                      │
+│  ┌─────────────────┐         ┌──────────────────────────────┐   │
+│  │  Claude Agent   │←──MCP──→│      JavaRagService          │   │
+│  │  (Claude Code)  │         │      :8081                   │   │
+│  └─────────────────┘         └──────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+
+Инфраструктура (Docker):
+  PostgreSQL :5432  ←  три изолированных схемы (mailagent, memory, rag)
+  OpenSearch :9200  ←  векторная база знаний
+  OpenSearch Dashboards :5601
+  Maildev :18080    ←  только local профиль
+
+Нативно (не в Docker):
+  Ollama :11434     ←  эмбеддинги multilingual-e5-large (Metal на M1)
+  Java-сервисы      ←  fat-jar, запуск локально
+```
+
+### Схема модулей
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  JavaMailAgent (:8080)                                        │
+│  ┌────────────┐  ┌─────────────┐  ┌──────────────────────┐  │
+│  │MailClient  │  │ClaudeRunner │  │MemoryServiceClient   │  │
+│  │(EWS/IMAP/  │→ │(--print)    │→ │POST /api/tasks/      │  │
+│  │ Maildev)   │  └─────────────┘  │      pending         │  │
+│  └────────────┘  ┌─────────────┐  └──────────────────────┘  │
+│                  │ActionExecutor│                             │
+│                  │REQUEST/DRAFT │                             │
+│                  │/NOISE        │                             │
+│                  └─────────────┘                             │
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  JavaMemoryService (:8082)                                    │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────┐ │
+│  │REST API  │  │Thymeleaf │  │MCP Server│  │CaptureBot   │ │
+│  │/api/*    │  │UI /ui/*  │  │14 tools  │  │Scheduler    │ │
+│  └──────────┘  └──────────┘  └──────────┘  └─────────────┘ │
+│  PostgreSQL schema: memory                                    │
+│  workspace/tasks/TASK-{id}.md                                 │
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  JavaRagService (:8081)                                       │
+│  ┌──────────────┐  ┌────────────┐  ┌──────────────────────┐ │
+│  │FileIndexer   │  │RagSearch   │  │MCP Tools             │ │
+│  │rag-inbox/    │→ │Ollama→     │  │rag_index/search/     │ │
+│  │watcher       │  │OpenSearch  │  │status                │ │
+│  └──────────────┘  └────────────┘  └──────────────────────┘ │
+│  PostgreSQL schema: rag (indexed_documents)                   │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Доступные функции
+
+### JavaMailAgent
+- Чтение входящей почты (Maildev / IMAP / Exchange EWS)
+- Классификация писем через Claude: REQUEST / DRAFT / NOISE
+- REQUEST → создание PENDING задачи в JavaMemoryService
+- DRAFT → сохранение черновика в drafts/
+- NOISE → пометить прочитанным, переместить в processed/
+- Дедупликация через таблицу processed_emails
+- Web UI: http://localhost:8080/ui/status
+
+### JavaMemoryService
+- Ежедневный план задач с приоритетами и статусами
+- PENDING очередь: подтверждение / отклонение задач от агентов
+- Расширенные описания задач в файлах workspace/tasks/TASK-{id}.md
+- Управление инцидентами (P1/P2/P3) и рисками
+- Карточки людей и хронологические заметки
+- Capture Bot: приём сырых заметок → классификация в 18:00
+- MCP Server: 14 инструментов для Claude агента
+- Web UI: /ui/today, /ui/notes, /ui/incidents, /ui/risks, /ui/people
+
+### JavaRagService
+- Семантический поиск по Markdown-документации
+- Автоиндексация папки rag-inbox/ каждые 60 секунд
+- Идемпотентная переиндексация по SHA-256 хешу файла
+- Валидация структуры документов (ADR, SERVICE_CARD, PROCESS, GLOSSARY)
+- MCP tools: rag_index, rag_search, rag_index_directory, rag_status
+- REST API для прямого доступа
+
+---
+
+## Пресквизиты
+
+Java 21+, Maven 3.9+, Docker 24+, Claude Code (latest), Ollama (latest)
+
+Проверить: java -version && mvn -version && docker --version && claude --version && ollama --version
+
+---
+
+## Установка
+
+1. git clone https://github.com/andreyznsk/Leader-Role-Framework.git
+2. ollama pull mxbai-embed-large
+3. Скопировать application-local.yml.example → application-local.yml для каждого сервиса
+4. Создать симлинки ARCHITECTURE.md в каждом сервисе
+5. docker compose up -d
+6. ./test-runner/build.sh
+
+---
+
+## Запуск
+
+./test-runner/start-services.sh --profile local
+
+Или вручную из корня Leader-Role-Framework/:
+  SPRING_PROFILES_ACTIVE=local java -jar JavaMemoryService/target/memory-service.jar
+  SPRING_PROFILES_ACTIVE=local java -jar JavaRagService/target/rag-service.jar
+  SPRING_PROFILES_ACTIVE=local java -jar JavaMailAgent/target/mail-agent.jar
+
+---
+
+## Health check
+
+./test-runner/healthcheck.sh
+
+Web UI:
+  http://localhost:8082/ui/today   — план дня
+  http://localhost:8080/ui/status  — почтовый агент
+  http://localhost:5601            — OpenSearch Dashboards
+
+---
+
+## E2E тесты
+
+Smoke: claude --print "Прочитай test-runner/AGENT.md. Прогони CRITICAL сценарии всех сервисов."
+Full:  claude --print "Прочитай test-runner/AGENT.md. Прогони JavaRagService/test_e2e/*."
+
+JavaRagService: 44 PASS / 0 FAIL (2026-06-12)
+
+---
+
+## Профили
+
+local → Maildev (Docker), разработка
+dev   → IMAP, тестовый сервер
+prod  → Exchange EWS, рабочий ПК
+
 
 ## Структура проекта
 
@@ -58,65 +208,3 @@ techlead-workspace/
     └── 08_daily_journal/        ← Дневник
 ```
 
-## Команды агенту
-
-### Понять архитектуру (Day 1)
-```
-Используй скилл из skills/arch-mapper.md.
-Прочитай через Confluence MCP space: [НАЗВАНИЕ].
-Построй карту сервисов команды.
-```
-
-### Найти риски (Day 1-2)
-```
-Запусти суб-агент risk-scanner.
-Jira проект: [PROJECT_KEY].
-Найди все инциденты за последние 90 дней.
-```
-
-### Stakeholder Map (Day 3)
-```
-Используй скилл из skills/people-mapper.md.
-Я расскажу о людях в команде: [описание]
-```
-
-### Подготовить релиз
-```
-Используй скилл из skills/release-prep.md.
-Задачи для релиза: [список]
-```
-
-### Дневник
-```
-Используй скилл из skills/daily-journal.md.
-Вот мои наблюдения за сегодня: [описание дня]
-```
-
-### Slash-команды
-```
-/standup       ← подготовка к стендапу
-/week-review   ← итоги недели
-```
-
-## Настройка MCP токенов
-
-Открой `.mcp.json` и замени:
-
-| Placeholder | Где взять |
-|-------------|-----------|
-| `YOUR_COMPANY.atlassian.net` | URL вашего Jira/Confluence |
-| `YOUR_EMAIL@company.ru` | Твой email в Atlassian |
-| `YOUR_CONFLUENCE_API_TOKEN` | https://id.atlassian.com/manage-profile/security/api-tokens |
-| `YOUR_JIRA_API_TOKEN` | Тот же токен что и Confluence |
-| `YOUR_GITHUB_TOKEN` | https://github.com/settings/tokens (repo, read:org) |
-
-## Первая неделя по плану
-
-| День | Задача агенту | Что получишь |
-|------|--------------|--------------|
-| Day 1 | arch-mapper + risk-scanner | Карта системы + топ-10 рисков |
-| Day 2 | incident-playbook (интервью с TL) | Emergency Playbook |
-| Day 3 | people-mapper (после встреч) | Stakeholder Map |
-| Day 4 | signal-filter (список задач) | Noise vs Signal |
-| Day 5 | release-prep | Готовые артефакты |
-| Day 6-7 | /week-review | Рефлексия + план |

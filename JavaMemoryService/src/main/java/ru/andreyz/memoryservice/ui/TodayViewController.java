@@ -34,22 +34,16 @@ public class TodayViewController {
         LocalDate tomorrow = today.plusDays(1);
 
         List<Task> pending = taskService.findPending();
-        List<Task> todayTasks = taskService.findByDate(today).stream()
-                .filter(t -> !"DELETED".equals(t.status()) && !"PENDING".equals(t.status()))
-                .toList();
-        List<Task> tomorrowTasks = taskService.findByDate(tomorrow).stream()
-                .filter(t -> !"DELETED".equals(t.status()) && !"PENDING".equals(t.status()))
-                .toList();
+        List<Task> currentTasks = taskService.findCurrentTasks();
 
-        long doneTodayCount = todayTasks.stream().filter(t -> "DONE".equals(t.status())).count();
+        long doneTodayCount = currentTasks.stream().filter(t -> "DONE".equals(t.status())).count();
         long openIncidentsCount = incidentRepository.findByStatus("OPEN").size();
 
         model.addAttribute("today", today);
         model.addAttribute("tomorrow", tomorrow);
         model.addAttribute("pending", pending);
-        model.addAttribute("todayTasks", todayTasks);
-        model.addAttribute("tomorrowTasks", tomorrowTasks);
-        model.addAttribute("todayTasksCount", todayTasks.size());
+        model.addAttribute("currentTasks", currentTasks);
+        model.addAttribute("currentTasksCount", currentTasks.size());
         model.addAttribute("pendingCount", pending.size());
         model.addAttribute("doneTodayCount", doneTodayCount);
         model.addAttribute("openIncidentsCount", openIncidentsCount);
