@@ -78,6 +78,9 @@ docker compose up -d
 ```
 
 ### Запуск
+
+Внимание все запуски только с профилем local 
+
 ```bash
 ./test-runner/start-services.sh
 # или один сервис:

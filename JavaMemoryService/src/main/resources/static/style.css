@@ -1,7 +1,248 @@
-/* Custom overrides — minimal, Bootstrap 5 is the primary system */
-body {
-    background-color: #f8f9fa;
+:root {
+  --bg:      #0D1117;
+  --bg2:     #161B22;
+  --bg3:     #21262D;
+  --border:  #30363D;
+  --accent:  #00D4AA;
+  --accent2: #4A9EFF;
+  --accent3: #F78166;
+  --accent4: #D2A8FF;
+  --text:    #E6EDF3;
+  --text2:   #8B949E;
+  --text3:   #6E7681;
+  --mono:    'JetBrains Mono', monospace;
+  --sans:    'Inter', sans-serif;
 }
+
+[data-bs-theme="dark"] {
+  --bs-body-bg:            var(--bg);
+  --bs-body-color:         var(--text);
+  --bs-card-bg:            var(--bg2);
+  --bs-card-border-color:  var(--border);
+  --bs-border-color:       var(--border);
+  --bs-secondary-bg:       var(--bg3);
+  --bs-tertiary-bg:        var(--bg3);
+  --bs-secondary-color:    var(--text2);
+  --bs-emphasis-color:     var(--text);
+  --bs-link-color:         var(--accent2);
+  --bs-link-hover-color:   var(--accent);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  padding-top: 56px;
+}
+
+/* ─── NAVBAR ─────────────────────────────────────── */
+.los-navbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 56px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 24px;
+  z-index: 1000;
+}
+
+.los-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.los-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: los-pulse 2s infinite;
+}
+
+@keyframes los-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.los-title {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+
+.los-accent { color: var(--accent); }
+
+.los-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.los-links a {
+  font-size: 13px;
+  color: var(--text2);
+  text-decoration: none;
+  padding: 5px 10px;
+  border-radius: 6px;
+  transition: color .15s, background .15s;
+  white-space: nowrap;
+}
+
+.los-links a:hover {
+  color: var(--text);
+  background: var(--bg3);
+}
+
+.los-links a.active {
+  color: var(--accent);
+  background: rgba(0, 212, 170, .08);
+}
+
+/* ─── CARDS ───────────────────────────────────────── */
 .card {
-    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  background: var(--bg2);
+  border-color: var(--border);
+}
+
+.card-header {
+  background: var(--bg3);
+  border-bottom-color: var(--border);
+  color: var(--text);
+}
+
+/* ─── TABLE ───────────────────────────────────────── */
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--text);
+  --bs-table-border-color: var(--border);
+  --bs-table-striped-bg: rgba(255,255,255,.02);
+  --bs-table-hover-bg: rgba(255,255,255,.04);
+}
+
+.table thead th {
+  color: var(--text2);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-family: var(--mono);
+  border-bottom-color: var(--border);
+}
+
+/* ─── FORMS ───────────────────────────────────────── */
+.form-control,
+.form-select,
+.form-control:disabled {
+  background-color: var(--bg3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.form-control:focus,
+.form-select:focus {
+  background-color: var(--bg3);
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 0 3px rgba(0, 212, 170, .12);
+}
+
+.form-control::placeholder { color: var(--text3); }
+.form-label { color: var(--text2); font-size: 13px; }
+
+/* ─── MODAL ───────────────────────────────────────── */
+.modal-content {
+  background: var(--bg2);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.modal-header { border-bottom-color: var(--border); }
+.modal-footer { border-top-color: var(--border); }
+.btn-close { filter: invert(1) grayscale(1) brightness(1.5); }
+
+/* ─── ALERTS ──────────────────────────────────────── */
+.alert-warning {
+  background: rgba(247, 129, 102, .07);
+  border-color: var(--accent3);
+  color: var(--text);
+}
+
+.alert-heading { color: var(--accent3) !important; }
+
+/* ─── PENDING CARDS ───────────────────────────────── */
+.los-pending-card {
+  background: rgba(247, 129, 102, .05);
+  border: 1px solid var(--accent3);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+}
+
+.los-pending-card:last-child { margin-bottom: 0; }
+
+.los-pending-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent3);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  margin-bottom: 8px;
+}
+
+/* ─── SUMMARY STATS ───────────────────────────────── */
+.los-stat {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+
+.los-stat-num {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.los-stat-label {
+  font-size: 11px;
+  color: var(--text2);
+}
+
+/* ─── PRESENTATION ────────────────────────────────── */
+.presentation-container {
+  position: fixed;
+  top: 56px;
+  left: 0; right: 0; bottom: 0;
+  background: var(--bg);
+}
+
+.presentation-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* ─── UTILS ───────────────────────────────────────── */
+.text-muted { color: var(--text3) !important; }
+.border-bottom { border-bottom-color: var(--border) !important; }
+
+.btn-outline-secondary {
+  --bs-btn-color: var(--text2);
+  --bs-btn-border-color: var(--border);
+  --bs-btn-hover-color: var(--text);
+  --bs-btn-hover-bg: var(--bg3);
+  --bs-btn-hover-border-color: var(--text3);
+  --bs-btn-active-color: var(--text);
+  --bs-btn-active-bg: var(--bg3);
 }

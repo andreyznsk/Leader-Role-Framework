@@ -96,6 +96,12 @@ public class TaskController {
     }
 
     @PostMapping("/{id}/delete")
+    public ResponseEntity<Void> deleteTaskPost(@PathVariable Long id) {
+        taskService.updateStatus(id, "DELETED");
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
         taskService.updateStatus(id, "DELETED");
         return ResponseEntity.noContent().build();

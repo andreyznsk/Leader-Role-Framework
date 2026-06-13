@@ -48,6 +48,7 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 `AgentClient` для вызова LLM из сервисов.
 
 **Интерфейс:**
+
 | Класс | Описание |
 |-------|----------|
 | `AgentClient` | `String complete(String prompt)` |
@@ -77,6 +78,7 @@ agent:
 **Миграции:** Flyway, `classpath:db/migration`, только схема `mailagent`
 
 **Протоколы подключения к почте:**
+
 | Профиль | Протокол | Клиент | Статус |
 |---------|----------|--------|--------|
 | local | Maildev HTTP API | `MaildevClient` | ✅ реализован |
@@ -88,6 +90,7 @@ agent:
 от Inbox, например `Inbox/CI/CD`.
 
 **Классификация писем (enum AgentResponseType):**
+
 | Тип | Действие |
 |-----|----------|
 | `REQUEST` | Добавить в `plans/today.md` + POST `/api/tasks/pending` в JavaMemoryService |
@@ -129,6 +132,7 @@ agent:
 Инициализация: `infra/postgres/init.sql` — схемы, пользователи, права.
 
 **Ключевые endpoint-ы:**
+
 | Метод | Путь | Описание |
 |-------|------|----------|
 | `GET` | `/api/context` | Контекст сессии: today/tomorrow, open incidents/risks, recent people notes |
@@ -179,6 +183,7 @@ agent:
 **Миграции:** Flyway V1 (таблица `indexed_documents`), V2 (поле `error_message`)
 
 **REST API (`RagRestController`):**
+
 | Метод | Путь | Описание |
 |-------|------|----------|
 | `POST` | `/api/rag/index` | Индексировать файл → `{chunksAdded, status, filePath}` |
