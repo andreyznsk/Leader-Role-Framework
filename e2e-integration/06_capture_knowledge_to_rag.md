@@ -57,11 +57,11 @@ curl -s -X POST $MS_URL/api/capture/process-now | jq '{total, routed}'
 ### Step 5 — Файл появился в rag-inbox/captures/
 ```bash
 for i in $(seq 1 30); do
-  FOUND=$(grep -R "$RUN_ID" JavaRagService/rag-inbox/captures/ 2>/dev/null | wc -l)
+  FOUND=$(grep -R "$RUN_ID" rag-inbox/captures/ 2>/dev/null | wc -l)
   [ "$FOUND" -ge 1 ] && echo "✅ Knowledge file in rag-inbox/captures (attempt $i)" && break
   sleep 2
 done
-KNOWLEDGE_FILE=$(grep -R "$RUN_ID" JavaRagService/rag-inbox/captures/ -l 2>/dev/null | head -1)
+KNOWLEDGE_FILE=$(grep -R "$RUN_ID" rag-inbox/captures/ -l 2>/dev/null | head -1)
 echo "File: $KNOWLEDGE_FILE"
 ```
 **Expected:** файл найден
@@ -91,6 +91,6 @@ echo "Found in search: $FOUND_COUNT"
 
 ## Cleanup
 ```bash
-rm -f "$KNOWLEDGE_FILE" 2>/dev/null || true
+rm -f "rag-inbox/captures/$(basename "$KNOWLEDGE_FILE")" 2>/dev/null || true
 echo "IT-06 cleanup done (RAG doc remains indexed)"
 ```

@@ -10,6 +10,13 @@
 .env.*
 *.env
 
+# rclone local credentials/cache - keep OAuth tokens out of git
+rclone.conf
+.rclone.conf
+.rclone/
+.rclone-cache/
+/.cache/rclone/
+
 # OS
 .DS_Store
 Thumbs.db

@@ -45,6 +45,15 @@ public class CaptureService {
     public CaptureSaveResult saveWithFile(CaptureRequest req) {
         Instant now = Instant.now();
         String source = req.source() != null ? req.source() : "manual";
+
+        // Email captures are already classified by MailAgent — skip re-classification queue
+        if ("email".equals(source)) {
+            Capture capture = new Capture(null, req.text(), source, "PROCESSED",
+                    "email", "capture", now, now);
+            Capture saved = captureRepository.save(capture);
+            return new CaptureSaveResult(saved, null);
+        }
+
         Capture capture = new Capture(null, req.text(), source, "PENDING",
                 null, null, now, null);
         Capture saved = captureRepository.save(capture);
