@@ -551,7 +551,8 @@ PATCH /api/tasks/{id}/status             body: { "status": "TODO|IN_PROGRESS|BLO
 POST /api/tasks/{id}/done
 POST /api/tasks/{id}/move                body: { "toDate": "2026-06-09" }
 POST /api/tasks/{id}/reorder             body: { "direction": "up"|"down" } | { "position": N }
-POST /api/tasks/{id}/delete              # мягкое удаление (статус → DELETED)
+POST   /api/tasks/{id}/delete             # мягкое удаление (статус → DELETED)
+DELETE /api/tasks/{id}                   # мягкое удаление (статус → DELETED), REST-алиас
 
 # Описания задач (файловая шина workspace/tasks/)
 GET  /api/tasks/{id}/description         # 200 text/plain | 204 если файл отсутствует

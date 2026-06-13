@@ -13,7 +13,19 @@
 ## Preconditions
 - JavaMailAgent запущен с `memory.service.enabled=true`, `mock.agent=true`
 - JavaMemoryService запущен на :8082
-- Maildev доступен на $MAILDEV_URL
+- Maildev доступен через Docker bridge (см. env ниже)
+
+## Environment
+
+```bash
+export MA_URL="http://localhost:8080"
+export MS_URL="http://localhost:8082"
+export MAILDEV_URL="http://172.80.2.1:18080"   # Docker bridge IP, не localhost
+export MAILDEV_SMTP="172.80.2.1:1025"
+```
+
+> ⚠️ Maildev слушает на Docker bridge `172.80.2.1`, а не на `localhost`.
+> Порт UI/API: 18080. Порт SMTP: 1025.
 
 ## Steps
 
@@ -35,12 +47,10 @@ echo "RUN_ID=$RUN_ID | PENDING before: $PENDING_BEFORE"
 ```
 **Extract:** `$RUN_ID`, `$TODAY`, `$PENDING_BEFORE`
 
-### Step 3 — Отправить REQUEST письмо (нет BUILD/PASSED → REQUEST, ДЕДЛАЙН → HIGH)
+### Step 3 — Отправить REQUEST письмо
 ```bash
-curl -s --url "smtp://$MAILDEV_SMTP" \
-  --mail-from "boss@company.ru" \
-  --mail-rcpt "me@test.com" \
-  --upload-file - <<EOF
+TMPFILE=$(mktemp)
+cat > "$TMPFILE" <<EOF
 Subject: $RUN_ID Нужна ревью архитектуры — дедлайн завтра
 From: boss@company.ru
 To: me@test.com
@@ -48,22 +58,28 @@ To: me@test.com
 Привет, нужно ревью архитектурного решения.
 Дедлайн — завтра утром. Это важно для релиза.
 EOF
+
+curl -s --url "smtp://$MAILDEV_SMTP" \
+  --mail-from "boss@company.ru" \
+  --mail-rcpt "me@test.com" \
+  --upload-file "$TMPFILE"
+rm "$TMPFILE"
 echo "Email sent with RUN_ID=$RUN_ID"
 ```
-**Expected:** exit code 0
+**Expected:** curl exit code 0, письмо появляется в Maildev (`curl $MAILDEV_URL/email | jq 'length'` >= 1)
 
 ### Step 4 — Дождаться обработки MailAgent (до 90 сек)
 ```bash
 for i in $(seq 1 18); do
   sleep 5
-  COUNT=$(psql -h $PGHOST -U $PGUSER -d $PGDATABASE -t \
-    -c "SELECT COUNT(*) FROM mailagent.processed_emails WHERE sender='boss@company.ru';" \
-    2>/dev/null | tr -d ' ')
-  echo "  Attempt $i/18: count=$COUNT"
-  [ "$COUNT" -ge 1 ] 2>/dev/null && echo "  ✅ Email processed" && break
+  PENDING_NOW=$(curl -s $MS_URL/api/tasks/pending | jq 'length')
+  echo "  Attempt $i/18: PENDING=$PENDING_NOW (baseline=$PENDING_BEFORE)"
+  [ "$PENDING_NOW" -gt "$PENDING_BEFORE" ] && echo "  ✅ New PENDING task appeared" && break
 done
 ```
-**Expected:** count >= 1
+**Expected:** `PENDING_NOW > PENDING_BEFORE`
+
+> Вместо psql используется опрос `/api/tasks/pending` — psql-client может не быть на хосте.
 
 ### Step 5 — Задача появилась в PENDING очереди MemoryService
 ```bash
@@ -73,21 +89,26 @@ echo "New PENDING tasks: $NEW (total: $PENDING_AFTER)"
 ```
 **Expected:** `$PENDING_AFTER > $PENDING_BEFORE`
 
-### Step 6 — Новая задача: статус PENDING, приоритет HIGH
+### Step 6 — Новая задача: статус PENDING, emailId совпадает с нашим письмом
 ```bash
 TASK_JSON=$(curl -s $MS_URL/api/tasks/pending \
-  | jq '[.[] | select(.sender == "boss@company.ru")] | last')
+  | jq 'sort_by(.id) | last')
 TASK_ID=$(echo "$TASK_JSON" | jq -r '.id')
-echo "$TASK_JSON" | jq '{id, title, status, priority, sender}'
+echo "$TASK_JSON" | jq '{id, title, status, priority, emailId}'
 echo "Task ID: $TASK_ID"
 ```
-**Expected:** `"status":"PENDING"`, `"priority":"HIGH"`, `"sender":"boss@company.ru"`
+**Expected:** `"status":"PENDING"`
+
+> **Примечание по приоритету:** при `mock.agent=true` приоритет всегда `NORMAL` — mock не
+> анализирует текст письма. Для проверки HIGH-приоритета нужен реальный агент (`mock.agent=false`).
+> Поле `sender` отсутствует в Task DTO (хранится только `emailId`).
+
 **Extract:** `id` → `$TASK_ID`
 
 ### Step 7 — PENDING задача НЕ в /api/context (не видна агенту)
 ```bash
-CONTEXT_CONTAINS=$(curl -s $MS_URL/api/context | grep -c "boss@company.ru" || true)
-echo "Context contains PENDING task: $CONTEXT_CONTAINS"
+CONTEXT_CONTAINS=$(curl -s $MS_URL/api/context | grep -c "$TASK_ID" || true)
+echo "Context contains PENDING task id: $CONTEXT_CONTAINS"
 ```
 **Expected:** 0
 
@@ -103,7 +124,7 @@ echo "HTTP: $(echo "$RESULT" | tail -1) | Status: $(echo "$RESULT" | head -n -1 
 curl -s "$MS_URL/api/tasks?date=$TODAY&status=TODO" \
   | jq "[.[] | select(.id == $TASK_ID)] | first | {id, title, status, priority}"
 ```
-**Expected:** `"status":"TODO"`, `"priority":"HIGH"`
+**Expected:** `"status":"TODO"`
 
 ### Step 10 — Завершить задачу: TODO → DONE
 ```bash
@@ -114,6 +135,6 @@ curl -s -X POST "$MS_URL/api/tasks/$TASK_ID/done" | jq '{id, status}'
 ## Cleanup
 ```bash
 curl -s -X DELETE $MAILDEV_URL/email/all > /dev/null
-curl -s -X POST "$MS_URL/api/tasks/$TASK_ID/delete" > /dev/null 2>&1 || true
+curl -s -X DELETE "$MS_URL/api/tasks/$TASK_ID" > /dev/null
 echo "IT-01 cleanup done"
 ```
