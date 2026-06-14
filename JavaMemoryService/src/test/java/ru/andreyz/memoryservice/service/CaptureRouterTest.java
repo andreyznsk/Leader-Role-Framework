@@ -49,7 +49,7 @@ class CaptureRouterTest {
 
         String routedTo = router.route(c);
 
-        verify(taskService).createPending("Write ADR", "details", null, null, "HIGH");
+        verify(taskService).createPending("Write ADR", "details", null, null, "HIGH", null, "capture-bot");
         assertThat(routedTo).isEqualTo("tasks/pending");
     }
 

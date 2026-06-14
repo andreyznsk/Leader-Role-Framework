@@ -2,7 +2,7 @@ app:
   capture:
     inbox-dir: capture-inbox
   rag:
-    inbox-dir: JavaRagService/rag-inbox
+    inbox-dir: rag-inbox
   workspace:
     dir: workspace
 

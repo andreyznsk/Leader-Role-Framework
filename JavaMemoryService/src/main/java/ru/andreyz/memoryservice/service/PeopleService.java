@@ -32,10 +32,18 @@ public class PeopleService {
     public Person update(Long id, Person updated) {
         Person existing = personRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Person not found: " + id));
-        Person toSave = new Person(existing.id(), updated.fullName(), updated.login(),
-                updated.email(), updated.phone(), updated.domain(), updated.currentTask(),
-                updated.capacitySprint(), updated.capacityMonth(), updated.capacityQuarter(),
-                updated.notes(), existing.createdAt(), Instant.now());
+        Person toSave = new Person(existing.id(),
+                updated.fullName() != null ? updated.fullName() : existing.fullName(),
+                updated.login() != null ? updated.login() : existing.login(),
+                updated.email() != null ? updated.email() : existing.email(),
+                updated.phone() != null ? updated.phone() : existing.phone(),
+                updated.domain() != null ? updated.domain() : existing.domain(),
+                updated.currentTask() != null ? updated.currentTask() : existing.currentTask(),
+                updated.capacitySprint() != null ? updated.capacitySprint() : existing.capacitySprint(),
+                updated.capacityMonth() != null ? updated.capacityMonth() : existing.capacityMonth(),
+                updated.capacityQuarter() != null ? updated.capacityQuarter() : existing.capacityQuarter(),
+                updated.notes() != null ? updated.notes() : existing.notes(),
+                existing.createdAt(), Instant.now());
         return personRepository.save(toSave);
     }
 

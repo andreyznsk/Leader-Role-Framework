@@ -72,6 +72,11 @@ public class FileIndexer {
 
         List<String> chunks = splitter.split(content);
         String docId = path.getFileName().toString().replaceAll("\\.md$", "");
+        String action = existing.isPresent() ? "reindex" : "new";
+
+        log.info("[INDEX] → file={} docId={} type={} size={}B chunks={} hash={} action={}",
+                filePath, docId, validation.docType(), content.length(),
+                chunks.size(), hash.substring(0, 8), action);
 
         try {
             for (int i = 0; i < chunks.size(); i++) {
@@ -86,7 +91,8 @@ public class FileIndexer {
                     .orElse(IndexedDocument.indexed(filePath, hash, indexed));
             repository.save(doc);
 
-            log.info("✅ Indexed {} chunks from {}", indexed, filePath);
+            log.info("[INDEX] ✓ file={} docId={} type={} chunks={} hash={} action={}",
+                    filePath, docId, validation.docType(), indexed, hash.substring(0, 8), action);
             return new IndexResult(indexed, "indexed", filePath);
 
         } catch (Exception e) {

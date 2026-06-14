@@ -63,7 +63,7 @@ public class CaptureRouter {
     }
 
     private String routeTask(ClassifiedCapture c) {
-        taskService.createPending(c.title(), c.body(), null, null, c.priority());
+        taskService.createPending(c.title(), c.body(), null, null, c.priority(), null, "capture-bot");
         return "tasks/pending";
     }
 

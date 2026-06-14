@@ -3,7 +3,9 @@ package ru.andreyz.memoryservice.service;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.domain.DailyPlan;
 import ru.andreyz.memoryservice.domain.Task;
+import ru.andreyz.memoryservice.domain.UsageEventType;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
+import ru.andreyz.memoryservice.dto.UsageEventCommand;
 import ru.andreyz.memoryservice.repository.DailyPlanRepository;
 import ru.andreyz.memoryservice.repository.TaskRepository;
 
@@ -16,10 +18,14 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final DailyPlanRepository planRepository;
+    private final UsageEventService usageEventService;
 
-    public TaskService(TaskRepository taskRepository, DailyPlanRepository planRepository) {
+    public TaskService(TaskRepository taskRepository,
+                       DailyPlanRepository planRepository,
+                       UsageEventService usageEventService) {
         this.taskRepository = taskRepository;
         this.planRepository = planRepository;
+        this.usageEventService = usageEventService;
     }
 
     public Task createConfirmed(LocalDate date, String title, String priority,
@@ -30,7 +36,9 @@ public class TaskService {
                 "TODO", priority != null ? priority : "NORMAL",
                 date, source != null ? source : "MANUAL", emailId,
                 sortOrder, Instant.now(), Instant.now());
-        return taskRepository.save(task);
+        Task saved = taskRepository.save(task);
+        recordTaskCreated(saved, usageSource(source), false);
+        return saved;
     }
 
     public Task createPending(String title, String description,
@@ -41,12 +49,34 @@ public class TaskService {
     public Task createPending(String title, String description,
                               String emailId, String sender, String priority,
                               LocalDate dueDate) {
+        return createPending(title, description, emailId, sender, priority, dueDate, "mail-agent");
+    }
+
+    public Task createPending(String title, String description,
+                              String emailId, String sender, String priority,
+                              LocalDate dueDate, String usageSource) {
         String desc = description != null ? description : (sender != null ? "От: " + sender : null);
         Task task = new Task(null, null, title, desc,
                 "PENDING", priority != null ? priority : "NORMAL",
                 dueDate, "EMAIL", emailId,
                 0, Instant.now(), Instant.now());
-        return taskRepository.save(task);
+        Task saved = taskRepository.save(task);
+        boolean mailTask = "mail-agent".equals(usageSource);
+        if (mailTask) {
+            usageEventService.record(new UsageEventCommand(
+                    UsageEventType.MAIL_TASK_CREATED,
+                    usageSource,
+                    "SUCCESS",
+                    emailId,
+                    "task",
+                    String.valueOf(saved.id()),
+                    null,
+                    null,
+                    java.util.Map.of("title", saved.title())
+            ));
+        }
+        recordTaskCreated(saved, usageSource != null ? usageSource : "memory-service", mailTask);
+        return saved;
     }
 
     public Task confirm(Long id) {
@@ -97,7 +127,21 @@ public class TaskService {
         Task updated = new Task(task.id(), task.planId(), task.title(), task.description(),
                 status, task.priority(), task.dueDate(), task.source(), task.emailId(),
                 task.sortOrder(), task.createdAt(), Instant.now());
-        return taskRepository.save(updated);
+        Task saved = taskRepository.save(updated);
+        if ("DONE".equals(status) && !"DONE".equals(task.status())) {
+            usageEventService.record(new UsageEventCommand(
+                    UsageEventType.TASK_COMPLETED,
+                    "memory-service",
+                    "SUCCESS",
+                    task.emailId(),
+                    "task",
+                    String.valueOf(saved.id()),
+                    null,
+                    null,
+                    java.util.Map.of("title", saved.title())
+            ));
+        }
+        return saved;
     }
 
     public Task reorder(Long id, String direction, Integer position) {
@@ -183,5 +227,35 @@ public class TaskService {
     private DailyPlan getOrCreatePlan(LocalDate date) {
         return planRepository.findByPlanDate(date)
                 .orElseGet(() -> planRepository.save(DailyPlan.create(date)));
+    }
+
+    private void recordTaskCreated(Task task, String source, boolean explicitMailTaskEventAlreadyRecorded) {
+        usageEventService.record(new UsageEventCommand(
+                UsageEventType.TASK_CREATED,
+                source,
+                "SUCCESS",
+                task.emailId(),
+                "task",
+                String.valueOf(task.id()),
+                null,
+                explicitMailTaskEventAlreadyRecorded ? 0 : null,
+                java.util.Map.of("title", task.title(), "status", task.status())
+        ));
+    }
+
+    private String usageSource(String source) {
+        if (source == null || source.isBlank()) {
+            return "memory-service";
+        }
+        if ("MANUAL".equalsIgnoreCase(source)) {
+            return "manual-ui";
+        }
+        if ("EMAIL".equalsIgnoreCase(source)) {
+            return "mail-agent";
+        }
+        if ("AGENT".equalsIgnoreCase(source) || "AI_AGENT".equalsIgnoreCase(source)) {
+            return "ai-agent";
+        }
+        return source.toLowerCase(java.util.Locale.ROOT);
     }
 }

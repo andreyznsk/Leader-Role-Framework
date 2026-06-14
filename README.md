@@ -99,8 +99,9 @@ LeaderOS — система из трёх Java-сервисов, оркестр�
 - Управление инцидентами (P1/P2/P3) и рисками
 - Карточки людей и хронологические заметки
 - Capture Bot: приём сырых заметок → классификация в 18:00
+- Usage Statistics UI: /ui/stats — показывает вопросы агенту, RAG search, задачи, captures и оценку сэкономленного времени.
 - MCP Server: 14 инструментов для Claude агента
-- Web UI: /ui/today, /ui/notes, /ui/incidents, /ui/risks, /ui/people
+- Web UI: /ui/today, /ui/notes, /ui/incidents, /ui/risks, /ui/people, /ui/stats
 
 ### JavaRagService
 - Семантический поиск по Markdown-документации
@@ -207,4 +208,3 @@ techlead-workspace/
     ├── 07_risks/                ← Operational risks
     └── 08_daily_journal/        ← Дневник
 ```
-

@@ -1,0 +1,22 @@
+package ru.andreyz.memoryservice.domain;
+
+public enum UsageEventType {
+    ASK_QUESTION,
+    ASK_ANSWERED,
+    ASK_FAILED,
+
+    KNOWLEDGE_SEARCH,
+    RAG_SEARCH,
+    RAG_RESULT_USED,
+
+    TASK_CREATED,
+    TASK_COMPLETED,
+    MAIL_TASK_CREATED,
+
+    CAPTURE_CREATED,
+    CAPTURE_PROCESSED,
+
+    NOTE_CREATED,
+    RISK_CREATED,
+    INCIDENT_CREATED
+}

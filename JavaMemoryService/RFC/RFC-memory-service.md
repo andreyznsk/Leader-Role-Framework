@@ -20,6 +20,8 @@
 - Принимает предложения задач от java-mail-agent (статус PENDING) и ждёт подтверждения через UI
 - Принимает raw capture-заметки в `capture-inbox/`, пакетно классифицирует их через `AgentClient` из `common`
   и маршрутизирует в задачи, риски, заметки, вопросы, RAG inbox или daily journal
+- Владеет usage statistics: пишет `usage_events` для AI-agent flows, task/capture сценариев,
+  отдаёт агрегаты через `/api/stats/usage` и UI `/ui/stats`
 
 ---
 
@@ -122,6 +124,25 @@ SPRING_PROFILES_ACTIVE=prod java -jar JavaMemoryService/target/memory-service.ja
 ---
 
 ## 4. База данных
+
+### 4.0 Usage Statistics
+
+Memory Service owns usage statistics. It records `usage_events` for AI-agent flows,
+knowledge search, task creation, capture processing and task completion.
+
+Core endpoints:
+- `GET /api/stats/usage?period=today|7d|30d|all` — aggregated counters and saved time
+- `GET /ui/stats` — Thymeleaf UI with period switcher, cards, sources, formula and latest events
+- `POST /api/stats/events` — local-profile debug endpoint for e2e/manual event injection
+- `POST /api/knowledge/search` — Memory-owned proxy to JavaRagService `/api/search` with
+  `KNOWLEDGE_SEARCH`, `RAG_SEARCH` and `RAG_RESULT_USED` usage events
+
+Saved time MVP formula:
+- `ASK_ANSWERED = 15 min`
+- `RAG_RESULT_USED = 10 min`
+- `MAIL_TASK_CREATED = 3 min`
+- `CAPTURE_PROCESSED = 2 min`
+- `TASK_CREATED = 1 min`
 
 ### 4.1 Схема (V1__init_schema.sql)
 

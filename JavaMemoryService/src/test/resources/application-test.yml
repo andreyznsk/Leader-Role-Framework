@@ -12,6 +12,7 @@ app:
     inbox-dir: ${java.io.tmpdir}/test-capture-inbox
   rag:
     inbox-dir: ${java.io.tmpdir}/test-rag-inbox
+    base-url: http://localhost:8081
   workspace:
     dir: ${java.io.tmpdir}/test-workspace
 

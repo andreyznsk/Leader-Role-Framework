@@ -5,7 +5,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.domain.Capture;
+import ru.andreyz.memoryservice.domain.UsageEventType;
 import ru.andreyz.memoryservice.dto.CaptureRequest;
+import ru.andreyz.memoryservice.dto.UsageEventCommand;
 import ru.andreyz.memoryservice.repository.CaptureRepository;
 
 import java.io.IOException;
@@ -30,11 +32,14 @@ public class CaptureService {
     private static final DateTimeFormatter FRONT_MATTER_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final CaptureRepository captureRepository;
+    private final UsageEventService usageEventService;
     private final Path inboxDir;
 
     public CaptureService(CaptureRepository captureRepository,
+                          UsageEventService usageEventService,
                           @Value("${app.capture.inbox-dir:capture-inbox}") String inboxDir) {
         this.captureRepository = captureRepository;
+        this.usageEventService = usageEventService;
         this.inboxDir = Path.of(inboxDir);
     }
 
@@ -51,12 +56,14 @@ public class CaptureService {
             Capture capture = new Capture(null, req.text(), source, "PROCESSED",
                     "email", "capture", now, now);
             Capture saved = captureRepository.save(capture);
+            recordCaptureCreated(saved);
             return new CaptureSaveResult(saved, null);
         }
 
         Capture capture = new Capture(null, req.text(), source, "PENDING",
                 null, null, now, null);
         Capture saved = captureRepository.save(capture);
+        recordCaptureCreated(saved);
         Path file = writeToInbox(saved);
         return new CaptureSaveResult(saved, file);
     }
@@ -186,4 +193,18 @@ public class CaptureService {
 
     public record CaptureSaveResult(Capture capture, Path file) {}
     public record CaptureFile(String file, String text) {}
+
+    private void recordCaptureCreated(Capture capture) {
+        usageEventService.record(new UsageEventCommand(
+                UsageEventType.CAPTURE_CREATED,
+                capture.source() != null && !capture.source().isBlank() ? capture.source() : "manual-ui",
+                "SUCCESS",
+                null,
+                "capture",
+                String.valueOf(capture.id()),
+                null,
+                null,
+                java.util.Map.of("status", capture.status())
+        ));
+    }
 }

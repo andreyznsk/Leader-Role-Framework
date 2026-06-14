@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
+<head th:replace="~{fragments/layout :: head('Статистика')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+
+<div class="container">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h4 mb-1">Статистика</h1>
+            <div class="text-muted small">Usage statistics по событиям Memory Service</div>
+        </div>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Period">
+            <a th:each="p : ${periods}"
+               th:href="@{/ui/stats(period=${p.value()})}"
+               class="btn"
+               th:classappend="${period == p.value()} ? 'btn-primary' : 'btn-outline-secondary'"
+               th:text="${p.value() == 'today' ? 'Today' : (p.value() == '7d' ? '7 days' : (p.value() == '30d' ? '30 days' : 'All time'))}">
+                7 days
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="los-stat">
+                <div class="los-stat-num" style="color:var(--accent2)" th:text="${stats.questionsAsked()}">0</div>
+                <div class="los-stat-label">Questions asked</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="los-stat">
+                <div class="los-stat-num" style="color:var(--accent)" th:text="${stats.successfulAnswers()}">0</div>
+                <div class="los-stat-label">Successful answers</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="los-stat">
+                <div class="los-stat-num" style="color:var(--accent4)" th:text="${stats.successRate()} + '%'">0%</div>
+                <div class="los-stat-label">Success rate</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="los-stat">
+                <div class="los-stat-num" style="color:var(--accent3)" th:text="${stats.ragSearches()}">0</div>
+                <div class="los-stat-label">RAG searches</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="los-stat">
+                <div class="los-stat-num" style="color:var(--accent2)" th:text="${stats.agentCreatedTasks()}">0</div>
+                <div class="los-stat-label">Tasks created by agents</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="los-stat">
+                <div class="los-stat-num" style="color:var(--accent)" th:text="${stats.capturesProcessed()}">0</div>
+                <div class="los-stat-label">Captures processed</div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="los-stat">
+                <div class="los-stat-num" style="color:var(--accent3)">
+                    <span th:text="${stats.savedHours()}">0</span>h
+                    <span class="text-muted fs-6" th:text="'(' + ${stats.savedMinutes()} + ' min)'">(0 min)</span>
+                </div>
+                <div class="los-stat-label">Saved time</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Sources used</div>
+                <div class="card-body">
+                    <div th:if="${stats.eventsBySource().isEmpty()}" class="text-muted">No events for selected period</div>
+                    <div th:each="entry : ${stats.eventsBySource()}" class="d-flex justify-content-between border-bottom py-2">
+                        <span th:text="${entry.key}">memory-service</span>
+                        <span class="badge bg-secondary" th:text="${entry.value}">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Saved time formula</div>
+                <div class="card-body">
+                    <div class="font-monospace small lh-lg">
+                        <div>ASK_ANSWERED = 15 min</div>
+                        <div>RAG_RESULT_USED = 10 min</div>
+                        <div>MAIL_TASK_CREATED = 3 min</div>
+                        <div>CAPTURE_PROCESSED = 2 min</div>
+                        <div>TASK_CREATED = 1 min</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Latest events</div>
+        <div class="card-body p-0">
+            <div th:if="${#lists.isEmpty(events)}" class="text-muted p-3">No usage events for selected period</div>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(events)}">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Event type</th>
+                        <th>Source</th>
+                        <th>Status</th>
+                        <th>Saved minutes</th>
+                        <th>Details</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="event : ${events}">
+                        <td class="text-nowrap" th:text="${#temporals.format(event.createdAt(), 'yyyy-MM-dd HH:mm')}">time</td>
+                        <td th:text="${event.eventType()}">TASK_CREATED</td>
+                        <td th:text="${event.source()}">memory-service</td>
+                        <td><span class="badge bg-secondary" th:text="${event.status()}">SUCCESS</span></td>
+                        <td th:text="${event.savedMinutes()}">0</td>
+                        <td class="small text-muted" th:text="${event.metadataJson() != null ? event.metadataJson() : event.entityType() + ':' + event.entityId()}">details</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
