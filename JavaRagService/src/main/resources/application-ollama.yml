@@ -1,0 +1,42 @@
+# Профиль: Ollama локальный (эмбеддинги)
+# Запуск: --spring.profiles.active=ollama
+# Модель: mxbai-embed-large — Docker Ollama на localhost:11435
+
+spring:
+  datasource:
+    url: jdbc:postgresql://172.80.2.1:5432/leader_framework?sslmode=disable
+    username: rag_user
+    password: rag_password
+  flyway:
+    locations: classpath:db/migration
+    schemas: rag
+    default-schema: rag
+
+ollama:
+  url: http://localhost:11435
+  model: mxbai-embed-large
+
+opensearch:
+  url: http://172.80.2.1:9200
+  index: rag-knowledge
+
+app:
+  capture:
+    inbox-dir: capture-inbox
+  rag:
+    inbox-dir: rag-inbox
+  workspace:
+    dir: workspace
+
+rag:
+  inbox:
+    path: rag-inbox
+  scheduler:
+    interval-ms: 60000
+
+agent:
+  provider: mock
+
+logging:
+  level:
+    ru.andreyz.ragservice: DEBUG
