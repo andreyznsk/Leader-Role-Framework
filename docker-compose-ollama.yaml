@@ -21,7 +21,7 @@ services:
 
   # ─────────────────────────────────────────────
   # Ollama — LLM-сервер
-  # API: http://localhost:11435 (host), port 11434 inside container
+  # API:  (host), port 11434 inside container
   # Порт 11434 на хосте занят локальной Ollama, поэтому используем 11435
   # ─────────────────────────────────────────────
   ollama:

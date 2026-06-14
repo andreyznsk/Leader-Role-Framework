@@ -1,6 +1,6 @@
 # Профиль: Ollama локальный (агентский режим)
 # Запуск: --spring.profiles.active=ollama
-# Модель: qwen3:8b — Docker Ollama на localhost:11435
+# Модель: qwen3:8b — локальная Ollama localhost:11434
 
 spring:
   datasource:
@@ -9,7 +9,7 @@ spring:
     password: mailagent_password
   ai:
     ollama:
-      base-url: http://localhost:11435
+      base-url: http://localhost:11434
       chat:
         model: qwen3:8b
         options:

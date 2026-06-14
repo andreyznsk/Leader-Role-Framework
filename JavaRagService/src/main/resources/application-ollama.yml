@@ -1,6 +1,6 @@
 # Профиль: Ollama локальный (эмбеддинги)
 # Запуск: --spring.profiles.active=ollama
-# Модель: mxbai-embed-large — Docker Ollama на localhost:11435
+# Модель: mxbai-embed-large — локальная Ollama localhost:11434
 
 spring:
   datasource:
@@ -13,7 +13,7 @@ spring:
     default-schema: rag
 
 ollama:
-  url: http://localhost:11435
+  url: http://localhost:11434
   model: mxbai-embed-large
 
 opensearch:

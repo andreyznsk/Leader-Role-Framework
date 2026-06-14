@@ -44,7 +44,7 @@ public class CaptureProcessingService {
             return new ProcessResult(0, 0);
         }
 
-        log.info("Processing {} capture files via claude --print", pending.size());
+        log.info("Processing {} capture files via agent", pending.size());
 
         List<ClassifiedCapture> classified;
         try {
