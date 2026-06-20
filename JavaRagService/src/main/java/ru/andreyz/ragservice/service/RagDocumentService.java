@@ -1,6 +1,7 @@
 package ru.andreyz.ragservice.service;
 
 import org.springframework.stereotype.Service;
+import ru.andreyz.ragservice.client.OpenSearchClient;
 import ru.andreyz.ragservice.db.IndexedDocument;
 import ru.andreyz.ragservice.db.IndexedDocumentRepository;
 import ru.andreyz.ragservice.indexer.FileIndexer;
@@ -21,10 +22,13 @@ public class RagDocumentService {
 
     private final IndexedDocumentRepository repository;
     private final FileIndexer fileIndexer;
+    private final OpenSearchClient openSearchClient;
 
-    public RagDocumentService(IndexedDocumentRepository repository, FileIndexer fileIndexer) {
+    public RagDocumentService(IndexedDocumentRepository repository, FileIndexer fileIndexer,
+                              OpenSearchClient openSearchClient) {
         this.repository = repository;
         this.fileIndexer = fileIndexer;
+        this.openSearchClient = openSearchClient;
     }
 
     public List<RagDocumentSummary> listDocuments(String type) {
@@ -72,6 +76,19 @@ public class RagDocumentService {
         IndexedDocument document = repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Document not found: " + id));
         return fileIndexer.indexFile(document.filePath());
+    }
+
+    public DeleteResult deleteDocument(Long id) throws IOException {
+        IndexedDocument document = repository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Document not found: " + id));
+
+        openSearchClient.deleteBySource(document.filePath());
+
+        Path path = Path.of(document.filePath());
+        boolean fileDeleted = Files.deleteIfExists(path);
+        repository.deleteById(id);
+
+        return new DeleteResult(id, document.filePath(), fileDeleted, "deleted");
     }
 
     private RagDocumentSummary toSummary(IndexedDocument document) {
@@ -194,5 +211,12 @@ public class RagDocumentService {
     public record RagDocumentDetails(
             RagDocumentSummary summary,
             String content
+    ) {}
+
+    public record DeleteResult(
+            Long id,
+            String filePath,
+            boolean fileDeleted,
+            String status
     ) {}
 }

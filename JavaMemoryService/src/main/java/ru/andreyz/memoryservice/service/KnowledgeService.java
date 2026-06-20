@@ -53,6 +53,13 @@ public class KnowledgeService {
                 .body(ReindexResult.class);
     }
 
+    public DeleteResult delete(Long id) {
+        return restClient.delete()
+                .uri(ragBaseUrl + "/api/rag/documents/{id}", id)
+                .retrieve()
+                .body(DeleteResult.class);
+    }
+
     public record KnowledgeDocumentSummary(
             Long id,
             String filePath,
@@ -71,4 +78,6 @@ public class KnowledgeService {
     public record KnowledgeDocumentDetails(KnowledgeDocumentSummary summary, String content) {}
 
     public record ReindexResult(int chunksAdded, String status, String filePath) {}
+
+    public record DeleteResult(Long id, String filePath, boolean fileDeleted, String status) {}
 }

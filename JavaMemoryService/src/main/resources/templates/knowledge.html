@@ -29,23 +29,37 @@
                 <div class="card-body p-0">
                     <div class="px-3 py-2 border-bottom small text-muted" th:text="${selectedTypeLabel}">Notices</div>
                     <div th:if="${#lists.isEmpty(documents)}" class="text-muted p-3">RAG-документов по фильтру пока нет</div>
-                    <a th:each="document : ${documents}"
-                       th:href="${selectedType == 'ALL'} ? @{/ui/knowledge(id=${document.id})} : @{/ui/knowledge(type=${selectedType},id=${document.id})}"
-                       class="los-notice-item text-decoration-none d-block p-3 border-bottom"
-                       th:classappend="${selectedDocumentId == document.id} ? ' active' : ''">
-                        <div class="d-flex justify-content-between align-items-start gap-2">
-                            <div>
-                                <div class="fw-semibold" th:text="${document.title != null ? document.title : document.fileName}">Title</div>
-                                <div class="small text-muted" th:text="${document.docType}">NOTICE</div>
+                    <div th:each="document : ${documents}"
+                         class="los-notice-item d-flex align-items-start gap-2 p-3 border-bottom"
+                         th:classappend="${selectedDocumentId == document.id} ? ' active' : ''">
+                        <a th:href="${selectedType == 'ALL'} ? @{/ui/knowledge(id=${document.id})} : @{/ui/knowledge(type=${selectedType},id=${document.id})}"
+                           class="text-decoration-none flex-grow-1 min-w-0">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <div class="min-w-0">
+                                    <div class="fw-semibold text-body" th:text="${document.title != null ? document.title : document.fileName}">Title</div>
+                                    <div class="small text-muted" th:text="${document.docType}">NOTICE</div>
+                                </div>
+                                <span class="badge text-uppercase flex-shrink-0"
+                                      th:classappend="${document.status == 'indexed'} ? ' bg-success-subtle text-success' : (${document.status == 'outdated'} ? ' bg-warning-subtle text-warning' : ' bg-danger-subtle text-danger')"
+                                      th:text="${document.status}">indexed</span>
                             </div>
-                            <span class="badge text-uppercase"
-                                  th:classappend="${document.status == 'indexed'} ? ' bg-success-subtle text-success' : (${document.status == 'outdated'} ? ' bg-warning-subtle text-warning' : ' bg-danger-subtle text-danger')"
-                                  th:text="${document.status}">indexed</span>
-                        </div>
-                        <div class="small text-muted mt-2" th:text="${document.subject != null ? document.subject : document.filePath}">subject</div>
-                        <div class="small text-muted mt-1" th:text="${document.updated != null ? 'updated: ' + document.updated : document.receivedAt}">updated</div>
-                        <div th:if="${document.errorMessage}" class="small text-danger mt-2" th:text="${document.errorMessage}"></div>
-                    </a>
+                            <div class="small text-muted mt-2" th:text="${document.subject != null ? document.subject : document.filePath}">subject</div>
+                            <div class="small text-muted mt-1" th:text="${document.updated != null ? 'updated: ' + document.updated : document.receivedAt}">updated</div>
+                            <div th:if="${document.errorMessage}" class="small text-danger mt-2" th:text="${document.errorMessage}"></div>
+                        </a>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-danger knowledge-delete-button flex-shrink-0"
+                                th:attr="data-document-id=${document.id},data-document-title=${document.title != null ? document.title : document.fileName}"
+                                title="Удалить">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M3 6h18"/>
+                                <path d="M8 6V4h8v2"/>
+                                <path d="M19 6l-1 14H6L5 6"/>
+                                <path d="M10 11v6"/>
+                                <path d="M14 11v6"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -58,10 +72,16 @@
                             <h5 class="mb-1" th:text="${selectedDocument.summary.title != null ? selectedDocument.summary.title : selectedDocument.summary.fileName}">Title</h5>
                             <div class="small text-muted" th:text="${selectedDocument.summary.filePath}">path</div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="reindexButton"
-                                th:attr="data-document-id=${selectedDocument.summary.id}">
-                            Reindex
-                        </button>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="deleteButton"
+                                    th:attr="data-document-id=${selectedDocument.summary.id},data-document-title=${selectedDocument.summary.title != null ? selectedDocument.summary.title : selectedDocument.summary.fileName}">
+                                Delete
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="reindexButton"
+                                    th:attr="data-document-id=${selectedDocument.summary.id}">
+                                Reindex
+                            </button>
+                        </div>
                     </div>
 
                     <div class="row g-2 small text-muted mb-3">
@@ -98,6 +118,34 @@
     const form = document.getElementById('knowledgeForm');
     const feedback = document.getElementById('knowledgeFeedback');
     const reindexButton = document.getElementById('reindexButton');
+    const deleteButton = document.getElementById('deleteButton');
+    const rowDeleteButtons = document.querySelectorAll('.knowledge-delete-button');
+
+    function showDeleteError(message) {
+        if (feedback) {
+            feedback.textContent = message;
+            feedback.className = 'small mt-2 text-danger';
+            return;
+        }
+        window.alert(message);
+    }
+
+    function deleteDocument(documentId, documentTitle) {
+        const label = documentTitle || 'документ';
+        if (!window.confirm('Удалить "' + label + '" из knowledge index и с диска?')) {
+            return;
+        }
+        fetch('/api/knowledge/documents/' + documentId, {
+            method: 'DELETE'
+        }).then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const url = new URL(window.location.href);
+            url.searchParams.delete('id');
+            window.location.href = url.pathname + url.search;
+        }).catch(function (error) {
+            showDeleteError('Ошибка удаления: ' + error.message);
+        });
+    }
 
     if (form) {
         form.addEventListener('submit', function (event) {
@@ -132,6 +180,18 @@
             });
         });
     }
+
+    if (deleteButton) {
+        deleteButton.addEventListener('click', function () {
+            deleteDocument(deleteButton.dataset.documentId, deleteButton.dataset.documentTitle);
+        });
+    }
+
+    rowDeleteButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            deleteDocument(button.dataset.documentId, button.dataset.documentTitle);
+        });
+    });
 })();
 </script>
 </body>

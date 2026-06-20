@@ -28,7 +28,7 @@
                             <span class="badge bg-secondary" th:text="${capture.status}">PENDING</span>
                         </div>
                         <div class="small text-muted mt-2"
-                             th:text="${capture.classifiedAs != null ? 'classified: ' + capture.classifiedAs + ', routed: ' + capture.routedTo : 'awaiting classification'}">
+                             th:text="${capture.classified != null ? 'classified: ' + capture.classified + ', routed: ' + capture.routedTo : 'awaiting classification'}">
                             route
                         </div>
                     </div>

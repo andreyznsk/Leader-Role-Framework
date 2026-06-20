@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>LeaderOS — Framework тех лида</title>
+<link rel="icon" id="favicon" type="image/png">
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -13,6 +14,7 @@
   --accent:#00D4AA;--accent2:#4A9EFF;--accent3:#F78166;--accent4:#D2A8FF;
   --text:#E6EDF3;--text2:#8B949E;--text3:#6E7681;
   --mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;
+  --diagram-scale:1.1;
 }
 html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
 .deck{width:100%;height:100%;position:relative}
@@ -92,16 +94,38 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .analogy b{color:var(--text);font-style:normal}
 @media(max-width:640px){.concept-wrap{flex-direction:column}}
 
+/* SLIDE 4 — arch diagram fit */
+.slide-arch{--diagram-scale:1}
+.slide-arch .arch-main .mermaid svg{
+  width:auto;
+  height:auto;
+  max-width:min(100%,90vw);
+  max-height:calc(100vh - 460px);
+  transform:none;
+}
+
 /* MERMAID */
-.mwrap{flex:1;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
-.mwrap .mermaid{width:100%;max-height:100%}
-.mermaid svg{max-width:100%;height:auto;max-height:calc(100vh - 220px)}
+.mwrap{flex:1;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:8px 0}
+.mwrap .mermaid,.sc-mwrap .mermaid{width:100%;max-height:100%;display:flex;align-items:center;justify-content:center}
+.mermaid svg{
+  width:100%;height:auto;
+  max-width:min(100%,calc(90vw / var(--diagram-scale)));
+  max-height:calc((100vh - 220px) / var(--diagram-scale));
+  transform:scale(var(--diagram-scale));
+  transform-origin:center center;
+}
+
+.arch-layout{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;flex:1;min-height:0}
+.arch-main{width:min(1180px,100%);flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.arch-side{width:min(980px,100%);display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media(max-width:900px){.arch-side{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.arch-side{grid-template-columns:1fr}}
 
 /* SCENARIO */
-.sc-wrap{flex:1;display:flex;gap:14px;min-height:0}
-.sc-left{width:230px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
-.sc-right{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column}
-@media(max-width:700px){.sc-wrap{flex-direction:column}.sc-left{width:100%}}
+.sc-wrap{flex:1;display:flex;flex-direction:column;gap:14px;min-height:0;align-items:center;justify-content:center}
+.sc-left{width:min(1040px,100%);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.sc-right{width:min(1100px,100%);min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;flex:1;min-height:0}
+@media(max-width:900px){.sc-left{grid-template-columns:1fr}}
 .pain-block{background:var(--bg2);border:1px solid var(--accent3);border-radius:10px;padding:14px 16px}
 .pain-title{font-family:var(--mono);font-size:10px;color:var(--accent3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
 .pain-text{font-size:13px;color:var(--text2);line-height:1.5}
@@ -113,13 +137,18 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .result-text{font-size:13px;color:var(--text2);line-height:1.5}
 .sc-diagram-title{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;text-align:center}
 .sc-mwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.sc-mwrap .mermaid{width:100%}
-.sc-mwrap .mermaid svg{max-width:100%;height:auto;max-height:calc(100vh - 280px)}
+.sc-mwrap .mermaid svg{max-height:calc((100vh - 310px) / var(--diagram-scale))}
 
 /* ROADMAP */
 .rcol-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);text-align:center}
 .ri{display:flex;gap:7px;align-items:flex-start;margin-bottom:8px;font-size:12px;color:var(--text2);line-height:1.4}
 .ri span{flex-shrink:0}
+
+.slide-roadmap .title{font-size:clamp(34.8px,5.184vw,66px)}
+.slide-roadmap .eyebrow{font-size:14.4px}
+.slide-roadmap .rcol-title{font-size:14.4px}
+.slide-roadmap .ri{font-size:20.2px}
+.slide-roadmap .ri span[style]{font-size:17.3px !important}
 
 /* 11A/11B */
 .ask{background:var(--bg2);border:1px solid var(--accent);border-radius:12px;padding:20px 24px;margin-bottom:12px}
@@ -138,6 +167,21 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .sc-card.on .scl li::before{color:var(--accent)}
 .final{border:1px solid var(--accent);padding:16px 24px;border-radius:12px;font-size:15px;color:var(--text);line-height:1.7;margin-top:12px;text-align:center;background:rgba(0,212,170,.04)}
 .final b{color:var(--accent);font-family:var(--mono)}
+
+.slide-tribe .eyebrow{font-size:14px}
+.slide-tribe .title{font-size:clamp(29px,4.32vw,55px)}
+.slide-tribe .sclbl{font-size:12px}
+.slide-tribe .sct{font-size:18px}
+.slide-tribe .scl{font-size:14px}
+.slide-tribe .final{font-size:18px}
+
+/* SLIDE 3 — +20% text */
+.slide-concept .eyebrow{font-size:14.4px}
+.slide-concept .title{font-size:clamp(28.8px,4.32vw,55.2px)}
+.slide-concept .col-title{font-size:14.4px}
+.slide-concept .ci-title{font-size:14.4px}
+.slide-concept .ci-desc{font-size:17.3px}
+.slide-concept .analogy{font-size:20.2px}
 
 /* TITLE */
 .pulsedot{width:9px;height:9px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;flex-shrink:0}
@@ -161,7 +205,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
     <div class="tagline">AI-система которая автоматизирует рутину техлида —<br>почту, планирование, документацию, мониторинг команды.</div>
     <div class="tags">
       <div class="tag">Java · Spring Boot 3</div>
-      <div class="tag">Claude AI · RAG</div>
+      <div class="tag">AI-Agent · RAG</div>
       <div class="tag">k8s-ready</div>
       <div class="tag">работает сейчас</div>
     </div>
@@ -188,14 +232,14 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 </div>
 
 <!-- 3. КОНЦЕПЦИЯ -->
-<div class="slide" data-t="~2:00">
+<div class="slide slide-concept" data-t="~2:00">
   <div class="eyebrow">Концепция</div>
   <div class="title">LeaderOS — это среда работы.<br><span style="color:var(--text3);font-size:.7em">Как IDE для разработчика — только для техлида.</span></div>
   <div class="body">
     <div class="concept-wrap">
       <div class="concept-col hi">
         <div class="col-title" style="color:var(--accent)">🗂 Среда (workspace)</div>
-        <div class="concept-item"><div class="ci-icon">📋</div><div><div class="ci-title">CLAUDE.md</div><div class="ci-desc">Личная конфигурация агента — контекст, правила, инструменты под роль техлида</div></div></div>
+        <div class="concept-item"><div class="ci-icon">📋</div><div><div class="ci-title">AGENT.md <span style="font-size:.85em;color:var(--accent);font-weight:400">(агент-агностик)</span></div><div class="ci-desc">Один файл конфигурации — симлинки под каждый агент:<br><span style="color:var(--text3);font-family:var(--mono);font-size:.9em">CLAUDE.md · CODEX.md · GIGACODE.md → AGENT.md</span></div></div></div>
         <div class="concept-item"><div class="ci-icon">📁</div><div><div class="ci-title">workspace/</div><div class="ci-desc">Структурированное хранилище: люди, сервисы, решения, риски, дневник</div></div></div>
         <div class="concept-item"><div class="ci-icon">📅</div><div><div class="ci-title">plans/today.md</div><div class="ci-desc">Живой план дня — обновляется агентом автоматически</div></div></div>
         <div class="concept-item"><div class="ci-icon">📥</div><div><div class="ci-title">capture-inbox/</div><div class="ci-desc">Входящий поток мыслей — записал, агент разберёт вечером</div></div></div>
@@ -205,7 +249,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
         <div class="concept-item"><div class="ci-icon">📧</div><div><div class="ci-title">Mail Agent</div><div class="ci-desc">Читает почту фоном, создаёт задачи без участия техлида</div></div></div>
         <div class="concept-item"><div class="ci-icon">🧠</div><div><div class="ci-title">Memory Service</div><div class="ci-desc">Оперативная память — задачи, инциденты, риски, люди с MCP-интерфейсом</div></div></div>
         <div class="concept-item"><div class="ci-icon">🔍</div><div><div class="ci-title">RAG Service</div><div class="ci-desc">База знаний команды — семантический поиск по документации</div></div></div>
-        <div class="concept-item"><div class="ci-icon">🤖</div><div><div class="ci-title">Claude-агент</div><div class="ci-desc">Всегда в контексте — читает workspace, управляет через MCP tools</div></div></div>
+        <div class="concept-item"><div class="ci-icon">🤖</div><div><div class="ci-title">AI-Agent</div><div class="ci-desc">Всегда в контексте — читает workspace, управляет через MCP tools</div></div></div>
       </div>
     </div>
     <div class="analogy">Разработчик не пишет код в блокноте. <b>Техлид не должен управлять командой в чатах и Excel.</b></div>
@@ -213,12 +257,13 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 </div>
 
 <!-- 4. АРХИТЕКТУРА -->
-<div class="slide" data-t="~3:30">
+<div class="slide slide-arch" data-t="~3:30">
   <div class="eyebrow e2">Архитектура</div>
   <div class="title">Production-grade. <span style="color:var(--text3)">Не игрушка.</span></div>
   <div class="body">
-    <div style="display:flex;gap:14px;flex:1;min-height:0">
-      <div class="mwrap" style="flex:1">
+    <div class="arch-layout">
+      <div class="arch-main">
+        <div class="mwrap" style="width:100%">
         <div class="mermaid">
 flowchart TB
   subgraph CORP["🏢 Корпоративная среда"]
@@ -245,15 +290,15 @@ flowchart TB
     end
   end
   subgraph AI["🤖 AI слой"]
-    CLAUDE["claude --print\nBatch агент"]:::agent
-    CLAUDE_I["Claude-агент\nИнтерактивный"]:::mcp
+    CLAUDE["agent --print\nAI-Agent batch"]:::agent
+    CLAUDE_I["AI-Agent\nИнтерактивный"]:::mcp
     OLLAMA["Ollama\nmxbai-embed-large"]
   end
   CORP -->|"MCP"| MEM_MCP
   EWS -->|"EWS/IMAP"| MA_S
-  MA_S -->|"claude --print"| CLAUDE
+  MA_S -->|"agent --print"| CLAUDE
   CLAUDE -->|"REQUEST"| MEM_MCP
-  MEM_C -->|"claude --print"| CLAUDE
+  MEM_C -->|"agent --print"| CLAUDE
   CLAUDE_I -->|"MCP tools"| MEM_MCP
   CLAUDE_I -->|"rag_search"| RAG_S
   RAG_S --> OLLAMA
@@ -263,8 +308,8 @@ flowchart TB
   classDef db fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
         </div>
       </div>
-      <div style="width:170px;flex-shrink:0;display:flex;flex-direction:column;gap:8px">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;text-align:center;margin-bottom:4px">Точки агента</div>
+      </div>
+      <div class="arch-side">
         <div class="card" style="border-color:#F78166;background:rgba(247,129,102,.06);padding:12px 14px;text-align:center">
           <div style="font-family:var(--mono);font-size:10px;color:#F78166;margin-bottom:4px">🔴 BATCH АВТО</div>
           <div style="font-size:11px;color:var(--text2)">Mail Agent каждые 60 сек</div>
@@ -275,11 +320,13 @@ flowchart TB
         </div>
         <div class="card" style="border-color:#00D4AA;background:rgba(0,212,170,.06);padding:12px 14px;text-align:center">
           <div style="font-family:var(--mono);font-size:10px;color:#00D4AA;margin-bottom:4px">🟢 ИНТЕРАКТИВ</div>
-          <div style="font-size:11px;color:var(--text2)">Claude-агент + MCP</div>
+          <div style="font-size:11px;color:var(--text2)">AI-Agent + MCP</div>
         </div>
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;text-align:center;margin-top:6px">Стек</div>
-        <div style="font-size:11px;color:var(--text2);line-height:1.9;text-align:center">
+        <div class="card" style="padding:12px 14px;text-align:center">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Стек</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.9;text-align:center">
           Java 21 · Spring Boot 3<br>Spring AI · MCP tools<br>PostgreSQL · Flyway<br>OpenSearch · RAG<br>Kubernetes-ready
+          </div>
         </div>
       </div>
     </div>
@@ -289,29 +336,32 @@ flowchart TB
 <!-- 5. СЦЕНАРИЙ 1 -->
 <div class="slide" data-t="~5:00">
   <div class="eyebrow e3">Сценарий 1</div>
-  <div class="title">📧 Письмо → Задача</div>
+  <div class="title">📧 Письмо → Задача · Знания</div>
   <div class="body">
     <div class="sc-wrap">
       <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Письма теряются в потоке. Важные запросы не фиксируются. Приходится вручную переносить в трекер.</div></div>
+        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Письма теряются в потоке. Важные запросы не фиксируются. Полезные знания из писем никуда не сохраняются.</div></div>
         <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">Шедулер каждые 60 сек сканирует почту</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">Ни одно важное письмо не потеряется. Задача ждёт подтверждения в UI.</div></div>
+        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">5 маршрутов: задача, заметка, знание в RAG, черновик или шум — каждое письмо попадает куда надо.</div></div>
       </div>
       <div class="sc-right">
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
 flowchart TD
   A(["📬 Exchange EWS"]) --> B["Mail Agent\nScheduler"]
-  B -->|"claude --print"| C{"Claude AI\nклассификация"}
+  B -->|"agent --print"| C{"AI-Agent\n5 маршрутов"}
   C -->|"REQUEST"| D["Memory Service\n/api/tasks/pending"]
-  C -->|"NOISE"| E(["✓ пометить прочитанным"])
-  C -->|"DRAFT"| F(["💾 сохранить в drafts/"])
-  D --> G["PENDING задача"]
-  G -->|"Принять"| H(["✅ TODO в плане дня"])
-  G -->|"Отклонить"| I(["🗑 DELETED"])
+  C -->|"CAPTURE"| G["Memory Service\n/api/capture"]
+  C -->|"NOTICE"| H["rag-inbox/\nдокумент знаний"]
+  C -->|"DRAFT"| F(["💾 drafts/"])
+  C -->|"NOISE"| E(["✓ прочитано"])
+  D --> I(["⏳ PENDING задача\n→ подтверждение в UI"])
+  H -->|"RAG Scheduler"| L(["📚 OpenSearch\nвекторная база"])
   style C fill:#2D1B1B,stroke:#F78166,color:#F78166
   style D fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
-  style H fill:#1B2D1B,stroke:#00D4AA,color:#00D4AA
+  style G fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style H fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
+  style L fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
         </div></div>
       </div>
     </div>
@@ -335,7 +385,7 @@ flowchart TD
 flowchart TD
   A(["💬 Заметка тимлида"]) --> B["POST /api/capture\nMemory Service"]
   B --> C["capture-inbox/\nбез интерпретации"]
-  C -->|"Шедулер 18:00"| D{"Claude AI\nклассификация"}
+  C -->|"Шедулер 18:00"| D{"AI-Agent\nклассификация"}
   D -->|"TASK"| E(["⏳ PENDING задача"])
   D -->|"RISK"| F(["⚠️ Реестр рисков"])
   D -->|"KNOWLEDGE"| G(["📚 RAG база знаний"])
@@ -364,7 +414,7 @@ flowchart TD
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
 flowchart TD
-  A(["❓ Вопрос тимлида"]) --> B["Claude-агент\nинтерактивный"]
+  A(["❓ Вопрос тимлида"]) --> B["AI-Agent\nинтерактивный"]
   B -->|"MCP rag_search"| C["RAG Service :8081"]
   C -->|"embeddings"| D["Ollama\nmxbai-embed-large"]
   D --> C
@@ -395,7 +445,7 @@ flowchart TD
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
 flowchart TD
-  A(["☀️ Начало дня"]) --> B["Claude-агент\nMCP getContext"]
+  A(["☀️ Начало дня"]) --> B["AI-Agent\nMCP getContext"]
   B --> C["Memory Service\n/api/context"]
   C --> D["Задачи сегодня\n+ завтра"]
   C --> E["Открытые\nинциденты"]
@@ -426,7 +476,7 @@ flowchart TD
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
 flowchart TD
-  A(["🚨 Сообщение тимлида"]) --> B["Claude-агент\nпоказывает карточку"]
+  A(["🚨 Сообщение тимлида"]) --> B["AI-Agent\nпоказывает карточку"]
   B -->|"подтвердить"| C["MCP createIncident\nP1 · OPEN"]
   C --> D["Memory Service\nИнцидент зафиксирован"]
   D --> E["OPEN → INVESTIGATING"]
@@ -442,7 +492,7 @@ flowchart TD
 </div>
 
 <!-- 10. ROADMAP -->
-<div class="slide" data-t="~10:30">
+<div class="slide slide-roadmap" data-t="~10:30">
   <div class="eyebrow e2">Развитие проекта</div>
   <div class="title">Что есть. Что будет.</div>
   <div class="body">
@@ -456,15 +506,16 @@ flowchart TD
         <div class="ri"><span>🔗</span>MCP: Jira, Confluence, k8s</div>
         <div class="ri"><span>📝</span>Capture Bot</div>
         <div class="ri"><span>🧪</span>E2E: 44 PASS / 0 FAIL</div>
+        <div class="ri"><span>🧩</span>Common LLM модуль<br><span style="font-size:10px;color:var(--text3);padding-left:18px">GigaChat · YandexGPT · Claude</span></div>
       </div>
       <div class="card" style="display:flex;flex-direction:column;gap:8px">
         <div class="rcol-title" style="color:var(--accent2)">🔜 В разработке</div>
-        <div class="ri"><span>📊</span>Capacity Dashboard</div>
-        <div class="ri"><span>🌅</span>End of Day Summary</div>
-        <div class="ri"><span>📅</span>Weekly Routine Manager</div>
-        <div class="ri"><span>⚡</span>Proactive Briefing</div>
-        <div class="ri"><span>🔄</span>Daily Cycle</div>
-        <div class="ri"><span>🧩</span>Common LLM модуль<br><span style="font-size:10px;color:var(--text3);padding-left:18px">GigaChat · YandexGPT · Claude</span></div>
+        <div class="ri"><span>📊</span>Capacity Dashboard<br><span style="font-size:10px;color:var(--text3);padding-left:18px">загрузка · выгорание · спринт</span></div>
+        <div class="ri"><span>🌅</span>End of Day Summary<br><span style="font-size:10px;color:var(--text3);padding-left:18px">итоги · незавершённое · завтра</span></div>
+        <div class="ri"><span>📅</span>Weekly Routine Manager<br><span style="font-size:10px;color:var(--text3);padding-left:18px">1-on-1 · ретро · планирование</span></div>
+        <div class="ri"><span>⚡</span>Proactive Briefing<br><span style="font-size:10px;color:var(--text3);padding-left:18px">алерты · аномалии · превентив</span></div>
+        <div class="ri"><span>🔄</span><div style="min-width:0;word-break:break-word">Daily Cycle<br><span style="font-size:10px;color:var(--text3)">календарь → брифинг по встрече</span><br><span style="font-size:10px;color:var(--text3)">утренний старт · вечерний итог</span><br><span style="font-size:10px;color:var(--text3)">настройка ежедневных активностей</span></div></div>
+        <div class="ri"><span>💬</span>СберЧат Agent<br><span style="font-size:10px;color:var(--text3);padding-left:18px">разбор чата → задачи · знания</span></div>
       </div>
       <div class="card" style="display:flex;flex-direction:column;gap:8px">
         <div class="rcol-title" style="color:var(--accent3)">🚀 Для трайба</div>
@@ -479,50 +530,101 @@ flowchart TD
   </div>
 </div>
 
-<!-- 11A. ТЕХ ЛИД -->
+<!-- 11. DEV FLOW -->
 <div class="slide" data-t="~11:30">
-  <div class="eyebrow" style="color:var(--accent)">Версия A · для тех лида · 10 мин</div>
-  <div class="title">Давай покажем это <span style="color:var(--accent)">выше</span></div>
+  <div class="eyebrow e2">Как мы разрабатываем</div>
+  <div class="title">Идея → CR → Agent → <span style="color:var(--accent2)">Code</span></div>
   <div class="body">
-    <div class="ask">
-      <div class="askt">Что уже есть</div>
-      <div class="askb">Работающий MVP с E2E тестами. Сделан <b>в нерабочее время</b>, на личных ресурсах.<br>5 автоматизированных сценариев. Интеграции с корп системами.<br><br>Вижу потенциал масштабирования на весь трайб. Но <b>один я это не потяну.</b></div>
+    <div class="mwrap">
+      <div class="mermaid">
+flowchart LR
+  A(["💡 Идея\nпользователь"]) --> B["ChatGPT\nавтор CR"]
+  B --> C["CR · docs/cr/\ngit commit → repo"]
+  C --> D["GitHub\nIssue"]
+  D --> E{"Claude Code\nCodex Agent\nисполнитель"}
+  E --> F["Изменения\nв коде"]
+  E --> G["Обновление\nдокументации"]
+  F & G --> H["E2E\nТесты"]
+  H --> I["✅ Пользователь\nпроверяет"]
+  I --> J[("☁️ Google Drive\nSource of Truth")]
+  J -.->|"актуальная документация\nперед каждым новым CR"| B
+  style B fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style E fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style J fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
+  style I fill:#1B2D1B,stroke:#00D4AA,color:#00D4AA
+      </div>
     </div>
-    <div class="invite">
-      <div class="invl">Мой вопрос к тебе</div>
-      <div class="invt">Готов подготовить 15-минутную презентацию для уровня трайба.<br><b style="color:var(--accent)">Поддержишь? Можем выйти вместе?</b></div>
-    </div>
+    <div class="analogy"><b>ChatGPT</b> — автор и архитектор. <b>Claude Code / Codex</b> — исполнитель. <b>Google Drive</b> — единственная истина.</div>
   </div>
 </div>
 
-<!-- 11B. ТРАЙБ -->
-<div class="slide" data-t="~13:00">
-  <div class="eyebrow e2">Версия B · для трайба · 15 мин</div>
-  <div class="title">Нужна <span style="color:var(--accent)">роль</span>, а не хобби</div>
+<!-- 12. DOC STRUCTURE -->
+<div class="slide" data-t="~12:30">
+  <div class="eyebrow e4">Организация документации</div>
+  <div class="title">RFC на модуль.<br><span style="color:var(--text3);font-size:.7em">ARCHITECTURE.md — одна мастер-спека для всех агентов.</span></div>
   <div class="body">
-    <div class="g2" style="margin-bottom:12px">
-      <div class="sc-card">
-        <div class="sclbl">Сценарий А — сейчас</div>
-        <div class="sct">Pet-project</div>
-        <ul class="scl">
-          <li>Работает только для меня</li>
-          <li>Развивается в личное время</li>
-          <li>Семья забыла как я выгляжу</li>
-          <li>На трайб не масштабируется</li>
-        </ul>
-      </div>
-      <div class="sc-card on">
-        <div class="sclbl">Сценарий Б — предложение</div>
-        <div class="sct" style="color:var(--accent)">Platform Engineer</div>
-        <ul class="scl">
-          <li>Официальный внутренний продукт</li>
-          <li>Роль Platform Engineer</li>
-          <li>Рабочее время на развитие</li>
-          <li>LeaderOS Hub для трайба</li>
-        </ul>
+    <div class="tags" style="justify-content:center;flex-shrink:0;margin-bottom:4px">
+      <div class="tag" style="font-size:15px;padding:8px 18px">🐧 SberOS</div>
+      <div class="tag" style="font-size:15px;padding:8px 18px">🐧 Ubuntu</div>
+      <div class="tag" style="font-size:15px;padding:8px 18px">🍎 macOS</div>
+      <div class="tag" style="font-size:15px;padding:8px 18px">UNIX система</div>
+    </div>
+    <div class="mwrap">
+      <div class="mermaid">
+flowchart TB
+  MASTER(["📄 ARCHITECTURE.md\nМастер-спека · корень проекта"])
+
+  subgraph MAIL["📦 JavaMailAgent"]
+    MA["🔗 ARCHITECTURE.md"]
+    MR["📋 RFC-JavaMailAgent.md"]
+  end
+  subgraph MEM["📦 JavaMemoryService"]
+    ME["🔗 ARCHITECTURE.md"]
+    MM["📋 RFC-memory-service.md"]
+  end
+  subgraph RAG["📦 JavaRagService"]
+    RA["🔗 ARCHITECTURE.md"]
+    RR["📋 RFC-rag-service.md"]
+  end
+  subgraph COM["📦 common"]
+    CA["🔗 ARCHITECTURE.md"]
+    CR2["📋 RFC-common.md"]
+  end
+
+  MA -->|"symlink"| MASTER
+  ME -->|"symlink"| MASTER
+  RA -->|"symlink"| MASTER
+  CA -->|"symlink"| MASTER
+
+  MR -.->|"ref"| MA
+  MM -.->|"ref"| ME
+  RR -.->|"ref"| RA
+  CR2 -.->|"ref"| CA
+
+  classDef symlink fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
+  classDef rfc fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  classDef masterNode fill:#162030,stroke:#4A9EFF,color:#E6EDF3,font-weight:bold
+
+  class MA,ME,RA,CA symlink
+  class MR,MM,RR,CR2 rfc
+  class MASTER masterNode
       </div>
     </div>
-    <div class="final">Продукт готов к промышленному развитию.<br>Человек который это построит — уже есть.<br><b>Это я.</b></div>
+    <div class="analogy">Агент в любом модуле открывает <b>ARCHITECTURE.md</b> — и сразу видит всю систему. <b>RFC</b> описывает детали конкретного сервиса.</div>
+  </div>
+</div>
+
+<!-- 13. ФИНАЛ -->
+<div class="slide" data-t="~13:00">
+  <div class="body" style="justify-content:center;align-items:center;text-align:center">
+    <div style="font-family:var(--mono);font-size:clamp(32px,5vw,64px);font-weight:700;color:var(--accent);line-height:1.1;margin-bottom:20px">Спасибо за внимание</div>
+    <div style="font-size:clamp(18px,2.4vw,28px);color:var(--text2);margin-bottom:40px">Ваши вопросы?</div>
+    <div class="tags" style="justify-content:center">
+      <div class="tag">Java · Spring Boot 3</div>
+      <div class="tag">AI-Agent · RAG</div>
+      <div class="tag">k8s-ready</div>
+      <div class="tag">работает сейчас</div>
+    </div>
   </div>
 </div>
 
@@ -559,7 +661,7 @@ function go(n){
   setTimeout(()=>ss[o].classList.remove('out'),400);
   ss[cur].classList.add('active');upd();
 }
-function nav(d){const n=Math.max(0,Math.min(N-1,cur+d));if(n!==cur)go(n);}
+function nav(d){const n=(cur+d+N)%N;if(n!==cur)go(n);}
 function upd(){
   document.getElementById('pf').style.width=((cur+1)/N*100)+'%';
   document.getElementById('cnt').textContent=(cur+1)+'/'+N;
@@ -579,6 +681,13 @@ document.addEventListener('touchend',e=>{
   if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>44)nav(dx>0?1:-1);
 },{passive:true});
 upd();
+(function(){
+  const c=document.createElement('canvas');c.width=32;c.height=32;
+  const x=c.getContext('2d');
+  x.fillStyle='#00D4AA';
+  x.beginPath();x.arc(16,16,14,0,Math.PI*2);x.fill();
+  document.getElementById('favicon').href=c.toDataURL('image/png');
+})();
 </script>
 </body>
 </html>

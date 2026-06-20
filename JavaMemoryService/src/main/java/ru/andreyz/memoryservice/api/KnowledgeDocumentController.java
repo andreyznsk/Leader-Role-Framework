@@ -37,5 +37,10 @@ public class KnowledgeDocumentController {
         return ResponseEntity.ok(knowledgeService.reindex(id));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<KnowledgeService.DeleteResult> delete(@PathVariable Long id) {
+        return ResponseEntity.ok(knowledgeService.delete(id));
+    }
+
     public record UpdateKnowledgeDocumentRequest(String content) {}
 }

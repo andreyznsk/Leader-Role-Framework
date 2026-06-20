@@ -79,6 +79,11 @@ public class RagRestController {
         return ResponseEntity.ok(documentService.reindexDocument(id));
     }
 
+    @DeleteMapping("/api/rag/documents/{id}")
+    public ResponseEntity<RagDocumentService.DeleteResult> deleteDocument(@PathVariable Long id) throws IOException {
+        return ResponseEntity.ok(documentService.deleteDocument(id));
+    }
+
     record IndexRequest(String file_path) {}
     record IndexDirRequest(String dir_path, String pattern) {}
     record SearchRequest(String query, Integer top_k) {}
