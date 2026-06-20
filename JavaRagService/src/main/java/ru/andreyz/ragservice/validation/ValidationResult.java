@@ -19,6 +19,10 @@ public record ValidationResult(
         return new ValidationResult(false, null, errors);
     }
 
+    public static ValidationResult errors(DocType docType, List<String> errors) {
+        return new ValidationResult(false, docType, errors);
+    }
+
     public String errorsAsString() {
         return String.join("; ", errors);
     }

@@ -9,29 +9,34 @@ import java.time.LocalDateTime;
 public record IndexedDocument(
         @Id Long id,
         String filePath,
+        String docType,
         String fileHash,
         LocalDateTime indexedAt,
         Integer chunkCount,
         String status,
         String errorMessage
 ) {
-    public static IndexedDocument indexed(String path, String hash, int chunks) {
-        return new IndexedDocument(null, path, hash, LocalDateTime.now(), chunks, "indexed", null);
+    public static IndexedDocument indexed(String path, String docType, String hash, int chunks) {
+        return new IndexedDocument(null, path, docType, hash, LocalDateTime.now(), chunks, "indexed", null);
     }
 
-    public static IndexedDocument invalid(String path, String hash, String error) {
-        return new IndexedDocument(null, path, hash, LocalDateTime.now(), 0, "invalid", error);
+    public static IndexedDocument invalid(String path, String docType, String hash, String error) {
+        return new IndexedDocument(null, path, docType, hash, LocalDateTime.now(), 0, "invalid", error);
     }
 
-    public static IndexedDocument failed(String path, String hash, String error) {
-        return new IndexedDocument(null, path, hash, LocalDateTime.now(), 0, "failed", error);
+    public static IndexedDocument failed(String path, String docType, String hash, String error) {
+        return new IndexedDocument(null, path, docType, hash, LocalDateTime.now(), 0, "failed", error);
     }
 
-    public IndexedDocument withUpdated(String fileHash, int chunkCount, String status) {
-        return new IndexedDocument(id, filePath, fileHash, LocalDateTime.now(), chunkCount, status, null);
+    public IndexedDocument withUpdated(String docType, String fileHash, int chunkCount, String status) {
+        return new IndexedDocument(id, filePath, docType, fileHash, LocalDateTime.now(), chunkCount, status, null);
     }
 
-    public IndexedDocument withUpdated(String fileHash, int chunkCount, String status, String errorMessage) {
-        return new IndexedDocument(id, filePath, fileHash, LocalDateTime.now(), chunkCount, status, errorMessage);
+    public IndexedDocument withUpdated(String docType, String fileHash, int chunkCount, String status, String errorMessage) {
+        return new IndexedDocument(id, filePath, docType, fileHash, LocalDateTime.now(), chunkCount, status, errorMessage);
+    }
+
+    public IndexedDocument withStatus(String status, String errorMessage) {
+        return new IndexedDocument(id, filePath, docType, fileHash, LocalDateTime.now(), chunkCount, status, errorMessage);
     }
 }

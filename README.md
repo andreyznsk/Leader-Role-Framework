@@ -101,7 +101,7 @@ LeaderOS — система из трёх Java-сервисов, оркестр�
 - Capture Bot: приём сырых заметок → классификация в 18:00
 - Usage Statistics UI: /ui/stats — показывает вопросы агенту, RAG search, задачи, captures и оценку сэкономленного времени.
 - MCP Server: 14 инструментов для Claude агента
-- Web UI: /ui/today, /ui/notes, /ui/incidents, /ui/risks, /ui/people, /ui/stats
+- Web UI: /ui/today, /ui/notes (Operational Notes), /ui/captures, /ui/knowledge, /ui/incidents, /ui/risks, /ui/people, /ui/stats
 
 ### JavaRagService
 - Семантический поиск по Markdown-документации

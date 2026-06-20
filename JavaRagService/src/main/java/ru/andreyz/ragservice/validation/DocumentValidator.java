@@ -61,7 +61,7 @@ public class DocumentValidator {
         if (errors.isEmpty()) {
             return ValidationResult.ok(docType);
         }
-        return ValidationResult.errors(errors);
+        return ValidationResult.errors(docType, errors);
     }
 
     private Map<String, String> parseFrontmatter(String content) {

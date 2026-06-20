@@ -27,6 +27,11 @@ public enum DocSchema {
     KNOWLEDGE(DocType.KNOWLEDGE,
             List.of(DocField.TYPE),
             List.of()
+    ),
+
+    NOTICE(DocType.NOTICE,
+            List.of(DocField.TYPE, DocField.SOURCE, DocField.UPDATED, DocField.REVIEW_BY),
+            List.of("## Контекст", "## Содержание", "## Возможное применение")
     );
 
     private final DocType docType;

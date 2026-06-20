@@ -118,8 +118,8 @@ class RagMcpToolsTest {
 
     @Test
     void ragStatus_returnsAllDocuments() {
-        IndexedDocument d1 = new IndexedDocument(1L, "file1.md", "hash1", LocalDateTime.now(), 3, "indexed", null);
-        IndexedDocument d2 = new IndexedDocument(2L, "file2.md", "hash2", LocalDateTime.now(), 5, "indexed", null);
+        IndexedDocument d1 = new IndexedDocument(1L, "file1.md", "ADR", "hash1", LocalDateTime.now(), 3, "indexed", null);
+        IndexedDocument d2 = new IndexedDocument(2L, "file2.md", "NOTICE", "hash2", LocalDateTime.now(), 5, "indexed", null);
         when(repository.findAll()).thenReturn(List.of(d1, d2));
 
         List<IndexedDocument> docs = tools.ragStatus();
@@ -176,7 +176,7 @@ class RagMcpToolsTest {
         Path file = tempDir.resolve("stable.md");
         Files.writeString(file, content);
         String hash = sha256(content);
-        IndexedDocument existing = new IndexedDocument(1L, file.toString(), hash, LocalDateTime.now(), 1, "indexed", null);
+        IndexedDocument existing = new IndexedDocument(1L, file.toString(), "SERVICE_CARD", hash, LocalDateTime.now(), 1, "indexed", null);
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.of(existing));
 
         DirectoryIndexResult result = tools.ragIndexDirectory(tempDir.toString(), null);

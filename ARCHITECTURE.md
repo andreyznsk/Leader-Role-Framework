@@ -115,9 +115,10 @@ agent:
 **RFC:** `JavaMemoryService/RFC/RFC-memory-service.md`
 **Статус:** In Progress
 
-**Роль:** Операционная память техлида. Хранит быстро меняющиеся данные —
-задачи, планы, инциденты, риски, людей, заметки и raw captures.
-Даёт REST, Thymeleaf UI и MCP tools для Claude-агента.
+**Роль:** Операционная память техлида и UI/gateway для базы знаний.
+Хранит быстро меняющиеся данные — задачи, планы, инциденты, риски, людей,
+заметки и raw captures. RAG-документами не владеет, но отдаёт browser-facing
+UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP tools для Claude-агента.
 
 **База данных:** PostgreSQL, схема `memory`, владелец `memory_user`
 
@@ -143,11 +144,14 @@ agent:
 | `POST` | `/api/capture` | Сохранить raw capture в БД и `capture-inbox/` |
 | `POST` | `/api/capture/process-now` | Ручной запуск классификации capture-файлов |
 | `POST` | `/api/knowledge/search` | Memory-owned прокси к JavaRagService `/api/search` + usage events |
+| `GET/PUT/POST` | `/api/knowledge/documents/**` | Browser-facing proxy управления RAG-документами |
 | `GET` | `/api/stats/usage?period=7d` | Usage Statistics: агрегаты по usage events |
 | `GET/POST` | `/api/notes` | Лента заметок |
 | `GET/POST/PUT/DELETE` | `/api/incidents`, `/api/risks`, `/api/people` | CRUD/soft delete рабочих сущностей |
 | `GET` | `/ui/today` | Web UI: план дня |
-| `GET` | `/ui/notes` | Web UI: лента заметок |
+| `GET` | `/ui/notes` | Web UI: Operational Notes |
+| `GET` | `/ui/captures` | Web UI: Capture Inbox |
+| `GET` | `/ui/knowledge` | Web UI: Knowledge Gateway для RAG lifecycle |
 | `GET` | `/ui/stats` | Web UI: статистика использования и saved time |
 
 **Статусы задачи:** `PENDING → TODO → IN_PROGRESS → DONE` / `DELETED`
@@ -163,8 +167,8 @@ agent:
 **Usage Statistics:** Memory Service владеет таблицей `memory.usage_events` и пишет события
 из task, pending task, capture, capture processing и knowledge search flow. Агрегаты доступны через
 `GET /api/stats/usage?period=today|7d|30d|all`, UI — `/ui/stats`. Saved time считается
-по MVP-формуле из CR-MEM-008. Knowledge search проходит через `/api/knowledge/search`,
-который проксирует публичный REST API JavaRagService и не получает прямого доступа к БД RAG.
+по MVP-формуле из CR-MEM-008. Knowledge search и knowledge document management проходят через
+REST proxy (`/api/knowledge/**`) и не получают прямого JDBC-доступа к схеме `rag`.
 
 **MCP tools:** `getContext`, `getTasks`, `createTask`, `markTaskDone`, `moveTask`,
 `updateTaskStatus`, `getTaskDescription`, `setTaskDescription`, `createIncident`,

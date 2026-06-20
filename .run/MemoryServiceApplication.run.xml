@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="MemoryServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
-    <option name="ACTIVE_PROFILES" value="local" />
+    <option name="ACTIVE_PROFILES" value="ollama" />
     <module name="memory-service" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="ru.andreyz.memoryservice.MemoryServiceApplication" />
     <option name="VM_PARAMETERS" value="-Dserver.port=8090" />

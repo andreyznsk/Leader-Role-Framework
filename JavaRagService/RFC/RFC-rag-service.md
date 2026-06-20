@@ -1,7 +1,7 @@
 # RFC: JavaRagService
 
-**Версия:** 1.4
-**Дата:** 2026-06-12
+**Версия:** 1.5
+**Дата:** 2026-06-20
 **Статус:** Active
 **Автор:** Андрей Зайцев
 **Проект:** Leader-Role-Framework
@@ -17,6 +17,7 @@
 | 1.2 | 2026-06-11 | CR-RAG-002 | DocumentValidator, `invalid` статус, `error_message` в таблице |
 | 1.3 | 2026-06-12 | CR-RAG-BUGFIX-002, CR-RAG-E2E-001 | REST API (`RagRestController`), поле `invalid` в DirectoryIndexResult, актуальные URL |
 | 1.4 | 2026-06-12 | CR-ARCH-003 | Добавлена зависимость `common` для будущих AgentClient-сценариев |
+| 1.5 | 2026-06-20 | CR-ARCH-005, CR-MEM-009 | `NOTICE` как DocType, document management API, `doc_type` в indexed_documents, degraded response для missing files |
 
 ---
 
@@ -29,6 +30,7 @@ JavaRagService — самостоятельный Java-сервис (отдел�
 - архитектурные схемы (ADR, C4, карточки сервисов)
 - процессы команды (release flow, onboarding, runbooks)
 - глоссарий сокращений
+- notice-документы из почты (`NOTICE`)
 - Markdown-артефакты из workspace
 
 **Что НЕ хранит** (→ это в PostgreSQL / JavaMemoryService):
@@ -98,7 +100,11 @@ JavaRagService ──depends on──→  common 1.0.0 (future AgentClient featu
 | POST | `/api/rag/index` | `{"file_path": "..."}` | `{"chunksAdded": N, "status": "indexed\|skipped\|invalid", "filePath": "..."}` |
 | POST | `/api/rag/index-directory` | `{"dir_path": "...", "pattern": "*.md"}` | `{"indexed": N, "skipped": N, "failed": N, "invalid": N, "message": "done"}` |
 | POST | `/api/search` | `{"query": "...", "top_k": N}` | `[{"text":"...","source":"...","score":0.87,"chunkIndex":0}]` |
-| GET | `/api/rag/status` | — | `[{"filePath":"...","chunkCount":N,"status":"...","indexedAt":"..."}]` |
+| GET | `/api/rag/status` | — | `[{"filePath":"...","docType":"NOTICE","chunkCount":N,"status":"...","indexedAt":"..."}]` |
+| GET | `/api/rag/documents?type=NOTICE` | — | список документов для UI/proxy |
+| GET | `/api/rag/documents/{id}` | — | документ + markdown content |
+| PUT | `/api/rag/documents/{id}` | `{"content":"..."}` | обновлённый документ, обычно `status=outdated` |
+| POST | `/api/rag/documents/{id}/reindex` | — | `{"chunksAdded":N,"status":"indexed","filePath":"..."}` |
 
 > **Примечание:** поля ответа в camelCase (Jackson default) — `chunksAdded`, `filePath`, `chunkCount`, `indexedAt`.
 
@@ -180,6 +186,7 @@ updated: YYYY-MM-DD
 | `SERVICE_CARD` | type, service, updated, review_by | `## Назначение`, `## Стек`, `## Интеграции`, `## Деплой` |
 | `PROCESS` | type, updated, review_by | `## Когда использовать`, `## Шаги`, `## Кто участвует`, `## Escalation` |
 | `GLOSSARY` | type, updated | `# Глоссарий` |
+| `NOTICE` | type, source, updated, review_by | `## Контекст`, `## Содержание`, `## Возможное применение` |
 
 **При ошибке валидации:**
 - файл записывается в `indexed_documents` со статусом `invalid`
@@ -256,6 +263,7 @@ OpenSearchClient → kNN query:
 CREATE TABLE IF NOT EXISTS indexed_documents (
     id            SERIAL PRIMARY KEY,
     file_path     TEXT        NOT NULL UNIQUE,
+    doc_type      VARCHAR(50),
     file_hash     TEXT        NOT NULL,
     indexed_at    TIMESTAMP   NOT NULL DEFAULT NOW(),
     chunk_count   INT,
@@ -279,7 +287,8 @@ ALTER TABLE indexed_documents
 | `indexed` | успешно проиндексирован | > 0 | null |
 | `invalid` | не прошёл валидацию структуры | 0 | описание ошибок |
 | `failed` | ошибка при индексации (Ollama/OpenSearch недоступен) | 0 | текст исключения |
-| `outdated` | файл изменился, идёт переиндексация | старый | null |
+| `outdated` | markdown обновлён, ждёт переиндексации | старый | null |
+| `missing` | запись осталась, а markdown-файл отсутствует на диске | старый/0 | `Document file is missing on disk` |
 
 ---
 
@@ -307,16 +316,18 @@ JavaRagService/
 ├── src/main/java/ru/andreyz/ragservice/
 │   ├── RagServiceApplication.java
 │   ├── api/
-│   │   └── RagRestController.java   ← REST: /api/rag/index, /api/search, /api/rag/status
+│   │   └── RagRestController.java   ← REST: /api/rag/index, /api/search, /api/rag/status, /api/rag/documents/**
 │   ├── mcp/
 │   │   └── RagMcpTools.java         ← MCP tools: rag_index, rag_search, rag_status
 │   │                                   DirectoryIndexResult: indexed, skipped, failed, invalid
 │   ├── validation/
-│   │   ├── DocType.java             ← enum: SERVICE_CARD, PROCESS, GLOSSARY, ADR
+│   │   ├── DocType.java             ← enum: SERVICE_CARD, PROCESS, GLOSSARY, ADR, NOTICE
 │   │   ├── DocField.java            ← enum обязательных полей frontmatter
 │   │   ├── DocSchema.java           ← маппинг тип → поля + секции
 │   │   ├── ValidationResult.java    ← record: valid, docType, errors
 │   │   └── DocumentValidator.java   ← @Component: frontmatter + структура
+│   ├── service/
+│   │   └── RagDocumentService.java  ← list/get/update/reindex + degraded missing-file response
 │   ├── indexer/
 │   │   ├── FileIndexer.java         ← оркестратор: валидация → chunks → OS
 │   │   │                               IndexResult: chunksAdded, status, filePath

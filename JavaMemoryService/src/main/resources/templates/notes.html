@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
-<head th:replace="~{fragments/layout :: head('Заметки')}"></head>
+<head th:replace="~{fragments/layout :: head('Operational Notes')}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">Заметки</h4>
+        <div>
+            <h4 class="mb-0">Operational Notes</h4>
+            <div class="text-muted small">Рабочие заметки Memory Service, не RAG-документы</div>
+        </div>
         <form method="get" action="/ui/notes" class="d-flex gap-2">
             <input type="text" name="tags" class="form-control form-control-sm"
                    placeholder="tags" th:value="${tags}"/>

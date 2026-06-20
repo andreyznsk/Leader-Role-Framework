@@ -7,10 +7,12 @@ import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.integration.MemoryServiceClient;
 import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.AgentResponseType;
+import ru.andreyz.mailagent.model.Email;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -31,9 +33,10 @@ class ActionExecutorTest {
         paths.setProcessed(tempDir.resolve("processed").toString());
         paths.setDrafts(tempDir.resolve("drafts").toString());
         paths.setPlan(tempDir.resolve("plans/today.md").toString());
+        paths.setRagInbox(tempDir.resolve("rag-inbox").toString());
 
         memoryServiceClient = mock(MemoryServiceClient.class);
-        executor = new ActionExecutor(memoryServiceClient, paths);
+        executor = new ActionExecutor(memoryServiceClient, paths, new NoticeDocumentWriter(paths));
     }
 
     @Test
@@ -47,7 +50,7 @@ class ActionExecutorTest {
             AgentResponseType.NOISE, emailId, "CI notification", null, null, null, null, null, null
         );
 
-        executor.execute(response);
+        executor.execute(email(emailId), response);
 
         assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
@@ -71,7 +74,7 @@ class ActionExecutorTest {
             null
         );
 
-        executor.execute(response);
+        executor.execute(email(emailId), response);
 
         Path planFile = tempDir.resolve("plans/today.md");
         assertTrue(Files.exists(planFile));
@@ -93,9 +96,38 @@ class ActionExecutorTest {
             "К сведению: переезд на новый кластер с 1 июля"
         );
 
-        executor.execute(response);
+        executor.execute(email(emailId), response);
 
         verify(memoryServiceClient).createCapture("К сведению: переезд на новый кластер с 1 июля", "email");
+        assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
+        assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
+    }
+
+    @Test
+    void noticeCreatesRagDocumentAndMovesEmailToProcessed() throws IOException {
+        Path inbox = tempDir.resolve("inbox");
+        Files.createDirectories(inbox);
+        String emailId = "test-notice-001";
+        Files.writeString(inbox.resolve(emailId + ".json"), "{}");
+
+        AgentResponse response = new AgentResponse(
+                AgentResponseType.NOTICE, emailId,
+                "Новая release-практика команды", null, null, null, null, null, null
+        );
+
+        ActionExecutor.ActionResult result = executor.execute(
+                email(emailId, "NOTICE: Новый порядок релизов", "architect@example.com", "Согласование через release calendar"),
+                response
+        );
+
+        assertTrue(result.markAsRead());
+        assertNotNull(result.outputPath());
+        Path noticeFile = Path.of(result.outputPath());
+        assertTrue(Files.exists(noticeFile));
+        String content = Files.readString(noticeFile);
+        assertTrue(content.contains("type: NOTICE"));
+        assertTrue(content.contains("## Контекст"));
+        assertTrue(content.contains("release calendar"));
         assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
     }
@@ -104,5 +136,13 @@ class ActionExecutorTest {
     void sanitizeReplacesSpecialChars() {
         assertEquals("AAMk-123__abc", ActionExecutor.sanitize("AAMk-123::abc"));
         assertEquals("user_test.com", ActionExecutor.sanitize("user@test.com"));
+    }
+
+    private Email email(String emailId) {
+        return email(emailId, "Subject", "sender@example.com", "Body");
+    }
+
+    private Email email(String emailId, String subject, String from, String body) {
+        return new Email(emailId, subject, from, body, LocalDateTime.of(2026, 6, 20, 10, 15), "INBOX");
     }
 }

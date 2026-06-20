@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.integration.MemoryServiceClient;
 import ru.andreyz.mailagent.model.AgentResponse;
+import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.PendingTaskRequest;
 
 import java.io.IOException;
@@ -21,13 +22,17 @@ public class ActionExecutor {
 
     private final MemoryServiceClient memoryServiceClient;
     private final MailConfig.PathProperties pathProperties;
+    private final NoticeDocumentWriter noticeDocumentWriter;
 
-    public ActionExecutor(MemoryServiceClient memoryServiceClient, MailConfig.PathProperties pathProperties) {
+    public ActionExecutor(MemoryServiceClient memoryServiceClient,
+                          MailConfig.PathProperties pathProperties,
+                          NoticeDocumentWriter noticeDocumentWriter) {
         this.memoryServiceClient = memoryServiceClient;
         this.pathProperties = pathProperties;
+        this.noticeDocumentWriter = noticeDocumentWriter;
     }
 
-    public void execute(AgentResponse response) throws IOException {
+    public ActionResult execute(Email email, AgentResponse response) throws IOException {
         Path inbox = resolveInbox(response.emailId());
         Path processed = resolveProcessed(response.emailId());
 
@@ -48,14 +53,17 @@ public class ActionExecutor {
 
                 moveToProcessed(inbox, processed);
                 log.info("REQUEST → plan + memory-service: {}", response.taskLine());
+                return new ActionResult(null, false);
             }
             case DRAFT -> {
                 moveToProcessed(inbox, processed);
                 log.info("DRAFT → {}: {}", response.draftPath(), response.note());
+                return new ActionResult(null, false);
             }
             case NOISE -> {
                 moveToProcessed(inbox, processed);
                 log.info("NOISE: {}", response.note());
+                return new ActionResult(null, true);
             }
             case CAPTURE -> {
                 String text = response.captureText() != null && !response.captureText().isBlank()
@@ -64,8 +72,16 @@ public class ActionExecutor {
                 memoryServiceClient.createCapture(text, "email");
                 moveToProcessed(inbox, processed);
                 log.info("CAPTURE → memory-service: {}", text);
+                return new ActionResult(null, false);
+            }
+            case NOTICE -> {
+                Path noticePath = noticeDocumentWriter.write(email, response.note());
+                moveToProcessed(inbox, processed);
+                log.info("NOTICE → rag-inbox: {}", noticePath);
+                return new ActionResult(noticePath.toString(), true);
             }
         }
+        throw new IllegalStateException("Unsupported response type: " + response.type());
     }
 
     private Path resolveInbox(String emailId) {
@@ -86,4 +102,6 @@ public class ActionExecutor {
     static String sanitize(String emailId) {
         return emailId.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
+
+    public record ActionResult(String outputPath, boolean markAsRead) {}
 }

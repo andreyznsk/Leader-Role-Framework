@@ -31,6 +31,9 @@ opensearch:
   index: rag-knowledge
 
 rag:
+  chunk:
+    min-size: 100
+    max-size: 512
   inbox:
     path: ../rag-inbox
   scheduler:

@@ -45,6 +45,7 @@ public class MailConfig {
         private String processed = "processed";
         private String drafts = "drafts";
         private String plan = "plans/today.md";
+        private String ragInbox = "rag-inbox";
 
         public String getInbox() { return inbox; }
         public void setInbox(String v) { this.inbox = v; }
@@ -54,6 +55,8 @@ public class MailConfig {
         public void setDrafts(String v) { this.drafts = v; }
         public String getPlan() { return plan; }
         public void setPlan(String v) { this.plan = v; }
+        public String getRagInbox() { return ragInbox; }
+        public void setRagInbox(String v) { this.ragInbox = v; }
     }
 
     @ConfigurationProperties(prefix = "memory.service")

@@ -7,5 +7,6 @@ import java.util.Optional;
 
 public interface IndexedDocumentRepository extends CrudRepository<IndexedDocument, Long> {
     Optional<IndexedDocument> findByFilePath(String filePath);
+    List<IndexedDocument> findByDocType(String docType);
     List<IndexedDocument> findAll();
 }

@@ -49,11 +49,12 @@ public class FileIndexer {
         String hash = sha256(content);
 
         ValidationResult validation = validator.validate(content);
+        String docType = validation.docType() != null ? validation.docType().name() : null;
         if (!validation.valid()) {
             Optional<IndexedDocument> existing = repository.findByFilePath(filePath);
             IndexedDocument doc = existing
-                    .map(d -> d.withUpdated(hash, 0, "invalid", validation.errorsAsString()))
-                    .orElse(IndexedDocument.invalid(filePath, hash, validation.errorsAsString()));
+                    .map(d -> d.withUpdated(docType != null ? docType : d.docType(), hash, 0, "invalid", validation.errorsAsString()))
+                    .orElse(IndexedDocument.invalid(filePath, docType, hash, validation.errorsAsString()));
             repository.save(doc);
             log.warn("⚠️  File failed validation, skipping: {} — {}", filePath, validation.errorsAsString());
             return new IndexResult(0, "invalid", filePath);
@@ -87,8 +88,8 @@ public class FileIndexer {
             int indexed = chunks.size();
 
             IndexedDocument doc = existing
-                    .map(d -> d.withUpdated(hash, indexed, "indexed"))
-                    .orElse(IndexedDocument.indexed(filePath, hash, indexed));
+                    .map(d -> d.withUpdated(docType, hash, indexed, "indexed"))
+                    .orElse(IndexedDocument.indexed(filePath, docType, hash, indexed));
             repository.save(doc);
 
             log.info("[INDEX] ✓ file={} docId={} type={} chunks={} hash={} action={}",
@@ -98,8 +99,8 @@ public class FileIndexer {
         } catch (Exception e) {
             String errMsg = e.getMessage();
             IndexedDocument doc = existing
-                    .map(d -> d.withUpdated(hash, 0, "failed", errMsg))
-                    .orElse(IndexedDocument.failed(filePath, hash, errMsg));
+                    .map(d -> d.withUpdated(docType, hash, 0, "failed", errMsg))
+                    .orElse(IndexedDocument.failed(filePath, docType, hash, errMsg));
             repository.save(doc);
             log.error("❌ Indexing error: {} — {}", filePath, errMsg);
             return new IndexResult(0, "failed: " + errMsg, filePath);

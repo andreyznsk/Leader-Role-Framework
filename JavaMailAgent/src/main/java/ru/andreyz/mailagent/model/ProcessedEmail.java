@@ -13,10 +13,11 @@ public record ProcessedEmail(
     String sender,
     String subject,
     String agentType,
+    String outputPath,
     LocalDateTime processedAt
 ) {
-    public static ProcessedEmail of(Email email, String agentType) {
+    public static ProcessedEmail of(Email email, String agentType, String outputPath) {
         return new ProcessedEmail(null, email.id(), email.folder(), email.from(),
-            email.subject(), agentType, LocalDateTime.now());
+            email.subject(), agentType, outputPath, LocalDateTime.now());
     }
 }

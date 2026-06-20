@@ -21,6 +21,10 @@ rclone.conf
 .DS_Store
 Thumbs.db
 
+# Editor swap files
+*.swp
+*.swo
+
 # Logs
 *.log
 
@@ -47,6 +51,7 @@ build/
 *.tar.gz
 *.rar
 *.pid
+*.gz
 .gradle/
 gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties

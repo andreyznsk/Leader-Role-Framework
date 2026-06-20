@@ -1,7 +1,7 @@
 # RFC: JavaMailAgent — Java Application Core
 
 **Статус:** Living Document  
-**Дата:** 2026-06-12  
+**Дата:** 2026-06-20  
 **Проект:** Leader-Role-Framework / JavaMailAgent  
 **Запускать Claude Code из:** `Leader-Role-Framework/JavaMailAgent/`
 
@@ -15,7 +15,8 @@
 Spring Boot 3 приложение. Подключается к корпоративному почтовому серверу,
 читает новые письма, для каждого вызывает LLM через `AgentClient` из `common`, выполняет
 детерминированное действие по результату. Интегрируется с `java-memory-service`
-для хранения задач. Имеет минимальный Web UI для просмотра статуса.
+для хранения задач и capture flow, а с `JavaRagService` — через файловый inbox для
+`NOTICE`-документов. Имеет минимальный Web UI для просмотра статуса.
 
 Работает как бесконечный фоновый процесс.
 
@@ -111,6 +112,7 @@ path:
   processed: mail/processed
   drafts: mail/drafts
   plan: plans/today.md
+  rag-inbox: ../JavaRagService/rag-inbox
 
 memory:
   service:
@@ -286,7 +288,7 @@ JavaMailAgent/
     │   │   ├── model/
     │   │   │   ├── Email.java                  ← record (id, subject, from, body, receivedAt, folder)
     │   │   │   ├── AgentResponse.java          ← record (@JsonInclude NON_NULL)
-    │   │   │   ├── AgentResponseType.java      ← enum: REQUEST/DRAFT/NOISE/CAPTURE
+    │   │   │   ├── AgentResponseType.java      ← enum: REQUEST/DRAFT/NOISE/CAPTURE/NOTICE
     │   │   │   ├── PendingTaskRequest.java     ← record, payload для memory-service
     │   │   │   └── ProcessedEmail.java         ← Spring Data JDBC record (@Table mailagent.processed_emails)
     │   │   ├── repository/
@@ -341,7 +343,7 @@ logs/
 10:32:17 INFO  MailAgentJob        - Classified as NOISE
 10:32:17 INFO  ActionExecutor      - NOISE: CI уведомление, пропускаем
 10:32:17 INFO  MailAgentJob        - Email AAMk-456 marked as read (NOISE)
-10:32:18 INFO  MailAgentJob        - Poll finished: 2 processed (1 REQUEST, 0 DRAFT, 1 NOISE, 0 CAPTURE, 0 errors)
+10:32:18 INFO  MailAgentJob        - Poll finished: 3 processed (1 REQUEST, 0 DRAFT, 1 NOISE, 0 CAPTURE, 1 NOTICE, 0 errors)
 10:32:18 WARN  MailAgentJob        - Email AAMk-789 failed: Claude timed out after 5 minutes, will retry next poll
 ```
 
@@ -386,7 +388,7 @@ logs/
 2. Для каждой папки — получить непрочитанные письма (`listUnread(folder, limit)`)
 3. Пропустить письма, уже записанные в `processed_emails` (dedup по `emailId`)
 4. Обработать: Claude → ActionExecutor → записать в `processed_emails`
-5. `markAsRead` — **только для NOISE** (`REQUEST`/`DRAFT`/`CAPTURE` остаются непрочитанными)
+5. `markAsRead` — для `NOISE` и для `NOTICE` после успешной записи markdown-файла (`REQUEST`/`DRAFT`/`CAPTURE` остаются непрочитанными)
 
 ```java
 // fixedDelay — следующий тик только после завершения предыдущего
@@ -451,6 +453,23 @@ CaptureScheduler классифицирует письмо вместе с за�
 
 CAPTURE используется для писем с полезной информацией без немедленного действия:
 FYI, архитектурные решения, аналитика, плановые работы, новости команды.
+
+### Поток NOTICE → RAG документ
+
+```
+MailAgentJob (классифицировал как NOTICE)
+        ↓
+ActionExecutor + NoticeDocumentWriter
+        ↓
+write JavaRagService/rag-inbox/mail/YYYY-MM-DD/{safe-message-id}.md
+        ↓
+JavaRagService scheduler / manual reindex
+        ↓
+Memory Service /ui/knowledge?type=NOTICE
+```
+
+`NOTICE` используется для писем, которые уже должны стать knowledge-документом:
+release/process changes, operating rules, архитектурные договорённости, письма для RAG lifecycle.
 
 ### PendingTaskRequest.java — record
 ```java
@@ -609,6 +628,11 @@ public class ActionExecutor {
                 Files.move(inbox, processed, StandardCopyOption.REPLACE_EXISTING);
                 log.info("CAPTURE → memory-service: {}", text);
             }
+            case NOTICE -> {
+                Path noticePath = noticeDocumentWriter.write(email, response.note());
+                Files.move(inbox, processed, StandardCopyOption.REPLACE_EXISTING);
+                log.info("NOTICE → rag-inbox: {}", noticePath);
+            }
         }
     }
 }
@@ -646,8 +670,9 @@ public interface MailClient {
 }
 ```
 
-`markAsRead` вызывается **только для NOISE** — `REQUEST`, `DRAFT` и `CAPTURE` остаются
-непрочитанными в почте, повторная обработка предотвращается через `processed_emails`.
+`markAsRead` вызывается для `NOISE`, а также для `NOTICE` после успешной записи markdown.
+`REQUEST`, `DRAFT` и `CAPTURE` остаются непрочитанными в почте, повторная обработка
+предотвращается через `processed_emails`.
 
 ### EwsMailClient — Exchange on-premise ✅ реализован
 ```java
@@ -739,7 +764,8 @@ CREATE TABLE mailagent.processed_emails (
     folder        VARCHAR(255),
     sender        VARCHAR(255),
     subject       VARCHAR(512),
-    agent_type    VARCHAR(16) NOT NULL,   -- REQUEST | DRAFT | NOISE | CAPTURE
+    agent_type    VARCHAR(16) NOT NULL,   -- REQUEST | DRAFT | NOISE | CAPTURE | NOTICE
+    output_path   TEXT,                   -- путь до созданного RAG markdown для NOTICE
     processed_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
 ```
@@ -754,11 +780,12 @@ public record ProcessedEmail(
     String sender,
     String subject,
     String agentType,
+    String outputPath,
     LocalDateTime processedAt
 ) {
-    public static ProcessedEmail of(Email email, String agentType) {
+    public static ProcessedEmail of(Email email, String agentType, String outputPath) {
         return new ProcessedEmail(null, email.id(), email.folder(), email.from(),
-            email.subject(), agentType, LocalDateTime.now());
+            email.subject(), agentType, outputPath, LocalDateTime.now());
     }
 }
 ```
@@ -770,6 +797,7 @@ Flyway управляет схемой `mailagent`. Файлы — в `classpath
 | Версия | Файл | Содержимое |
 |--------|------|------------|
 | V1 | `V1__create_processed_emails.sql` | Таблица + индексы |
+| V2 | `V2__add_output_path_to_processed_emails.sql` | `output_path` для NOTICE markdown |
 
 ### Инфраструктура
 

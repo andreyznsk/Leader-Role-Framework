@@ -2,7 +2,7 @@
 
 **Статус:** Living document
 **Автор:** Андрей Зайцев
-**Дата:** 2026-06-12
+**Дата:** 2026-06-20
 **Порт:** 8082
 
 ---
@@ -22,6 +22,7 @@
   и маршрутизирует в задачи, риски, заметки, вопросы, RAG inbox или daily journal
 - Владеет usage statistics: пишет `usage_events` для AI-agent flows, task/capture сценариев,
   отдаёт агрегаты через `/api/stats/usage` и UI `/ui/stats`
+- Даёт две UI-зоны: `Operational Memory` и `Knowledge Gateway`, не дублируя RAG-документы в своей БД
 
 ---
 
@@ -136,6 +137,8 @@ Core endpoints:
 - `POST /api/stats/events` — local-profile debug endpoint for e2e/manual event injection
 - `POST /api/knowledge/search` — Memory-owned proxy to JavaRagService `/api/search` with
   `KNOWLEDGE_SEARCH`, `RAG_SEARCH` and `RAG_RESULT_USED` usage events
+- `GET /api/knowledge/documents`, `GET/PUT /api/knowledge/documents/{id}`, `POST /api/knowledge/documents/{id}/reindex`
+  — browser-facing proxy управления RAG-документами
 
 Saved time MVP formula:
 - `ASK_ANSWERED = 15 min`
@@ -232,7 +235,7 @@ CREATE TABLE email_state (
     subject        VARCHAR(1000),
     sender         VARCHAR(500),
     received_at    TIMESTAMP,
-    classification VARCHAR(20),   -- DRAFT | REQUEST | NOISE
+    classification VARCHAR(20),   -- DRAFT | REQUEST | NOISE | CAPTURE | NOTICE
     status         VARCHAR(20)  NOT NULL DEFAULT 'NEW',  -- NEW | PROCESSED | IGNORED
     summary        TEXT,
     created_at     TIMESTAMP    NOT NULL DEFAULT NOW()
@@ -575,6 +578,14 @@ POST /api/tasks/{id}/reorder             body: { "direction": "up"|"down" } | { 
 POST   /api/tasks/{id}/delete             # мягкое удаление (статус → DELETED)
 DELETE /api/tasks/{id}                   # мягкое удаление (статус → DELETED), REST-алиас
 
+# Knowledge Gateway proxy (без прямого JDBC в schema rag)
+POST /api/knowledge/search
+GET  /api/knowledge/documents
+GET  /api/knowledge/documents/{id}
+PUT  /api/knowledge/documents/{id}
+POST /api/knowledge/documents/{id}/reindex
+GET  /api/notices                       # legacy alias/filter type=NOTICE
+
 # Описания задач (файловая шина workspace/tasks/)
 GET  /api/tasks/{id}/description         # 200 text/plain | 204 если файл отсутствует
 PUT  /api/tasks/{id}/description         body: text/plain → записать в файл
@@ -714,6 +725,20 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 - Список notes из PostgreSQL, сортировка от новых к старым
 - Фильтр по тегам через `GET /api/notes?tags=...`
 - Кнопка "в задачу" создаёт PENDING задачу через `POST /api/tasks/pending`
+- Operational Notes: это не RAG knowledge и не source of truth для `NOTICE`
+
+**`/ui/captures`** — Capture Inbox
+- raw captures и их routing state
+- кнопка `Process Now` вызывает `POST /api/capture/process-now`
+
+**`/ui/knowledge`** — RAG Knowledge / Knowledge Gateway
+- список документов из JavaRagService REST API
+- фильтры по типам (`NOTICE`, `ADR`, `PROCESS`, `SERVICE_CARD`, `GLOSSARY`)
+- edit/reindex без JDBC-доступа к схеме `rag`
+
+**`/ui/notice`**
+- не самостоятельный экран
+- redirect на `/ui/knowledge?type=NOTICE`
 
 **Capture UI / ручной запуск**
 - Capture сохраняется через REST `POST /api/capture`
@@ -989,6 +1014,7 @@ Content-Type: application/json
 Далее пользователь видит её в UI `/ui/today` в секции "Ожидают подтверждения" и нажимает [Принять] / [Изменить] / [Отклонить].
 
 **Агент через MCP не участвует в этом потоке** — PENDING задачи подтверждаются только через UI.
+`NOTICE` письма в этот поток не попадают: они сразу становятся RAG-документами в Knowledge Gateway.
 
 ---
 

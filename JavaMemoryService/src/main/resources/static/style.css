@@ -32,6 +32,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
+  font-size: 19px;
   padding-top: 56px;
 }
 
@@ -71,7 +72,7 @@ body {
 
 .los-title {
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: 0.02em;
@@ -87,8 +88,17 @@ body {
   flex-wrap: wrap;
 }
 
+.los-group {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 0 8px 0 12px;
+}
+
 .los-links a {
-  font-size: 13px;
+  font-size: 16px;
   color: var(--text2);
   text-decoration: none;
   padding: 5px 10px;
@@ -130,7 +140,7 @@ body {
 
 .table thead th {
   color: var(--text2);
-  font-size: 11px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: .08em;
   font-family: var(--mono);
@@ -155,7 +165,7 @@ body {
 }
 
 .form-control::placeholder { color: var(--text3); }
-.form-label { color: var(--text2); font-size: 13px; }
+.form-label { color: var(--text2); font-size: 16px; }
 
 /* ─── MODAL ───────────────────────────────────────── */
 .modal-content {
@@ -190,7 +200,7 @@ body {
 
 .los-pending-title {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--accent3);
   text-transform: uppercase;
   letter-spacing: .1em;
@@ -215,7 +225,7 @@ body {
 }
 
 .los-stat-label {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text2);
 }
 
@@ -245,4 +255,21 @@ body {
   --bs-btn-hover-border-color: var(--text3);
   --bs-btn-active-color: var(--text);
   --bs-btn-active-bg: var(--bg3);
+}
+
+.los-notice-item {
+  background: transparent;
+  transition: background .15s ease, border-color .15s ease;
+}
+
+.los-notice-item:hover,
+.los-notice-item.active {
+  background: rgba(74, 158, 255, .08);
+}
+
+.los-notice-editor {
+  min-height: 560px;
+  font-family: var(--mono);
+  font-size: 16px;
+  line-height: 1.5;
 }

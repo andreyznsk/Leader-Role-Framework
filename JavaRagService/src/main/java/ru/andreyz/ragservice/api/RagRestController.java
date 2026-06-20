@@ -6,6 +6,7 @@ import ru.andreyz.ragservice.db.IndexedDocument;
 import ru.andreyz.ragservice.db.IndexedDocumentRepository;
 import ru.andreyz.ragservice.indexer.FileIndexer;
 import ru.andreyz.ragservice.mcp.RagMcpTools;
+import ru.andreyz.ragservice.service.RagDocumentService;
 import ru.andreyz.ragservice.search.RagSearchService;
 import ru.andreyz.ragservice.search.SearchResult;
 
@@ -19,13 +20,16 @@ public class RagRestController {
     private final RagMcpTools ragMcpTools;
     private final RagSearchService searchService;
     private final IndexedDocumentRepository repository;
+    private final RagDocumentService documentService;
 
     public RagRestController(FileIndexer fileIndexer, RagMcpTools ragMcpTools,
-                             RagSearchService searchService, IndexedDocumentRepository repository) {
+                             RagSearchService searchService, IndexedDocumentRepository repository,
+                             RagDocumentService documentService) {
         this.fileIndexer = fileIndexer;
         this.ragMcpTools = ragMcpTools;
         this.searchService = searchService;
         this.repository = repository;
+        this.documentService = documentService;
     }
 
     @PostMapping("/api/rag/index")
@@ -54,7 +58,29 @@ public class RagRestController {
         return ResponseEntity.ok(repository.findAll());
     }
 
+    @GetMapping("/api/rag/documents")
+    public ResponseEntity<List<RagDocumentService.RagDocumentSummary>> documents(@RequestParam(required = false) String type) {
+        return ResponseEntity.ok(documentService.listDocuments(type));
+    }
+
+    @GetMapping("/api/rag/documents/{id}")
+    public ResponseEntity<RagDocumentService.RagDocumentDetails> document(@PathVariable Long id) throws IOException {
+        return ResponseEntity.ok(documentService.getDocument(id));
+    }
+
+    @PutMapping("/api/rag/documents/{id}")
+    public ResponseEntity<RagDocumentService.RagDocumentDetails> updateDocument(@PathVariable Long id,
+                                                                                @RequestBody UpdateDocumentRequest req) throws IOException {
+        return ResponseEntity.ok(documentService.updateDocument(id, req.content()));
+    }
+
+    @PostMapping("/api/rag/documents/{id}/reindex")
+    public ResponseEntity<FileIndexer.IndexResult> reindexDocument(@PathVariable Long id) throws IOException {
+        return ResponseEntity.ok(documentService.reindexDocument(id));
+    }
+
     record IndexRequest(String file_path) {}
     record IndexDirRequest(String dir_path, String pattern) {}
     record SearchRequest(String query, Integer top_k) {}
+    record UpdateDocumentRequest(String content) {}
 }

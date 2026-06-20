@@ -1,7 +1,7 @@
 # RFC: common — Общий модуль LeaderOS
 
 **Статус:** Draft
-**Дата:** 2026-06-12
+**Дата:** 2026-06-20
 **Автор:** Андрей Зайцев
 **Модуль:** `common`
 **Запускать Claude Code из:** `Leader-Role-Framework/`
@@ -239,6 +239,7 @@ public class MockAgentClient implements AgentClient {
 > `agent.mock.response`, возвращается фиксированная строка. Если значение пустое,
 > mock классифицирует поддерживаемые prompt-ы по keyword-based правилам,
 > перенесённым из бывших `MockClaudeRunner` и `MockCaptureClassifierAgent`.
+> Mail classification mock должен покрывать `REQUEST`, `DRAFT`, `NOISE`, `CAPTURE`, `NOTICE`.
 
 ---
 

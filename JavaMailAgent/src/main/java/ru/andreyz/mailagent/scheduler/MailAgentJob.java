@@ -72,7 +72,7 @@ public class MailAgentJob {
         log.info("Poll started — scanning {} folder(s): {}", folders.size(), folders);
 
         int total = 0, errors = 0;
-        int[] counts = {0, 0, 0, 0}; // REQUEST, DRAFT, NOISE, CAPTURE
+        int[] counts = {0, 0, 0, 0, 0}; // REQUEST, DRAFT, NOISE, CAPTURE, NOTICE
 
         for (String folder : folders) {
             List<Email> emails;
@@ -98,8 +98,14 @@ public class MailAgentJob {
                         case DRAFT   -> counts[1]++;
                         case NOISE   -> counts[2]++;
                         case CAPTURE -> counts[3]++;
+                        case NOTICE  -> counts[4]++;
                     }
-                    processedEmailRepository.save(ProcessedEmail.of(email, resp.type().name()));
+                    ActionExecutor.ActionResult actionResult = actionExecutor.execute(email, resp);
+                    if (actionResult.markAsRead()) {
+                        mailClient.markAsRead(email.id(), email.folder());
+                        log.info("Email {} marked as read ({})", email.id(), resp.type());
+                    }
+                    processedEmailRepository.save(ProcessedEmail.of(email, resp.type().name(), actionResult.outputPath()));
                 } catch (Exception e) {
                     errors++;
                     log.warn("Email {} failed: {}, will retry next poll", email.id(), e.getMessage());
@@ -107,8 +113,8 @@ public class MailAgentJob {
             }
         }
 
-        log.info("Poll finished: {} processed ({} REQUEST, {} DRAFT, {} NOISE, {} CAPTURE, {} errors)",
-            total - errors, counts[0], counts[1], counts[2], counts[3], errors);
+        log.info("Poll finished: {} processed ({} REQUEST, {} DRAFT, {} NOISE, {} CAPTURE, {} NOTICE, {} errors)",
+            total - errors, counts[0], counts[1], counts[2], counts[3], counts[4], errors);
     }
 
     private AgentResponse processEmail(Email email) throws Exception {
@@ -120,11 +126,6 @@ public class MailAgentJob {
         AgentResponse resp = parseAgentResponse(raw);
         log.info("Classified as {}{}", resp.type(),
             resp.priority() != null ? ", priority " + resp.priority() : "");
-        actionExecutor.execute(resp);
-        if (resp.type() == AgentResponseType.NOISE) {
-            mailClient.markAsRead(email.id(), email.folder());
-            log.info("Email {} marked as read (NOISE)", email.id());
-        }
         return resp;
     }
 

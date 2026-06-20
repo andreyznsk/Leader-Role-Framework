@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
+<head th:replace="~{fragments/layout :: head(${pageTitle})}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+
+<div class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="mb-1">RAG Knowledge</h4>
+            <div class="text-muted small">Knowledge Gateway через JavaRagService REST API</div>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
+        <div class="small text-uppercase text-muted">View</div>
+        <div class="d-flex flex-wrap gap-2">
+        <a th:each="docType : ${documentTypes}"
+           th:href="${docType == 'ALL'} ? @{/ui/knowledge} : @{/ui/knowledge(type=${docType})}"
+           class="btn btn-sm"
+           th:classappend="${selectedType == docType} ? ' btn-primary' : ' btn-outline-secondary'"
+           th:text="${typeLabelResolver.labelFor(docType)}">Notices</a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="px-3 py-2 border-bottom small text-muted" th:text="${selectedTypeLabel}">Notices</div>
+                    <div th:if="${#lists.isEmpty(documents)}" class="text-muted p-3">RAG-документов по фильтру пока нет</div>
+                    <a th:each="document : ${documents}"
+                       th:href="${selectedType == 'ALL'} ? @{/ui/knowledge(id=${document.id})} : @{/ui/knowledge(type=${selectedType},id=${document.id})}"
+                       class="los-notice-item text-decoration-none d-block p-3 border-bottom"
+                       th:classappend="${selectedDocumentId == document.id} ? ' active' : ''">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                <div class="fw-semibold" th:text="${document.title != null ? document.title : document.fileName}">Title</div>
+                                <div class="small text-muted" th:text="${document.docType}">NOTICE</div>
+                            </div>
+                            <span class="badge text-uppercase"
+                                  th:classappend="${document.status == 'indexed'} ? ' bg-success-subtle text-success' : (${document.status == 'outdated'} ? ' bg-warning-subtle text-warning' : ' bg-danger-subtle text-danger')"
+                                  th:text="${document.status}">indexed</span>
+                        </div>
+                        <div class="small text-muted mt-2" th:text="${document.subject != null ? document.subject : document.filePath}">subject</div>
+                        <div class="small text-muted mt-1" th:text="${document.updated != null ? 'updated: ' + document.updated : document.receivedAt}">updated</div>
+                        <div th:if="${document.errorMessage}" class="small text-danger mt-2" th:text="${document.errorMessage}"></div>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-body" th:if="${selectedDocument != null}">
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                        <div>
+                            <h5 class="mb-1" th:text="${selectedDocument.summary.title != null ? selectedDocument.summary.title : selectedDocument.summary.fileName}">Title</h5>
+                            <div class="small text-muted" th:text="${selectedDocument.summary.filePath}">path</div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="reindexButton"
+                                th:attr="data-document-id=${selectedDocument.summary.id}">
+                            Reindex
+                        </button>
+                    </div>
+
+                    <div class="row g-2 small text-muted mb-3">
+                        <div class="col-md-6" th:text="${'Type: ' + selectedDocument.summary.docType}">Type</div>
+                        <div class="col-md-6" th:text="${'Status: ' + selectedDocument.summary.status}">Status</div>
+                        <div class="col-md-6" th:text="${'Sender: ' + selectedDocument.summary.sender}">Sender</div>
+                        <div class="col-md-6" th:text="${'Received: ' + selectedDocument.summary.receivedAt}">Received</div>
+                        <div class="col-md-6" th:text="${'Updated: ' + selectedDocument.summary.updated}">Updated</div>
+                        <div class="col-md-6" th:text="${'Indexed At: ' + selectedDocument.summary.indexedAt}">Indexed</div>
+                    </div>
+
+                    <div th:if="${selectedDocument.summary.errorMessage}" class="alert alert-warning py-2 mb-3" th:text="${selectedDocument.summary.errorMessage}"></div>
+
+                    <form id="knowledgeForm" th:attr="data-document-id=${selectedDocument.summary.id}">
+                        <textarea id="knowledgeContent" class="form-control los-notice-editor" rows="24"
+                                  th:text="${selectedDocument.content}"></textarea>
+                        <div id="knowledgeFeedback" class="small mt-2"></div>
+                        <div class="d-flex justify-content-end mt-3">
+                            <button type="submit" class="btn btn-primary">Сохранить</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-body text-muted" th:if="${selectedDocument == null}">
+                    Выберите документ из списка слева.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function () {
+    const form = document.getElementById('knowledgeForm');
+    const feedback = document.getElementById('knowledgeFeedback');
+    const reindexButton = document.getElementById('reindexButton');
+
+    if (form) {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            const documentId = form.dataset.documentId;
+            fetch('/api/knowledge/documents/' + documentId, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content: document.getElementById('knowledgeContent').value})
+            }).then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                feedback.textContent = 'Сохранено. Документ помечен для переиндексации.';
+                feedback.className = 'small mt-2 text-success';
+            }).catch(function (error) {
+                feedback.textContent = 'Ошибка сохранения: ' + error.message;
+                feedback.className = 'small mt-2 text-danger';
+            });
+        });
+    }
+
+    if (reindexButton) {
+        reindexButton.addEventListener('click', function () {
+            const documentId = reindexButton.dataset.documentId;
+            fetch('/api/knowledge/documents/' + documentId + '/reindex', {
+                method: 'POST'
+            }).then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                window.location.reload();
+            }).catch(function (error) {
+                feedback.textContent = 'Ошибка переиндексации: ' + error.message;
+                feedback.className = 'small mt-2 text-danger';
+            });
+        });
+    }
+})();
+</script>
+</body>
+</html>
