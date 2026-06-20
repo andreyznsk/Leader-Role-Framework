@@ -53,6 +53,22 @@ if ! rclone listremotes | grep -Fxq "${REMOTE_NAME}:"; then
   fail "rclone remote '${REMOTE_NAME}' is not configured. Run: rclone config"
 fi
 
+ensure_auth() {
+  local err
+  if err="$(rclone about "${REMOTE_NAME}:" 2>&1)"; then
+    return 0
+  fi
+  if echo "$err" | grep -qE "invalid_grant|Token has been expired|revoked"; then
+    log "OAuth token expired — запускаю переподключение..."
+    rclone config reconnect "${REMOTE_NAME}:"
+    log "Токен обновлён. Продолжаю..."
+  else
+    fail "Не удалось подключиться к remote '${REMOTE_NAME}': $err"
+  fi
+}
+
+ensure_auth
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." >/dev/null 2>&1 && pwd)"
 cd "$REPO_ROOT"
