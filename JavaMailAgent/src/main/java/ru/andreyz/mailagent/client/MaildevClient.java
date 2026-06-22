@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -38,20 +39,11 @@ public class MaildevClient implements MailClient {
 
     @PostConstruct
     public void checkConnection() {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(apiUrl + "/email"))
-                .timeout(Duration.ofSeconds(3))
-                .GET()
-                .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() == 200) {
-                log.info("✅ Maildev connection OK — {}", apiUrl);
-            } else {
-                log.error("❌ Maildev returned HTTP {}", response.statusCode());
-            }
-        } catch (Exception e) {
-            log.error("❌ Maildev connection FAILED — {}: {}", apiUrl, e.getMessage());
+        MailConnectionTestResult result = testConnection();
+        if (result.success()) {
+            log.info("Maildev connection OK - {}", result.target());
+        } else {
+            log.error("Maildev connection FAILED - {}: {}", result.target(), result.message());
         }
     }
 
@@ -97,6 +89,24 @@ public class MaildevClient implements MailClient {
             httpClient.send(request, HttpResponse.BodyHandlers.discarding());
         } catch (Exception e) {
             throw new MailException("Failed to mark email " + emailId + " as read", e);
+        }
+    }
+
+    @Override
+    public MailConnectionTestResult testConnection() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(apiUrl + "/email"))
+                .timeout(Duration.ofSeconds(3))
+                .GET()
+                .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                return new MailConnectionTestResult(true, "HTTP 200", apiUrl);
+            }
+            return new MailConnectionTestResult(false, "HTTP " + response.statusCode(), apiUrl);
+        } catch (Exception e) {
+            return new MailConnectionTestResult(false, e.getMessage(), apiUrl);
         }
     }
 

@@ -229,6 +229,28 @@ body {
   color: var(--text2);
 }
 
+.los-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.los-kv:last-child {
+  border-bottom: 0;
+}
+
+.los-kv span {
+  color: var(--text2);
+}
+
+.los-kv strong {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+}
+
 /* ─── PRESENTATION ────────────────────────────────── */
 .presentation-container {
   position: fixed;

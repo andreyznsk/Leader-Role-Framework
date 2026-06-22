@@ -10,6 +10,9 @@ spring:
 app:
   capture:
     inbox-dir: ${java.io.tmpdir}/test-capture-inbox
+  plugins:
+    mail:
+      base-url: http://localhost:19999
   rag:
     inbox-dir: ${java.io.tmpdir}/test-rag-inbox
     base-url: http://localhost:8081

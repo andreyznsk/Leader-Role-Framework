@@ -32,6 +32,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -66,12 +67,11 @@ public class EwsMailClient implements MailClient {
 
     @PostConstruct
     public void checkConnection() {
-        try {
-            Folder inbox = Folder.bind(service, WellKnownFolderName.Inbox, folderPropertySet());
-            log.info("EWS connection OK - {}, Inbox unread: {}",
-                    connectionTarget(), inbox.getUnreadCount());
-        } catch (Exception e) {
-            log.error("EWS connection FAILED - {}: {}", connectionTarget(), e.getMessage());
+        MailConnectionTestResult result = testConnection();
+        if (result.success()) {
+            log.info("EWS connection OK - {}: {}", result.target(), result.message());
+        } else {
+            log.error("EWS connection FAILED - {}: {}", result.target(), result.message());
         }
     }
 
@@ -132,6 +132,20 @@ public class EwsMailClient implements MailClient {
             message.update(ConflictResolutionMode.AutoResolve);
         } catch (Exception e) {
             throw new MailException("Failed to mark EWS email " + emailId + " as read", e);
+        }
+    }
+
+    @Override
+    public MailConnectionTestResult testConnection() {
+        try {
+            Folder inbox = Folder.bind(service, WellKnownFolderName.Inbox, folderPropertySet());
+            return new MailConnectionTestResult(
+                    true,
+                    "Inbox unread: " + inbox.getUnreadCount(),
+                    connectionTarget()
+            );
+        } catch (Exception e) {
+            return new MailConnectionTestResult(false, e.getMessage(), connectionTarget());
         }
     }
 
