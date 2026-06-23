@@ -1,6 +1,6 @@
 # LeaderOS — Architecture - Мастер-Спека
 
-**Последнее обновление:** 2026-06-12
+**Последнее обновление:** 2026-06-23
 **Статус:** Living document — обновлять при любом изменении контрактов между сервисами
 **git:** https://github.com/andreyznsk/Leader-Role-Framework.git
 ---
@@ -107,6 +107,30 @@ agent:
 
 **UI:** `http://localhost:8080/ui/status` — статус агента, счётчики, последние логи
 
+**Plugin Control API (CR-MAIL-004, ✅ Implemented):**
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `GET` | `/api/control/settings` | Настройки плагина как `ControlSettingsDescriptor` (key → value/type/label/editable/secret/options) |
+| `PUT` | `/api/control/settings` | Применить изменения. Body: `{"settings":{...}}`. Ответ: `{status,keys,configVersion,message}` |
+| `GET` | `/api/control/status` | Статус: `{pluginCode,pluginName,enabled,schedulerEnabled,configVersion,...}` |
+| `GET` | `/api/control/audit` | История изменений настроек |
+| `POST` | `/api/control/plugin-state` | `{enabled:true/false}` — включить/выключить polling внутри JVM (без остановки процесса) |
+| `POST` | `/api/control/test-connection` | Тест подключения к почтовому серверу. **200** `{success:true}` / **500** `{success:false}` |
+
+**Важно:** `enabled=false` останавливает polling/классификацию внутри JVM. Процесс mail-agent продолжает работать.
+
+**RuntimeMailClient:** выбирает реализацию на каждый вызов по `runtimeConfigService.snapshot().protocol()`:
+- `maildev` → `MaildevClient` (статические свойства из конфига)
+- `ews` → `EwsMailClient` (runtime `serverUrl` из базы)
+- `imap` → `MailException` (not implemented)
+
+**Новые таблицы БД:**
+
+| Таблица | Описание |
+|---------|----------|
+| `mailagent.control_settings_audit` | История изменений настроек (action, keys, status, message, createdAt) |
+
 ---
 
 ### JavaMemoryService
@@ -132,6 +156,14 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 Каждый сервис управляет только своей схемой через Flyway.
 Инициализация: `infra/postgres/init.sql` — схемы, пользователи, права.
 
+**Новые таблицы (CR-MEM-009):**
+
+| Таблица | Описание |
+|---------|----------|
+| `memory.control_plugins` | Реестр зарегистрированных плагинов (code, name, baseUrl, status, lastSyncAt) |
+| `memory.control_plugin_settings_snapshot` | Последний известный snapshot настроек плагина (для offline-рендеринга) |
+| `memory.control_plugin_audit` | История изменений настроек через control plane proxy |
+
 **Ключевые endpoint-ы:**
 
 | Метод | Путь | Описание |
@@ -139,7 +171,7 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `GET` | `/api/context` | Контекст сессии: today/tomorrow, open incidents/risks, recent people notes |
 | `POST` | `/api/tasks` | Создать подтверждённую задачу |
 | `POST` | `/api/tasks/pending` | Создать задачу со статусом PENDING |
-| `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `DELETED` по умолчанию |
+| `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `DELETED` по умолчанием |
 | `PATCH` | `/api/tasks/{id}/status` | Изменить статус задачи |
 | `POST` | `/api/capture` | Сохранить raw capture в БД и `capture-inbox/` |
 | `POST` | `/api/capture/process-now` | Ручной запуск классификации capture-файлов |
@@ -153,6 +185,23 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `GET` | `/ui/captures` | Web UI: Capture Inbox |
 | `GET` | `/ui/knowledge` | Web UI: Knowledge Gateway для RAG lifecycle |
 | `GET` | `/ui/stats` | Web UI: статистика использования и saved time |
+| `GET` | `/ui/settings` | Web UI: Control Plane — настройки плагинов (descriptor-driven UI) |
+
+**Control Plane Proxy (CR-MEM-009, CR-MEM-010, ✅ Implemented):**
+
+MemoryService выступает единой точкой управления для всех plugin-сервисов.
+`ControlPluginRegistry` регистрирует плагины: `mail → http://localhost:8080`, `rag → http://localhost:8081`.
+`ControlPluginService` проксирует запросы к `/api/control/*` каждого плагина.
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `GET` | `/api/settings/control/plugins` | Список зарегистрированных плагинов |
+| `GET` | `/api/settings/control/plugins/{code}/settings` | Получить настройки плагина через proxy (503 если недоступен) |
+| `PUT` | `/api/settings/control/plugins/{code}/settings` | Обновить настройки плагина через proxy |
+| `GET` | `/api/settings/control/plugins/{code}/audit` | История изменений плагина через proxy |
+| `POST` | `/api/settings/plugins/mail/test-connection` | Тест подключения почты. **200** `{success:true}` / **500** `{success:false}` |
+
+**UI Settings:** `/ui/settings` — Thymeleaf-страница `settings.html`. Рендерит форму настроек на сервере через `ControlSettingsDescriptor`. Данные полностью server-side (Thymeleaf), без client-side API fetch при загрузке. Форма сохраняется через browser fetch → `PUT /api/settings/control/plugins/{code}/settings`.
 
 **Статусы задачи:** `PENDING → TODO → IN_PROGRESS → DONE` / `DELETED`
 
@@ -215,6 +264,19 @@ REST proxy (`/api/knowledge/**`) и не получают прямого JDBC-д
 **Scheduler:** `scheduleWithFixedDelay` каждые ~60 сек, сканирует `rag-inbox/`, идемпотентен по hash
 
 **Входящие вызовы от:** Claude-агент (через MCP или REST API)
+
+**Plugin Control API (CR-RAG-001, ✅ Implemented):**
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `GET` | `/api/control/settings` | Настройки как `ControlSettingsDescriptor` |
+| `PUT` | `/api/control/settings` | Применить изменения. Body: `{"settings":{...}}` |
+| `GET` | `/api/control/status` | Статус сервиса: `{pluginCode,pluginName,enabled,schedulerEnabled,...}` |
+| `GET` | `/api/control/audit` | История изменений настроек |
+
+**Настройки плагина:** `enabled`, `schedulerEnabled`, `scanIntervalSeconds`, `ragInboxPath`, `embeddingModel`, `topK`, `opensearchUrl`, `validationEnabled`
+
+**`pluginCode = "rag"`, `pluginName = "RAG Service"`**
 
 ---
 
@@ -344,7 +406,20 @@ JavaMemoryService ──capture KNOWLEDGE файл──→  JavaRagService/rag-
 JavaMemoryService ──AgentClient──→  common
 JavaRagService ──depends on──→  common (future LLM features)
 LLM provider ──читает──→  JavaRagService (через MCP или HTTP /api/search)
+
+// Plugin Control Protocol (CR-MAIL-004, CR-RAG-001, CR-MEM-009):
+JavaMemoryService ──GET/PUT /api/control/settings──→  JavaMailAgent   (proxy via ControlPluginService)
+JavaMemoryService ──GET/PUT /api/control/settings──→  JavaRagService  (proxy via ControlPluginService)
+JavaMemoryService ──POST /api/control/test-connection──→  JavaMailAgent
+Browser/Agent ──/ui/settings──→  JavaMemoryService ──proxies──→  Plugins
 ```
+
+**Plugin Control Protocol** — единый контракт для управления plugin-сервисами из MemoryService:
+- Каждый plugin-сервис экспонирует `GET/PUT /api/control/settings`, `GET /api/control/status`, `GET /api/control/audit`
+- JavaMailAgent дополнительно: `POST /api/control/test-connection`, `POST /api/control/plugin-state`
+- JavaMemoryService проксирует все запросы через `ControlPluginService`
+- `ControlSettingsDescriptor` — ключ-значение дескриптор настройки: `{value, type, label, description, editable, secret, required, options[]}`
+- Типы настроек: `string`, `number`, `boolean`, `select`, `text`, `list`, `secret`
 
 ---
 
@@ -404,8 +479,14 @@ LLM provider ──читает──→  JavaRagService (через MCP или 
 
 ```
 Leader-Role-Framework/
-└── cr/
-    └── CR-ARCH-001-master-update.md
+├── cr/
+│   └── CR-ARCH-001-master-update.md
+└── docs/
+    └── cr/
+        ├── CR-MAIL-004-plugin-control-api.md      (Implemented, 2026-06-23)
+        ├── CR-MEM-009-plugin-settings-store.md    (Implemented, 2026-06-23)
+        ├── CR-MEM-010-universal-plugin-control-ui.md (Implemented, 2026-06-23)
+        └── CR-RAG-001-plugin-control-api.md       (Implemented, 2026-06-23)
 
 JavaMemoryService/
 └── cr/
@@ -617,6 +698,7 @@ docker compose up -d
 | `04_draft_no_task_created.md` | HIGH | DRAFT → черновик в drafts/, задача НЕ создана |
 | `05_mixed_batch_three_types.md` | HIGH | 3 письма → правильные типы и read-статусы |
 | `06_full_daily_cycle.md` | HIGH | письмо → PENDING → TODO → IN_PROGRESS → DONE |
+| `10_control_plane_settings.md` | HIGH | Plugin Control API: settings fetch/update/testConnection 200/500, audit, UI smoke |
 
 ---
 
