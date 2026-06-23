@@ -65,6 +65,12 @@ public class TodayViewController {
         return "redirect:/ui/today";
     }
 
+    @PostMapping("/tasks/{id}/toggle-done")
+    public String toggleDone(@PathVariable Long id) {
+        taskService.toggleDone(id);
+        return "redirect:/ui/today";
+    }
+
     @PostMapping("/tasks/{id}/move")
     public String moveTask(@PathVariable Long id,
                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {

@@ -3,6 +3,7 @@ package ru.andreyz.mailagent.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.client.EwsMailClient;
+import ru.andreyz.mailagent.client.ImapMailClient;
 import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.client.MailException;
 import ru.andreyz.mailagent.client.MaildevClient;
@@ -19,15 +20,18 @@ public class RuntimeMailClient implements MailClient {
     private final MailRuntimeConfigService runtimeConfigService;
     private final MailConfig.MaildevProperties maildevProperties;
     private final MailConfig.EwsProperties baseEwsProperties;
+    private final MailConfig.ImapProperties baseImapProperties;
 
     public RuntimeMailClient(ObjectMapper objectMapper,
                              MailRuntimeConfigService runtimeConfigService,
                              MailConfig.MaildevProperties maildevProperties,
-                             MailConfig.EwsProperties baseEwsProperties) {
+                             MailConfig.EwsProperties baseEwsProperties,
+                             MailConfig.ImapProperties baseImapProperties) {
         this.objectMapper = objectMapper;
         this.runtimeConfigService = runtimeConfigService;
         this.maildevProperties = maildevProperties;
         this.baseEwsProperties = baseEwsProperties;
+        this.baseImapProperties = baseImapProperties;
     }
 
     @Override
@@ -63,7 +67,7 @@ public class RuntimeMailClient implements MailClient {
         return switch (config.protocol()) {
             case "maildev" -> new MaildevClient(objectMapper, maildevProperties);
             case "ews" -> new EwsMailClient(toMailProperties(config), toEwsProperties(config));
-            case "imap" -> throw new MailException("IMAP protocol is not implemented yet");
+            case "imap" -> new ImapMailClient(toMailProperties(config), toImapProperties(config));
             default -> throw new MailException("Unsupported protocol: " + config.protocol());
         };
     }
@@ -84,6 +88,15 @@ public class RuntimeMailClient implements MailClient {
         properties.setDomain(baseEwsProperties.getDomain());
         properties.setVersion(baseEwsProperties.getVersion());
         properties.setTimeoutSeconds(baseEwsProperties.getTimeoutSeconds());
+        return properties;
+    }
+
+    private MailConfig.ImapProperties toImapProperties(MailRuntimeConfig config) {
+        MailConfig.ImapProperties properties = new MailConfig.ImapProperties();
+        properties.setHost(config.host() != null ? config.host() : baseImapProperties.getHost());
+        properties.setPort(config.port() > 0 ? config.port() : baseImapProperties.getPort());
+        properties.setSsl(config.ssl() || baseImapProperties.isSsl());
+        properties.setFolder(baseImapProperties.getFolder());
         return properties;
     }
 }

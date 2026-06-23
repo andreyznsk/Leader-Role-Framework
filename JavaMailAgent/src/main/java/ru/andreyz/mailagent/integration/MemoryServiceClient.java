@@ -53,7 +53,7 @@ public class MemoryServiceClient {
             }
         } catch (Exception e) {
             // Не останавливаем обработку почты если memory-service недоступен
-            log.warn("Failed to reach memory-service: {}", e.getMessage());
+            log.warn("Failed to reach memory-service: {}", e.toString());
         }
     }
 
@@ -82,7 +82,7 @@ public class MemoryServiceClient {
                 log.warn("memory-service /api/capture returned {}: {}", response.statusCode(), response.body());
             }
         } catch (Exception e) {
-            log.warn("Failed to save capture to memory-service: {}", e.getMessage());
+            log.warn("Failed to save capture to memory-service: {}", e.toString());
         }
     }
 

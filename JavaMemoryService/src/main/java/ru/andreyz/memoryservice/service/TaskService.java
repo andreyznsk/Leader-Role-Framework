@@ -111,6 +111,11 @@ public class TaskService {
         return updateStatus(id, "DONE");
     }
 
+    public Task toggleDone(Long id) {
+        Task task = findById(id);
+        return updateStatus(id, "DONE".equals(task.status()) ? "TODO" : "DONE");
+    }
+
     public Task moveToDate(Long id, LocalDate toDate) {
         Task task = findById(id);
         Long planId = getOrCreatePlan(toDate).id();

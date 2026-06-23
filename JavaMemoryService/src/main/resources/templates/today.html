@@ -82,8 +82,8 @@
                     <span class="drag-handle text-muted me-2" style="cursor:grab;user-select:none">⠿</span>
 
                     <!-- Done checkbox -->
-                    <form method="post" th:action="@{/ui/tasks/{id}/done(id=${task.id})}" class="me-2"
-                          th:attr="data-api-url=@{/api/tasks/{id}/done(id=${task.id})},data-api-method='POST',data-api-success='reload'">
+                    <form method="post" th:action="@{/ui/tasks/{id}/toggle-done(id=${task.id})}" class="me-2"
+                          th:attr="data-api-url=@{/api/tasks/{id}/toggle-done(id=${task.id})},data-api-method='POST',data-api-success='reload'">
                         <button type="submit"
                                 class="btn btn-sm p-0 border-0"
                                 th:title="${task.status == 'DONE'} ? 'Снять отметку' : 'Выполнено'">

@@ -55,6 +55,11 @@ public class TaskController {
         return ResponseEntity.ok(taskService.markDone(id));
     }
 
+    @PostMapping("/{id}/toggle-done")
+    public ResponseEntity<Task> toggleDone(@PathVariable Long id) {
+        return ResponseEntity.ok(taskService.toggleDone(id));
+    }
+
     @PostMapping("/{id}/move")
     public ResponseEntity<Task> moveTask(@PathVariable Long id, @RequestBody MoveTaskRequest req) {
         return ResponseEntity.ok(taskService.moveToDate(id, req.toDate()));

@@ -26,6 +26,7 @@ maildev:
 
 memory:
   service:
+    url: http://localhost:8082
     enabled: true
 
 agent:
