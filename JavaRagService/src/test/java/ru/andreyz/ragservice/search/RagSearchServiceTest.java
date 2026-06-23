@@ -8,6 +8,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.andreyz.ragservice.client.OllamaClient;
 import ru.andreyz.ragservice.client.OpenSearchClient;
+import ru.andreyz.ragservice.control.RagControlAuditStore;
+import ru.andreyz.ragservice.control.RagRuntimeConfigService;
 
 import java.util.List;
 
@@ -15,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,7 +33,7 @@ class RagSearchServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RagSearchService(ollama, openSearch);
+        service = new RagSearchService(ollama, openSearch, runtimeConfigService(10));
     }
 
     @Test
@@ -88,5 +91,30 @@ class RagSearchServiceTest {
         List<SearchResult> results = service.search("query", 3);
 
         assertThat(results).containsExactly(r1, r2, r3);
+    }
+
+    @Test
+    void search_withoutTopK_usesRuntimeDefault() {
+        RagSearchService runtimeDefaultService = new RagSearchService(ollama, openSearch, runtimeConfigService(7));
+        when(ollama.embed(any())).thenReturn(new float[1024]);
+        when(openSearch.knnSearch(any(), anyInt())).thenReturn(List.of());
+
+        runtimeDefaultService.search("runtime topk", null);
+
+        verify(openSearch).knnSearch(any(), eq(7));
+    }
+
+    private RagRuntimeConfigService runtimeConfigService(int topK) {
+        return new RagRuntimeConfigService(
+                true,
+                true,
+                60000,
+                "rag-inbox",
+                "mxbai-embed-large",
+                topK,
+                "http://localhost:9200",
+                true,
+                mock(RagControlAuditStore.class)
+        );
     }
 }

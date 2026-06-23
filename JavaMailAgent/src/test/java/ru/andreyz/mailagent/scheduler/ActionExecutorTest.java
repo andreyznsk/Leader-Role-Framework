@@ -8,6 +8,8 @@ import ru.andreyz.mailagent.integration.MemoryServiceClient;
 import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.service.MailControlAuditStore;
+import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -25,6 +27,7 @@ class ActionExecutorTest {
 
     ActionExecutor executor;
     MemoryServiceClient memoryServiceClient;
+    MailRuntimeConfigService runtimeConfigService;
 
     @BeforeEach
     void setUp() {
@@ -36,7 +39,13 @@ class ActionExecutorTest {
         paths.setRagInbox(tempDir.resolve("rag-inbox").toString());
 
         memoryServiceClient = mock(MemoryServiceClient.class);
-        executor = new ActionExecutor(memoryServiceClient, paths, new NoticeDocumentWriter(paths));
+        MailConfig.MailProperties mail = new MailConfig.MailProperties();
+        MailConfig.ImapProperties imap = new MailConfig.ImapProperties();
+        MailConfig.EwsProperties ews = new MailConfig.EwsProperties();
+        MailConfig.FolderProperties folders = new MailConfig.FolderProperties();
+        MailControlAuditStore auditStore = mock(MailControlAuditStore.class);
+        runtimeConfigService = new MailRuntimeConfigService(mail, paths, imap, ews, folders, auditStore);
+        executor = new ActionExecutor(memoryServiceClient, paths, new NoticeDocumentWriter(paths), runtimeConfigService);
     }
 
     @Test

@@ -1,7 +1,7 @@
 # CR-MEM-010: Universal Plugin Control UI
 
 **Дата:** 2026-06-22  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MEM  
 **Зависимости:** CR-MEM-009, CR-MAIL-004, JavaMailAgent, JavaRagService
 
@@ -110,7 +110,7 @@ UI должен уметь рендерить поля по типу:
 | select | select dropdown |
 | text | textarea |
 | list | textarea, one value per line |
-| secret | password input + masked stored value |
+| secret | password input + masked stored value (`*****`) |
 
 Для каждого поля показывать:
 
@@ -135,6 +135,7 @@ PUT {plugin.baseUrl}/api/control/settings
 3. Plugin возвращает applied result.
 4. MemoryService показывает результат пользователю.
 5. MemoryService обновляет локальный snapshot настроек.
+6. UI может гидратировать форму актуальным descriptor JSON сразу после bootstrap API-запросов.
 
 ## Изменения в API MemoryService
 
@@ -208,6 +209,17 @@ GET /api/settings/control/plugins/{code}/audit
 ```
 
 MVP может читать из локальной таблицы MemoryService или проксировать plugin audit endpoint.
+
+### Browser debug / XHR visibility
+
+UI сохраняет plugin settings через browser `fetch`, а initial bootstrap страницы может запрашивать:
+
+- `/api/settings/system`
+- `/api/settings/control/plugins`
+- `/api/settings/control/plugins/{code}/settings`
+- `/api/settings/control/plugins/{code}/audit`
+
+Это позволяет видеть реальные запросы и JSON responses в `DevTools -> Fetch/XHR`.
 
 ## Изменения в схеме БД MemoryService
 
@@ -308,7 +320,7 @@ JavaMemoryService/test_e2e/13_universal_plugin_control_ui.md
 Этот CR зависит от появления `/api/control` в подключенных plugin-сервисах:
 
 - `JavaMailAgent` — см. `CR-MAIL-004-plugin-control-api.md`;
-- `JavaRagService` — нужен отдельный CR `CR-RAG-XXX-plugin-control-api.md`.
+- `JavaRagService` — см. `CR-RAG-001-plugin-control-api.md`.
 
 ## Out of Scope
 

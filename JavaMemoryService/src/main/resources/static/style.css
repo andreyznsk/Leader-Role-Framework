@@ -251,6 +251,35 @@ body {
   text-align: right;
 }
 
+.los-plugin-field {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.los-plugin-field:last-child {
+  border-bottom: 0;
+}
+
+.los-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.los-collapse-icon {
+  display: inline-block;
+  transition: transform .15s ease;
+}
+
+.los-collapse-toggle[aria-expanded="false"] .los-collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.los-audit-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
 /* ─── PRESENTATION ────────────────────────────────── */
 .presentation-container {
   position: fixed;

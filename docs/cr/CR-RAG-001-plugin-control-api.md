@@ -1,7 +1,7 @@
 # CR-RAG-001: RAG Plugin Control API
 
 **Дата:** 2026-06-22
-**Статус:** Draft
+**Статус:** Implemented
 **Сервис:** RAG
 **Зависимости:** CR-MEM-010 Universal Plugin Control UI
 
@@ -35,23 +35,43 @@ Response:
   "settings": {
     "enabled": {
       "value": "true",
-      "type": "boolean"
+      "type": "boolean",
+      "label": "Enabled"
     },
     "schedulerEnabled": {
       "value": "true",
-      "type": "boolean"
+      "type": "boolean",
+      "label": "Scheduler enabled"
     },
     "scanIntervalSeconds": {
       "value": "60",
-      "type": "number"
+      "type": "number",
+      "label": "Scan interval seconds"
+    },
+    "ragInboxPath": {
+      "value": "rag-inbox",
+      "type": "string",
+      "label": "RAG inbox path"
     },
     "embeddingModel": {
       "value": "bge-m3",
-      "type": "string"
+      "type": "string",
+      "label": "Embedding model"
     },
     "topK": {
       "value": "10",
-      "type": "number"
+      "type": "number",
+      "label": "Default top K"
+    },
+    "opensearchUrl": {
+      "value": "http://localhost:9200",
+      "type": "string",
+      "label": "OpenSearch URL"
+    },
+    "validationEnabled": {
+      "value": "true",
+      "type": "boolean",
+      "label": "Validation enabled"
     }
   }
 }
@@ -91,14 +111,20 @@ GET /api/control/audit
 ```text
 enabled=false
     ↓
-индексация и фоновые задачи остановлены
+индексация и scheduler остановлены
 
 enabled=true
     ↓
-индексация и фоновые задачи активны
+индексация и scheduler активны
 ```
 
 JVM процесс при этом продолжает работать.
+
+Дополнительно:
+
+- `embeddingModel`, `opensearchUrl`, `topK`, `validationEnabled` применяются в runtime без рестарта JVM;
+- `schedulerEnabled=false` останавливает только background scheduler, не выключая весь сервис;
+- live status для control plane в MemoryService проверяется по `/actuator/health`.
 
 ## Acceptance Criteria
 
@@ -110,6 +136,7 @@ JVM процесс при этом продолжает работать.
 6. Настройки применяются без рестарта JVM.
 7. Изменения логируются.
 8. Добавлен E2E сценарий `JavaRagService/test_e2e/control_settings.md`.
+9. Runtime использует обновленные `embeddingModel`, `opensearchUrl`, `topK`, `validationEnabled`.
 
 ## Future
 

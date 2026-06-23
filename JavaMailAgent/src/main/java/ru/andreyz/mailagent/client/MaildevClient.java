@@ -1,11 +1,8 @@
 package ru.andreyz.mailagent.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
@@ -20,8 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@Component
-@ConditionalOnProperty(name = "mail.protocol", havingValue = "maildev")
 public class MaildevClient implements MailClient {
 
     private static final Logger log = LoggerFactory.getLogger(MaildevClient.class);
@@ -35,16 +30,6 @@ public class MaildevClient implements MailClient {
     public MaildevClient(ObjectMapper objectMapper, MailConfig.MaildevProperties props) {
         this.objectMapper = objectMapper;
         this.apiUrl = props.getApiUrl();
-    }
-
-    @PostConstruct
-    public void checkConnection() {
-        MailConnectionTestResult result = testConnection();
-        if (result.success()) {
-            log.info("Maildev connection OK - {}", result.target());
-        } else {
-            log.error("Maildev connection FAILED - {}: {}", result.target(), result.message());
-        }
     }
 
     @Override

@@ -4,33 +4,48 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.mailagent.client.MailClient;
+import ru.andreyz.mailagent.model.ControlAuditEntry;
+import ru.andreyz.mailagent.model.ControlSettingsResponse;
+import ru.andreyz.mailagent.model.ControlSettingsStatusResponse;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
+import ru.andreyz.mailagent.model.ControlStatusResponse;
 
-import java.util.concurrent.atomic.AtomicReference;
-
+import java.util.List;
+import java.util.Map;
 @Service
 public class MailAgentControlService {
 
     private static final Logger log = LoggerFactory.getLogger(MailAgentControlService.class);
 
     private final MailClient mailClient;
-    private final AtomicReference<Boolean> currentEnabled = new AtomicReference<>();
+    private final MailRuntimeConfigService runtimeConfigService;
 
-    public MailAgentControlService(MailClient mailClient) {
+    public MailAgentControlService(MailClient mailClient,
+                                   MailRuntimeConfigService runtimeConfigService) {
         this.mailClient = mailClient;
+        this.runtimeConfigService = runtimeConfigService;
     }
 
     public void applyEnabled(Boolean enabled) {
-        if (enabled == null) {
-            log.info("Mail plugin state sync received without enabled flag");
-            return;
+        if (enabled != null) {
+            runtimeConfigService.apply(Map.of("enabled", String.valueOf(enabled)));
         }
-        Boolean previous = currentEnabled.getAndSet(enabled);
-        if (previous == null || !previous.equals(enabled)) {
-            log.info("Mail plugin enabled updated from MemoryService control plane: {} -> {}", previous, enabled);
-        } else {
-            log.info("Mail plugin enabled state re-confirmed by MemoryService control plane: {}", enabled);
-        }
+    }
+
+    public ControlSettingsResponse getSettings() {
+        return runtimeConfigService.descriptor();
+    }
+
+    public ControlSettingsStatusResponse updateSettings(Map<String, String> settings) {
+        return runtimeConfigService.apply(settings);
+    }
+
+    public ControlStatusResponse getStatus() {
+        return runtimeConfigService.status();
+    }
+
+    public List<ControlAuditEntry> getAudit() {
+        return runtimeConfigService.audit();
     }
 
     public MailConnectionTestResult testConnection() {

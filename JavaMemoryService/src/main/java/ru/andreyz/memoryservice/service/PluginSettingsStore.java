@@ -68,7 +68,7 @@ public class PluginSettingsStore {
                             secret_ref = :secretRef,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE plugin_code = :pluginCode
-                        """.formatted(configExpression()))
+                        """.formatted(jsonExpression()))
                 .param("pluginCode", normalizedCode)
                 .param("pluginType", pluginType)
                 .param("enabled", enabled)
@@ -79,7 +79,7 @@ public class PluginSettingsStore {
             jdbcClient.sql("""
                             INSERT INTO plugin_settings (plugin_code, plugin_type, enabled, config_json, secret_ref, created_at, updated_at)
                             VALUES (:pluginCode, :pluginType, :enabled, %s, :secretRef, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                            """.formatted(configExpression()))
+                            """.formatted(jsonExpression()))
                     .param("pluginCode", normalizedCode)
                     .param("pluginType", pluginType)
                     .param("enabled", enabled)
@@ -138,7 +138,7 @@ public class PluginSettingsStore {
         return findHeartbeat(pluginCode).orElseThrow();
     }
 
-    private String configExpression() {
+    String jsonExpression() {
         return postgres ? "CAST(:configJson AS jsonb)" : ":configJson";
     }
 

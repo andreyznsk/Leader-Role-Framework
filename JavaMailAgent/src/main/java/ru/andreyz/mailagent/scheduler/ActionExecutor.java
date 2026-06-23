@@ -8,6 +8,8 @@ import ru.andreyz.mailagent.integration.MemoryServiceClient;
 import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.PendingTaskRequest;
+import ru.andreyz.mailagent.service.MailRuntimeConfig;
+import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,18 +25,22 @@ public class ActionExecutor {
     private final MemoryServiceClient memoryServiceClient;
     private final MailConfig.PathProperties pathProperties;
     private final NoticeDocumentWriter noticeDocumentWriter;
+    private final MailRuntimeConfigService runtimeConfigService;
 
     public ActionExecutor(MemoryServiceClient memoryServiceClient,
                           MailConfig.PathProperties pathProperties,
-                          NoticeDocumentWriter noticeDocumentWriter) {
+                          NoticeDocumentWriter noticeDocumentWriter,
+                          MailRuntimeConfigService runtimeConfigService) {
         this.memoryServiceClient = memoryServiceClient;
         this.pathProperties = pathProperties;
         this.noticeDocumentWriter = noticeDocumentWriter;
+        this.runtimeConfigService = runtimeConfigService;
     }
 
     public ActionResult execute(Email email, AgentResponse response) throws IOException {
+        MailRuntimeConfig runtime = runtimeConfigService.snapshot();
         Path inbox = resolveInbox(response.emailId());
-        Path processed = resolveProcessed(response.emailId());
+        Path processed = resolveProcessed(response.emailId(), runtime.processedFolder());
 
         switch (response.type()) {
             case REQUEST -> {
@@ -51,32 +57,32 @@ public class ActionExecutor {
                     response.priority()
                 ));
 
-                moveToProcessed(inbox, processed);
+                moveToProcessedIfEnabled(inbox, processed, runtime.moveProcessedMail());
                 log.info("REQUEST → plan + memory-service: {}", response.taskLine());
                 return new ActionResult(null, false);
             }
             case DRAFT -> {
-                moveToProcessed(inbox, processed);
+                moveToProcessedIfEnabled(inbox, processed, runtime.moveProcessedMail());
                 log.info("DRAFT → {}: {}", response.draftPath(), response.note());
                 return new ActionResult(null, false);
             }
             case NOISE -> {
-                moveToProcessed(inbox, processed);
+                moveToProcessedIfEnabled(inbox, processed, runtime.moveProcessedMail());
                 log.info("NOISE: {}", response.note());
-                return new ActionResult(null, true);
+                return new ActionResult(null, runtime.markNoiseAsRead());
             }
             case CAPTURE -> {
                 String text = response.captureText() != null && !response.captureText().isBlank()
                     ? response.captureText()
                     : (response.note() != null ? response.note() : "");
                 memoryServiceClient.createCapture(text, "email");
-                moveToProcessed(inbox, processed);
+                moveToProcessedIfEnabled(inbox, processed, runtime.moveProcessedMail());
                 log.info("CAPTURE → memory-service: {}", text);
                 return new ActionResult(null, false);
             }
             case NOTICE -> {
                 Path noticePath = noticeDocumentWriter.write(email, response.note());
-                moveToProcessed(inbox, processed);
+                moveToProcessedIfEnabled(inbox, processed, runtime.moveProcessedMail());
                 log.info("NOTICE → rag-inbox: {}", noticePath);
                 return new ActionResult(noticePath.toString(), true);
             }
@@ -88,12 +94,15 @@ public class ActionExecutor {
         return Path.of(pathProperties.getInbox(), sanitize(emailId) + ".json");
     }
 
-    private Path resolveProcessed(String emailId) {
-        return Path.of(pathProperties.getProcessed(), sanitize(emailId) + ".json");
+    private Path resolveProcessed(String emailId, String processedFolder) {
+        String target = processedFolder != null && !processedFolder.isBlank()
+                ? processedFolder
+                : pathProperties.getProcessed();
+        return Path.of(target, sanitize(emailId) + ".json");
     }
 
-    private void moveToProcessed(Path inbox, Path processed) throws IOException {
-        if (Files.exists(inbox)) {
+    private void moveToProcessedIfEnabled(Path inbox, Path processed, boolean enabled) throws IOException {
+        if (enabled && Files.exists(inbox)) {
             Files.createDirectories(processed.getParent());
             Files.move(inbox, processed, StandardCopyOption.REPLACE_EXISTING);
         }

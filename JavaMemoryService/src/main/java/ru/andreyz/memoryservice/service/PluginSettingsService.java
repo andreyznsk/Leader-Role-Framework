@@ -19,7 +19,7 @@ import java.util.Map;
 @Service
 public class PluginSettingsService {
 
-    private static final String SECRET_MASK = "********";
+    private static final String SECRET_MASK = "*****";
 
     private final PluginRegistry pluginRegistry;
     private final PluginSettingsStore store;

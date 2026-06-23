@@ -49,8 +49,7 @@ public class RagRestController {
 
     @PostMapping("/api/search")
     public ResponseEntity<List<SearchResult>> search(@RequestBody SearchRequest req) {
-        int topK = req.top_k() != null ? req.top_k() : 5;
-        return ResponseEntity.ok(searchService.search(req.query(), topK));
+        return ResponseEntity.ok(searchService.search(req.query(), req.top_k()));
     }
 
     @GetMapping("/api/rag/status")

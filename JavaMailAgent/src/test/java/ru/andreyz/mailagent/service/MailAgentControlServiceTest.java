@@ -2,11 +2,13 @@ package ru.andreyz.mailagent.service;
 
 import org.junit.jupiter.api.Test;
 import ru.andreyz.mailagent.client.MailClient;
+import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
 
 class MailAgentControlServiceTest {
 
@@ -37,7 +39,15 @@ class MailAgentControlServiceTest {
             }
         };
 
-        MailAgentControlService service = new MailAgentControlService(mailClient);
+        MailRuntimeConfigService runtimeConfigService = new MailRuntimeConfigService(
+                new MailConfig.MailProperties(),
+                new MailConfig.PathProperties(),
+                new MailConfig.ImapProperties(),
+                new MailConfig.EwsProperties(),
+                new MailConfig.FolderProperties(),
+                mock(MailControlAuditStore.class)
+        );
+        MailAgentControlService service = new MailAgentControlService(mailClient, runtimeConfigService);
         MailConnectionTestResult result = service.testConnection();
 
         assertEquals(true, result.success());

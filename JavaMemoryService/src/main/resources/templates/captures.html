@@ -59,8 +59,8 @@
     const button = document.getElementById('processCapturesButton');
     if (!button) return;
     button.addEventListener('click', function () {
-        fetch('/api/capture/process-now', {method: 'POST'})
-            .then(function () { window.location.reload(); });
+        window.LeaderUiApi.request('/api/capture/process-now', {method: 'POST'})
+            .then(function (result) { window.LeaderUiApi.handleSuccess('reload', result); });
     });
 })();
 </script>

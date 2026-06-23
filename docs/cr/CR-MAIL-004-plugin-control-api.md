@@ -1,7 +1,7 @@
 # CR-MAIL-004: Mail Plugin Control API
 
 **Дата:** 2026-06-22  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MAIL  
 **Зависимости:** CR-MEM-010, JavaMemoryService
 
@@ -80,7 +80,7 @@ Response:
       "required": false
     },
     "password": {
-      "value": "********",
+      "value": "*****",
       "type": "secret",
       "label": "Password / secret",
       "editable": true,
@@ -404,21 +404,12 @@ CR-MEM-010-universal-plugin-control-ui.md
 - реализация ChatAgent;
 - реализация RAG control API.
 
-## Future
+## Current ecosystem
 
-После реализации MailAgent control API аналогичный контракт нужно добавить в `JavaRagService`:
+Аналогичный контракт уже реализован в `JavaRagService`:
 
 ```text
-CR-RAG-XXX-plugin-control-api.md
+CR-RAG-001-plugin-control-api.md
 ```
 
-Для RAG настройки могут включать:
-
-- enabled;
-- scheduler enabled;
-- scan interval seconds;
-- rag inbox path;
-- embedding model;
-- opensearch URL;
-- topK default;
-- validation strict mode.
+Таким образом `MailAgent` и `JavaRagService` используют единый plugin control protocol, а `JavaMemoryService` работает как universal control plane.

@@ -10,15 +10,14 @@
             <h1 class="h4 mb-1">Settings</h1>
             <div class="text-muted small">MemoryService control plane for plugin configuration and status.</div>
         </div>
-        <div th:if="${saved}" class="alert alert-success py-2 px-3 mb-0">
-            Mail plugin settings saved.
+        <div th:if="${saved != null}" class="alert alert-success py-2 px-3 mb-0">
+            <span th:text="${saved}">mail</span> settings applied.
         </div>
     </div>
 
-    <div th:if="${testSuccess != null}" class="alert mb-4"
-         th:classappend="${testSuccess == '1'} ? ' alert-success' : ' alert-warning'"
-         th:text="${testMessage != null && !#strings.isEmpty(testMessage) ? testMessage : (testSuccess == '1' ? 'Connection test passed.' : 'Connection test failed.')}">
-        Connection test result.
+    <div th:if="${failed != null}" class="alert alert-warning mb-4">
+        <strong th:text="${failed}">plugin</strong>
+        <span th:text="${message != null ? message : 'Plugin update failed.'}">Plugin update failed.</span>
     </div>
 
     <div class="row g-3 mb-4">
@@ -49,31 +48,32 @@
     </div>
 
     <div class="card mb-4">
-        <div class="card-header">Registered Plugins</div>
+        <div class="card-header">Registered Control Plugins</div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0 align-middle">
                     <thead>
                     <tr>
                         <th>Plugin</th>
-                        <th>Type</th>
-                        <th>Enabled</th>
+                        <th>Base URL</th>
                         <th>Status</th>
-                        <th>Last heartbeat</th>
-                        <th>Actions</th>
+                        <th>Last sync</th>
+                        <th>Open</th>
                     </tr>
                     </thead>
                     <tbody>
-                    <tr th:each="item : ${plugins}">
-                        <td th:text="${item.name()}">Mail Plugin</td>
-                        <td th:text="${item.type()}">MAIL</td>
-                        <td th:text="${item.enabled()}">true</td>
-                        <td><span class="badge bg-secondary" th:text="${item.status()}">UNKNOWN</span></td>
-                        <td th:text="${item.lastHeartbeatAt() != null ? #temporals.format(item.lastHeartbeatAt(), 'yyyy-MM-dd HH:mm') : '—'}">—</td>
+                    <tr th:each="panel : ${plugins}">
+                        <td th:text="${panel.plugin().name()}">Mail Agent</td>
+                        <td th:text="${panel.plugin().baseUrl()}">http://localhost:8080</td>
+                        <td>
+                            <span class="badge"
+                                  th:classappend="${panel.plugin().status() == 'UP' ? ' bg-success-subtle text-success-emphasis' : ' bg-warning-subtle text-warning-emphasis'}"
+                                  th:text="${panel.plugin().status()}">UP</span>
+                        </td>
+                        <td th:text="${panel.plugin().lastSyncAt() != null ? #temporals.format(panel.plugin().lastSyncAt(), 'yyyy-MM-dd HH:mm:ss') : '—'}">—</td>
                         <td>
                             <a class="btn btn-sm btn-outline-secondary"
-                               th:href="'/ui/settings?plugin=' + ${item.code()} + '#plugin-' + ${item.code()}"
-                               th:text="${item.code() == 'mail' ? 'Edit' : 'Open'}">Edit</a>
+                               th:href="'/ui/settings?plugin=' + ${panel.plugin().code()} + '#plugin-' + ${panel.plugin().code()}">Open</a>
                         </td>
                     </tr>
                     </tbody>
@@ -82,116 +82,201 @@
         </div>
     </div>
 
-    <div id="plugin-mail" class="card mb-4">
-        <div class="card-header">Mail Plugin Settings</div>
+    <div th:each="panel : ${plugins}" th:id="'plugin-' + ${panel.plugin().code()}" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <button class="btn btn-sm btn-outline-secondary los-collapse-toggle"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        th:attr="data-bs-target=${'#plugin-body-' + panel.plugin().code()},aria-controls=${'plugin-body-' + panel.plugin().code()},aria-expanded=${plugin == panel.plugin().code() ? 'true' : 'false'}">
+                    <span class="los-collapse-icon" aria-hidden="true">▾</span>
+                    <span>Settings</span>
+                </button>
+                <div>
+                    <div th:text="${panel.plugin().name()}">Mail Agent</div>
+                    <div class="text-muted small" th:text="${panel.plugin().baseUrl()}">http://localhost:8080</div>
+                </div>
+            </div>
+            <span class="badge"
+                  th:classappend="${panel.plugin().status() == 'UP' ? ' bg-success-subtle text-success-emphasis' : ' bg-warning-subtle text-warning-emphasis'}"
+                  th:text="${panel.plugin().status()}">UP</span>
+        </div>
+        <div class="collapse" th:id="'plugin-body-' + ${panel.plugin().code()}" th:classappend="${plugin == panel.plugin().code()} ? ' show' : ''">
         <div class="card-body">
-            <form method="post" action="/ui/settings/plugins/mail" class="row g-3">
-                <div class="col-12">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="mail-enabled" name="enabled" value="true"
-                               th:checked="${mail.enabled()}">
-                        <label class="form-check-label" for="mail-enabled">Enabled</label>
+            <div th:if="${panel.error() != null}" class="alert alert-warning mb-3">
+                <div th:text="${panel.error()}">Plugin unavailable.</div>
+                <div class="small text-muted mt-2" th:if="${panel.descriptor() != null}">
+                    Rendering last synced snapshot.
+                </div>
+            </div>
+
+            <div th:if="${panel.descriptor() == null}" class="text-muted">
+                Descriptor not available.
+            </div>
+
+            <form th:if="${panel.descriptor() != null}"
+                  method="post"
+                  th:action="'/ui/settings/plugins/' + ${panel.plugin().code()}"
+                  th:attr="data-plugin-code=${panel.plugin().code()},data-api-url=${'/api/settings/control/plugins/' + panel.plugin().code() + '/settings'},data-api-custom-handler='true'"
+                  class="row g-3">
+                <div th:each="entry : ${panel.descriptor().settings()}" class="col-12">
+                    <div class="los-plugin-field" th:with="field=${entry.value}, key=${entry.key}">
+                        <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                            <label class="form-label mb-0" th:for="${'field-' + panel.plugin().code() + '-' + key}">
+                                <span th:text="${field.label()}">Enabled</span>
+                                <span th:if="${field.required()}" class="text-danger">*</span>
+                            </label>
+                            <span th:if="${!field.editable()}" class="badge bg-secondary-subtle text-secondary-emphasis">Read only</span>
+                        </div>
+
+                        <div th:if="${field.type() == 'boolean'}" class="form-check form-switch">
+                            <input type="hidden" th:name="${'settings[' + key + ']'}" value="false"/>
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                                   th:name="${'settings[' + key + ']'}"
+                                   th:attr="data-plugin-field=${key},data-field-type=${field.type()}"
+                                   value="true"
+                                   th:checked="${field.value() == 'true'}"
+                                   th:disabled="${!field.editable()}"/>
+                        </div>
+
+                        <select th:if="${field.type() == 'select'}"
+                                class="form-select"
+                                th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                                th:name="${'settings[' + key + ']'}"
+                                th:attr="data-plugin-field=${key},data-field-type=${field.type()}"
+                                th:disabled="${!field.editable()}">
+                            <option th:each="option : ${field.options()}"
+                                    th:value="${option}"
+                                    th:text="${option}"
+                                    th:selected="${option == field.value()}">maildev</option>
+                        </select>
+
+                        <textarea th:if="${field.type() == 'text' || field.type() == 'list'}"
+                                  class="form-control"
+                                  th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                                  th:name="${'settings[' + key + ']'}"
+                                  th:attr="data-plugin-field=${key},data-field-type=${field.type()}"
+                                  rows="4"
+                                  th:text="${field.value()}"
+                                  th:disabled="${!field.editable()}"></textarea>
+
+                        <input th:if="${field.type() == 'number'}"
+                               class="form-control"
+                               type="number"
+                               th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                               th:name="${'settings[' + key + ']'}"
+                               th:attr="data-plugin-field=${key},data-field-type=${field.type()}"
+                               th:value="${field.value()}"
+                               th:disabled="${!field.editable()}"/>
+
+                        <input th:if="${field.type() == 'secret'}"
+                               class="form-control"
+                               type="password"
+                               th:with="secretPlaceholder=${field.value() != null && !#strings.isEmpty(field.value()) ? field.value() : 'Enter new secret'}"
+                               th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                               th:name="${'settings[' + key + ']'}"
+                               data-empty-placeholder="Enter new secret"
+                               th:attr="data-plugin-field=${key},data-field-type=${field.type()},data-secret-placeholder=${secretPlaceholder}"
+                               th:placeholder="${secretPlaceholder}"
+                               th:disabled="${!field.editable()}"/>
+
+                        <input th:if="${field.type() == 'string'}"
+                               class="form-control"
+                               type="text"
+                               th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                               th:name="${'settings[' + key + ']'}"
+                               th:attr="data-plugin-field=${key},data-field-type=${field.type()}"
+                               th:value="${field.value()}"
+                               th:disabled="${!field.editable()}"/>
+
+                        <div th:if="${field.description() != null && !#strings.isEmpty(field.description())}"
+                             class="form-text"
+                             th:text="${field.description()}">Description</div>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="mail-protocol">Protocol</label>
-                    <select class="form-select" id="mail-protocol" name="protocol">
-                        <option value="maildev" th:selected="${mail.config().protocol() == 'maildev'}">maildev</option>
-                        <option value="imap" th:selected="${mail.config().protocol() == 'imap'}">imap</option>
-                        <option value="ews" th:selected="${mail.config().protocol() == 'ews'}">ews</option>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="mail-login">Login</label>
-                    <input class="form-control" id="mail-login" name="login" th:value="${mail.config().login()}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="mail-password">Password / secret</label>
-                    <input class="form-control" id="mail-password" name="password" type="password"
-                           th:placeholder="${mail.config().passwordConfigured() ? mail.config().passwordMasked() : 'Enter new secret'}">
-                    <div class="form-text" th:text="${mail.config().passwordConfigured() ? 'Stored value: ' + mail.config().passwordMasked() : 'Stored value: not configured'}">
-                        Stored value: not configured
+                <div class="col-12 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                    <div class="text-muted small">
+                        Version <span th:text="${panel.descriptor().version()}">1</span>
                     </div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label" for="mail-server-url">Server URL</label>
-                    <input class="form-control" id="mail-server-url" name="serverUrl" th:value="${mail.config().serverUrl()}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" for="mail-host">Host</label>
-                    <input class="form-control" id="mail-host" name="host" th:value="${mail.config().host()}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" for="mail-port">Port</label>
-                    <input class="form-control" id="mail-port" name="port" type="number" th:value="${mail.config().port()}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="mail-poll">Poll interval seconds</label>
-                    <input class="form-control" id="mail-poll" name="pollIntervalSeconds" type="number"
-                           th:value="${mail.config().pollIntervalSeconds()}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="mail-processed-folder">Processed folder</label>
-                    <input class="form-control" id="mail-processed-folder" name="processedFolder"
-                           th:value="${mail.config().processedFolder()}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="mail-draft-folder">Draft folder</label>
-                    <input class="form-control" id="mail-draft-folder" name="draftFolder"
-                           th:value="${mail.config().draftFolder()}">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label" for="mail-include">Folders include</label>
-                    <textarea class="form-control" id="mail-include" name="foldersInclude" rows="4"
-                              th:text="${mailIncludeText}"></textarea>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label" for="mail-exclude">Folders exclude</label>
-                    <textarea class="form-control" id="mail-exclude" name="foldersExclude" rows="4"
-                              th:text="${mailExcludeText}"></textarea>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="mail-secret-ref">Secret ref</label>
-                    <input class="form-control" id="mail-secret-ref" name="secretRef" th:value="${mail.config().secretRef()}">
-                </div>
-                <div class="col-md-4 d-flex align-items-end">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="mail-ssl" name="ssl" value="true"
-                               th:checked="${mail.config().ssl()}">
-                        <label class="form-check-label" for="mail-ssl">Use SSL / TLS</label>
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <div class="small text-muted los-api-status" th:attr="data-plugin-status=${panel.plugin().code()}">
+                            Save uses browser fetch. Inspect in Chrome DevTools.
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
                     </div>
-                </div>
-                <div class="col-md-4 d-flex align-items-end">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="mail-noise" name="markNoiseAsRead" value="true"
-                               th:checked="${mail.config().markNoiseAsRead()}">
-                        <label class="form-check-label" for="mail-noise">Mark noise as read</label>
-                    </div>
-                </div>
-                <div class="col-md-4 d-flex align-items-end">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="mail-move" name="moveProcessed" value="true"
-                               th:checked="${mail.config().moveProcessed()}">
-                        <label class="form-check-label" for="mail-move">Move processed mail</label>
-                    </div>
-                </div>
-                <div class="col-12 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">Save Mail Settings</button>
-                    <button type="submit"
-                            class="btn btn-outline-secondary"
-                            formaction="/ui/settings/plugins/mail/test-connection"
-                            formmethod="post">Test Connection</button>
                 </div>
             </form>
-        </div>
-    </div>
 
-    <div id="plugin-chat" class="card">
-        <div class="card-header">Chat Plugin Settings</div>
-        <div class="card-body text-muted">
-            Placeholder for future ChatAgent control-plane settings.
+            <div class="mt-4">
+                <div class="text-uppercase small text-muted mb-2">Recent Audit</div>
+                <div th:if="${#lists.isEmpty(panel.audit())}" class="text-muted small">No audit entries.</div>
+                <div th:each="item : ${panel.audit()}" class="los-audit-row">
+                    <div class="d-flex justify-content-between gap-3">
+                        <strong th:text="${item.action()}">APPLY_SETTINGS</strong>
+                        <span class="text-muted small" th:text="${item.createdAt() != null ? #temporals.format(item.createdAt(), 'yyyy-MM-dd HH:mm:ss') : '—'}">—</span>
+                    </div>
+                    <div class="small" th:text="${item.status()}">APPLIED</div>
+                    <div class="small text-muted" th:text="${item.message()}">Settings applied.</div>
+                </div>
+            </div>
+        </div>
         </div>
     </div>
 </div>
+<script>
+    (function () {
+        function formToPayload(form) {
+            const formData = new FormData(form);
+            const settings = {};
+            for (const [key, value] of formData.entries()) {
+                if (!key.startsWith('settings[') || !key.endsWith(']')) {
+                    continue;
+                }
+                const field = key.slice(9, -1);
+                settings[field] = value;
+            }
+
+            form.querySelectorAll('input[type="checkbox"][name^="settings["]').forEach(function (checkbox) {
+                const field = checkbox.name.slice(9, -1);
+                settings[field] = checkbox.checked ? 'true' : 'false';
+            });
+
+            return {settings: settings};
+        }
+
+        function updateStatus(pluginCode, text, isError) {
+            const node = document.querySelector('[data-plugin-status="' + pluginCode + '"]');
+            if (!node) return;
+            node.textContent = text;
+            node.classList.toggle('text-danger', !!isError);
+            node.classList.toggle('text-muted', !isError);
+        }
+
+        document.querySelectorAll('form[data-api-url]').forEach(function (form) {
+            form.addEventListener('submit', async function (event) {
+                event.preventDefault();
+
+                const apiUrl = form.dataset.apiUrl;
+                const pluginCode = form.dataset.pluginCode || 'plugin';
+                const payload = formToPayload(form);
+
+                updateStatus(pluginCode, 'Sending fetch request to ' + apiUrl, false);
+
+                try {
+                    const result = await window.LeaderUiApi.request(apiUrl, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                    updateStatus(pluginCode, 'Saved via fetch. HTTP ' + result.response.status + '. See DevTools Network/Console.', false);
+                } catch (error) {
+                    updateStatus(pluginCode, 'Fetch failed — see DevTools Console', true);
+                }
+            });
+        });
+    })();
+</script>
 </body>
 </html>

@@ -15,7 +15,7 @@ app:
       base-url: http://localhost:19999
   rag:
     inbox-dir: ${java.io.tmpdir}/test-rag-inbox
-    base-url: http://localhost:8081
+    base-url: http://localhost:19998
   workspace:
     dir: ${java.io.tmpdir}/test-workspace
 

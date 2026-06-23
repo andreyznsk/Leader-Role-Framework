@@ -12,7 +12,8 @@
         <span th:if="${task.emailId}" class="badge bg-info ms-1 small" th:text="${task.emailId}"></span>
     </div>
 
-    <form method="post" th:action="@{/ui/tasks/{id}/edit(id=${task.id})}">
+    <form method="post" th:action="@{/ui/tasks/{id}/edit(id=${task.id})}" id="task-edit-form"
+          th:attr="data-task-id=${task.id}">
         <input type="hidden" name="_method" value="PUT">
 
         <!-- Title -->
@@ -87,7 +88,7 @@
             <button type="submit" class="btn btn-primary">Сохранить</button>
             <button type="button" class="btn btn-outline-danger"
                     id="delete-btn"
-                    th:data-action="@{/ui/tasks/{id}/delete(id=${task.id})}"
+                    th:data-api-url=@{/api/tasks/{id}(id=${task.id})}
                     onclick="confirmDelete(this)">
                 Удалить
             </button>
@@ -141,7 +142,11 @@ function simpleMarkdown(md) {
 let deleteTimer = null;
 function confirmDelete(btn) {
     if (btn.dataset.confirmed === 'true') {
-        document.getElementById('delete-form').submit();
+        window.LeaderUiApi.request(btn.dataset.apiUrl, {method: 'DELETE'})
+            .then(function(result) {
+                window.LeaderUiApi.handleSuccess('redirect:/ui/today', result);
+            })
+            .catch(function() {});
         return;
     }
     btn.dataset.confirmed = 'true';
@@ -169,6 +174,37 @@ document.querySelectorAll('.status-radio').forEach(radio => {
             }
         });
     });
+});
+
+document.getElementById('task-edit-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const taskId = form.dataset.taskId;
+    const formData = new FormData(form);
+    const metaPayload = {
+        title: formData.get('title'),
+        priority: formData.get('priority'),
+        status: formData.get('status'),
+        dueDate: formData.get('dueDate') || null
+    };
+    const description = formData.get('description') || '';
+
+    try {
+        await window.LeaderUiApi.request('/api/tasks/' + taskId, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(metaPayload)
+        });
+
+        await window.LeaderUiApi.request('/api/tasks/' + taskId + '/description', {
+            method: 'PUT',
+            headers: {'Content-Type': 'text/plain'},
+            body: description
+        });
+
+        window.LeaderUiApi.handleSuccess('redirect:/ui/today', {response: {status: 200}, data: null});
+    } catch (error) {}
 });
 </script>
 </body>

@@ -56,6 +56,24 @@ metadata:
 
 Эти три теста прошли полностью за 1 attempt (быстрый poll). Флаки не обнаружены.
 
+## IT-10 — Control Plane Settings
+
+**2026-06-23 первый прогон (18 шагов):** Все 18 шагов PASS после пересборки всех сервисов.
+
+**2026-06-23 второй прогон (21 шаг, расширенный):** Все 21 шаг PASS. Добавлены Step 19-21 (UI-проверки).
+- Step 19: GET /ui/settings → HTTP 200 ✅
+- Step 20: bootstrap.bundle.min.js в HTML, data-bs-toggle="collapse" (2 элемента), collapse divs (2) ✅
+- Step 21: id="plugin-body-mail" отрендерен сервером, data-plugin-code="mail" присутствует ✅
+- maildev значение найдено в HTML 2 раза (selected + value) ✅
+
+**Дефект в сервисе:** settings.foldersExclude.value содержит литеральные `\n` в JSON — jq падает.
+Workaround: использовать `python3 json.loads(strict=False)` вместо jq для разбора ответов /api/control/settings.
+Применять для: /api/control/settings (MA и RAG), /api/settings/control/plugins/*/settings.
+
+**Предварительная пересборка:** пересборка JavaMemoryService обязательна перед запуском IT-10 если исходники изменились.
+
+**Статус сценария:** Steps 10, 14 используют обёртку `{"settings":{...}}` — это правильный формат (сценарий уже исправлен).
+
 ## Ollama порты
 
 - Локальная Ollama: localhost:11434 (рабочая)

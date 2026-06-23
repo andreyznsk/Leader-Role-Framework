@@ -1,501 +1,327 @@
 # CR-MEM-009: Plugin Settings Control Plane
 
 **Дата:** 2026-06-22  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MEM  
-**Зависимости:** JavaMailAgent, будущий ChatAgent, common
+**Зависимости:** JavaMailAgent, JavaRagService, common
 
 ## Проблема / Мотивация
 
-Сейчас настройки интеграций логически размазаны по отдельным сервисам. Например, настройки подключения к почте естественно хочется добавить в `JavaMailAgent`, но это создаёт неправильное направление архитектуры: каждый агент начинает иметь свой отдельный UI и свою отдельную модель конфигурации.
+Настройки подключенных сервисов не должны быть размазаны по отдельным UI и отдельным моделям конфигурации внутри каждого агента.
 
-Целевая архитектура LeaderOS должна быть другой:
+Целевая архитектура LeaderOS:
 
-- `JavaMemoryService` — ядро системы и единая точка управления;
-- внешние сервисы работают как подключаемые плагины / источники событий;
-- `MailAgent`, будущий `ChatAgent`, `CalendarAgent` и другие агенты не должны владеть пользовательскими настройками;
-- настройки должны задаваться в одном месте через UI MemoryService;
-- плагины должны получать свою конфигурацию из MemoryService и отправлять туда raw-события для дальнейшей маршрутизации.
-
-Это важно перед добавлением новых источников, особенно `ChatAgent`, который будет захватывать сообщения из чатов и маршрутизировать их аналогично почте.
+- `JavaMemoryService` является единой точкой управления;
+- внешние сервисы работают как подключаемые runtime plugins;
+- пользователь настраивает систему через один UI `/ui/settings`;
+- сами plugins отдают descriptor настроек и принимают runtime-изменения через control API;
+- статус plugin-сервисов определяется по их health endpoint, а не по прямому доступу к их внутренней БД.
 
 ## Решение
 
-Добавить в `JavaMemoryService` централизованный модуль настроек плагинов.
+В `JavaMemoryService` реализован централизованный control plane для plugin settings.
 
-Новый UI:
-
-```text
-/ui/settings
-```
-
-Новый раздел навигации:
+Основной flow:
 
 ```text
-Settings
+Browser
+  ↓
+GET /ui/settings
+  ↓
+JavaMemoryService
+  ├─ GET /api/settings/system
+  ├─ GET /api/settings/control/plugins
+  ├─ GET /api/settings/control/plugins/{code}/settings
+  └─ GET /api/settings/control/plugins/{code}/audit
+        ↓
+      plugin /api/control/**
 ```
 
-MemoryService становится `control plane` для всех подключаемых источников.
-
-Плагины:
+При сохранении:
 
 ```text
-Mail Plugin
-Chat Plugin
-Calendar Plugin future
-Knowledge Plugin future
+Browser
+  ↓
+PUT /api/settings/control/plugins/{code}/settings
+  ↓
+JavaMemoryService
+  ↓
+PUT {plugin.baseUrl}/api/control/settings
+  ↓
+plugin runtime config updated
 ```
 
-Каждый plugin имеет:
-
-- уникальный код;
-- тип;
-- статус включения;
-- настройки подключения;
-- настройки include/exclude источников;
-- настройки polling / scheduler;
-- routing policy;
-- последнее состояние health/status.
-
-## Целевая модель
+## Текущая архитектурная модель
 
 ```text
 JavaMemoryService
 ├── UI /ui/settings
-├── REST API /api/settings/plugins/**
-├── хранит настройки плагинов
-├── хранит правила маршрутизации
-├── показывает активный профиль приложения
-├── показывает зарегистрированные плагины
-└── отдаёт конфигурацию внешним агентам
+├── REST API /api/settings/system
+├── REST API /api/settings/control/plugins/**
+├── хранит registry control plugins
+├── хранит snapshot descriptor
+├── хранит audit proxy/history
+└── использует /actuator/health для live plugin status
 
 JavaMailAgent
-├── получает config из MemoryService
-├── читает почту
-└── отправляет raw email/capture/event в MemoryService
+├── /api/control/settings
+├── /api/control/status
+├── /api/control/audit
+└── /actuator/health
 
-ChatAgent future
-├── получает config из MemoryService
-├── читает сообщения из чатов
-└── отправляет raw chat/capture/event в MemoryService
+JavaRagService
+├── /api/control/settings
+├── /api/control/status
+├── /api/control/audit
+└── /actuator/health
 ```
 
 ## UI
 
 ### `/ui/settings`
 
-Страница должна содержать блоки:
+Страница содержит:
 
-### 1. System Settings
+- `System Settings`;
+- `Routing Settings`;
+- `Registered Control Plugins`;
+- отдельные collapsible sections по каждому plugin;
+- universal dynamic form, построенную по descriptor `settings`;
+- audit block по каждому plugin.
 
-Показывать read-only информацию:
+### Список control plugins
 
-- active Spring profiles;
-- application name;
-- Java version;
-- MemoryService status;
-- agent provider: `mock | ollama | claude | gigachat`;
-- registered plugins;
-- last configuration update time.
+Показываются:
 
-### 2. Plugin List
+- `code`;
+- `name`;
+- `baseUrl`;
+- `status`;
+- `lastSyncAt`;
+- action `Open`.
 
-Таблица:
+`status` определяется live healthcheck на:
 
-| Plugin | Type | Enabled | Status | Last heartbeat | Actions |
-|--------|------|---------|--------|----------------|---------|
-| Mail | MAIL | true | UP / DOWN / UNKNOWN | datetime | Edit |
-| Chat | CHAT | false | NOT_CONFIGURED | — | Edit |
+```text
+{plugin.baseUrl}/actuator/health
+```
 
-### 3. Mail Plugin Settings
+### Universal plugin settings form
 
-Поля:
+Поддерживаемые типы:
 
-- enabled: boolean;
-- protocol: `maildev | imap | ews`;
-- login;
-- password / secret value;
-- server URL / host;
-- port;
-- use SSL/TLS;
-- poll interval seconds;
-- folders include;
-- folders exclude;
-- mark noise as read: boolean;
-- move processed: boolean;
-- processed folder;
-- draft folder;
-- connection test button.
+| type | UI элемент |
+|------|------------|
+| string | input text |
+| number | input number |
+| boolean | checkbox / toggle |
+| select | select dropdown |
+| text | textarea |
+| list | textarea, one value per line |
+| secret | password input + masked stored value |
 
-Важно: пароль в UI не отображать в открытом виде. После сохранения показывать `********`.
+Для каждого поля UI показывает:
 
-### 4. Chat Plugin Settings future
+- `label`;
+- текущее значение;
+- `description`, если есть;
+- `required`;
+- `editable/read-only`.
 
-Заложить структуру, но можно оставить disabled / placeholder.
+Для `secret`:
 
-Поля будущего плагина:
+- plain secret никогда не возвращается;
+- при сохраненном секрете показывается маска `*****`;
+- при отсутствии секрета показывается placeholder `Enter new secret`.
 
-- enabled;
-- provider: `telegram | slack | mattermost | custom`;
-- server URL;
-- token / secret;
-- channels include;
-- channels exclude;
-- users include;
-- users exclude;
-- poll interval / webhook mode;
-- routing policy.
+### Browser debug behavior
 
-### 5. Routing Settings
+UI-операции по API выполняются через browser `fetch`.
 
-Общие правила маршрутизации событий:
+Это позволяет:
 
-| Input type | Route |
-|-----------|-------|
-| REQUEST | create pending task |
-| DRAFT | create draft / save proposal |
-| NOISE | ignore / archive |
-| CAPTURE | create raw capture |
-| KNOWLEDGE | send to RAG inbox |
-| RISK | create risk |
-| NOTE | create note |
-| QUESTION | create question |
-
-На первом этапе routing можно сделать read-only с дефолтными значениями.
+- видеть запросы в `DevTools -> Fetch/XHR`;
+- видеть request/response JSON в browser console;
+- использовать `?ui_debug=1`, чтобы временно отключать auto-navigation после успешных действий.
 
 ## Изменения в API
 
-Добавить REST API в JavaMemoryService.
-
-### Получить все настройки плагинов
-
-```http
-GET /api/settings/plugins
-```
-
-Response:
-
-```json
-[
-  {
-    "code": "mail",
-    "type": "MAIL",
-    "enabled": true,
-    "status": "UP",
-    "lastHeartbeatAt": "2026-06-22T20:00:00",
-    "updatedAt": "2026-06-22T19:30:00"
-  }
-]
-```
-
-### Получить настройки одного плагина
-
-```http
-GET /api/settings/plugins/{code}
-```
-
-Response example for mail:
-
-```json
-{
-  "code": "mail",
-  "type": "MAIL",
-  "enabled": true,
-  "config": {
-    "protocol": "ews",
-    "login": "user@example.com",
-    "serverUrl": "https://exchange.example.com/EWS/Exchange.asmx",
-    "port": 443,
-    "ssl": true,
-    "pollIntervalSeconds": 60,
-    "foldersInclude": ["Inbox"],
-    "foldersExclude": ["Inbox/CI/CD", "Junk Email"],
-    "markNoiseAsRead": true,
-    "moveProcessed": true,
-    "processedFolder": "processed",
-    "draftFolder": "drafts"
-  }
-}
-```
-
-Пароль/секрет не возвращать в открытом виде.
-
-### Обновить настройки плагина
-
-```http
-PUT /api/settings/plugins/{code}
-```
-
-Request:
-
-```json
-{
-  "enabled": true,
-  "config": {
-    "protocol": "ews",
-    "login": "user@example.com",
-    "password": "plain-value-only-on-write",
-    "serverUrl": "https://exchange.example.com/EWS/Exchange.asmx",
-    "port": 443,
-    "ssl": true,
-    "pollIntervalSeconds": 60,
-    "foldersInclude": ["Inbox"],
-    "foldersExclude": ["Inbox/CI/CD", "Junk Email"]
-  }
-}
-```
-
-### Получить system settings
+### System settings
 
 ```http
 GET /api/settings/system
 ```
 
-Response:
+Возвращает:
 
-```json
-{
-  "application": "JavaMemoryService",
-  "activeProfiles": ["local"],
-  "agentProvider": "mock",
-  "javaVersion": "21",
-  "status": "UP"
-}
-```
+- application;
+- activeProfiles;
+- agentProvider;
+- javaVersion;
+- status;
+- lastConfigurationUpdateAt;
+- registeredPlugins;
+- routingDefaults.
 
-### Plugin heartbeat
-
-Плагин отправляет heartbeat в MemoryService.
+### Registered control plugins
 
 ```http
-POST /api/settings/plugins/{code}/heartbeat
+GET /api/settings/control/plugins
+```
+
+Возвращает список control plugins:
+
+```json
+[
+  {
+    "code": "mail",
+    "name": "Mail Agent",
+    "baseUrl": "http://localhost:8080",
+    "enabled": true,
+    "status": "UP",
+    "lastSyncAt": "2026-06-22T20:00:00"
+  },
+  {
+    "code": "rag",
+    "name": "RAG Service",
+    "baseUrl": "http://localhost:8081",
+    "enabled": true,
+    "status": "UP",
+    "lastSyncAt": "2026-06-22T20:00:00"
+  }
+]
+```
+
+### Plugin descriptor proxy
+
+```http
+GET /api/settings/control/plugins/{code}/settings
+```
+
+Внутри MemoryService вызывает:
+
+```http
+GET {plugin.baseUrl}/api/control/settings
+```
+
+### Plugin update proxy
+
+```http
+PUT /api/settings/control/plugins/{code}/settings
 ```
 
 Request:
 
 ```json
 {
-  "status": "UP",
-  "message": "Mail polling is active",
-  "details": {
-    "lastPollAt": "2026-06-22T20:00:00",
-    "lastPollResult": "3 messages scanned"
+  "settings": {
+    "enabled": "true",
+    "pollIntervalSeconds": "60",
+    "foldersExclude": "Inbox/CI/CD\nJunk Email"
   }
 }
 ```
 
-### Plugin config endpoint для внешних агентов
+Внутри MemoryService вызывает:
 
 ```http
-GET /api/plugins/{code}/config
+PUT {plugin.baseUrl}/api/control/settings
 ```
 
-Используется `JavaMailAgent` и будущими агентами при старте.
+### Plugin audit proxy
 
-Response:
+```http
+GET /api/settings/control/plugins/{code}/audit
+```
 
-```json
-{
-  "code": "mail",
-  "enabled": true,
-  "configVersion": 3,
-  "config": {
-    "protocol": "ews",
-    "login": "user@example.com",
-    "serverUrl": "https://exchange.example.com/EWS/Exchange.asmx",
-    "port": 443,
-    "ssl": true,
-    "pollIntervalSeconds": 60,
-    "foldersInclude": ["Inbox"],
-    "foldersExclude": ["Inbox/CI/CD"]
-  }
-}
+MVP-реализация может:
+
+- читать remote audit;
+- либо показывать локально сохраненный snapshot/history при недоступном plugin.
+
+## Legacy API
+
+В `JavaMemoryService` остается legacy settings API:
+
+- `GET /api/settings/plugins`
+- `GET /api/settings/plugins/{code}`
+- `PUT /api/settings/plugins/{code}`
+- `POST /api/settings/plugins/{code}/heartbeat`
+- `GET /api/plugins/{code}/config`
+
+Но текущая архитектура UI/plugin control больше не строится вокруг этих endpoints. Основной control plane для runtime plugins идет через:
+
+```text
+/api/settings/control/plugins/**
 ```
 
 ## Изменения в схеме БД
 
-Схема: `memory`
+Схема `memory` включает control plane таблицы:
 
-### Таблица `memory.plugin_settings`
+- `control_plugins`
+- `control_plugin_settings_snapshot`
+- `control_plugin_audit`
 
-```sql
-CREATE TABLE memory.plugin_settings (
-    id BIGSERIAL PRIMARY KEY,
-    code VARCHAR(64) NOT NULL UNIQUE,
-    type VARCHAR(64) NOT NULL,
-    enabled BOOLEAN NOT NULL DEFAULT false,
-    config_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-    secret_ref VARCHAR(255),
-    config_version BIGINT NOT NULL DEFAULT 1,
-    created_at TIMESTAMP NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP NOT NULL DEFAULT now()
-);
-```
+Назначение:
 
-### Таблица `memory.plugin_status`
-
-```sql
-CREATE TABLE memory.plugin_status (
-    id BIGSERIAL PRIMARY KEY,
-    plugin_code VARCHAR(64) NOT NULL UNIQUE,
-    status VARCHAR(32) NOT NULL,
-    message TEXT,
-    details_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-    last_heartbeat_at TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT now()
-);
-```
-
-### Таблица `memory.routing_settings`
-
-```sql
-CREATE TABLE memory.routing_settings (
-    id BIGSERIAL PRIMARY KEY,
-    input_type VARCHAR(64) NOT NULL UNIQUE,
-    route VARCHAR(128) NOT NULL,
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    config_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at TIMESTAMP NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP NOT NULL DEFAULT now()
-);
-```
+- registry подключенных control plugins;
+- последний synced descriptor snapshot;
+- audit/history control операций.
 
 ## Безопасность секретов
 
-MVP-вариант:
-
-- пароль принимается только на запись;
-- в API и UI возвращается только masked value;
-- хранение можно временно делать в `config_json`, но это технический долг.
-
-Целевой вариант:
-
-- секреты вынести в отдельный механизм;
-- в `plugin_settings.secret_ref` хранить ссылку на секрет;
-- не логировать password/token;
-- не возвращать password/token из REST API;
-- добавить отдельный CR на secret storage.
-
-## Изменения в JavaMailAgent
-
-На первом этапе не переносить всю логику сразу.
-
-Минимальный будущий контракт:
-
-1. При старте `JavaMailAgent` вызывает:
-
-```http
-GET http://localhost:8082/api/plugins/mail/config
-```
-
-2. Если MemoryService недоступен, MailAgent использует локальный fallback из `application.yml`.
-
-3. После каждого poll-cycle отправляет heartbeat:
-
-```http
-POST http://localhost:8082/api/settings/plugins/mail/heartbeat
-```
-
-4. Настройки `mail.folders.exclude` постепенно мигрируются из `application.yml` в MemoryService.
-
-## Изменения в навигации UI
-
-Добавить пункт:
-
-```text
-Settings
-```
-
-Рядом с существующими страницами:
-
-- Today;
-- Notes;
-- Captures;
-- Knowledge;
-- Stats;
-- Settings.
+- plain password/token не должны попадать в UI;
+- plain password/token не должны попадать в logs;
+- descriptor и audit используют masked representation;
+- vault/secret storage остаются отдельным будущим шагом.
 
 ## Acceptance Criteria
 
-1. В `JavaMemoryService` появилась страница `/ui/settings`.
-2. На странице отображается текущий active profile.
-3. На странице отображается agent provider.
-4. На странице отображается список plugins.
-5. Можно открыть настройки `mail` plugin.
-6. Можно сохранить настройки `mail` plugin.
-7. Пароль не отображается в открытом виде после сохранения.
-8. Есть API `GET /api/settings/system`.
-9. Есть API `GET /api/settings/plugins`.
-10. Есть API `GET /api/settings/plugins/mail`.
-11. Есть API `PUT /api/settings/plugins/mail`.
-12. Есть API `GET /api/plugins/mail/config` для MailAgent.
-13. Есть API heartbeat для plugin status.
-14. Добавлены Flyway migrations для новых таблиц.
-15. Добавлены базовые E2E сценарии.
+1. В `JavaMemoryService` есть страница `/ui/settings`.
+2. Есть API `GET /api/settings/system`.
+3. Есть API `GET /api/settings/control/plugins`.
+4. Есть API `GET /api/settings/control/plugins/{code}/settings`.
+5. Есть API `PUT /api/settings/control/plugins/{code}/settings`.
+6. Есть API `GET /api/settings/control/plugins/{code}/audit`.
+7. UI строится по descriptor от plugin control API.
+8. UI поддерживает типы `string`, `number`, `boolean`, `select`, `text`, `list`, `secret`.
+9. Статус plugin определяется по `{baseUrl}/actuator/health`.
+10. Недоступный plugin не ломает страницу `/ui/settings`.
+11. Secret values не отображаются в открытом виде.
+12. В DevTools видны browser fetch/XHR запросы к API.
 
 ## Как тестировать
 
-### Unit / integration
+### API
 
-- проверить CRUD `plugin_settings`;
-- проверить masking password/token;
-- проверить получение system settings;
-- проверить сохранение include/exclude folders;
-- проверить heartbeat update.
+1. `GET /api/settings/system`
+2. `GET /api/settings/control/plugins`
+3. `GET /api/settings/control/plugins/mail/settings`
+4. `GET /api/settings/control/plugins/rag/settings`
+5. `PUT /api/settings/control/plugins/mail/settings`
+6. `PUT /api/settings/control/plugins/rag/settings`
+7. `GET /api/settings/control/plugins/mail/audit`
 
-### E2E сценарии
+### UI
 
-Создать файл:
+1. Открыть `/ui/settings`
+2. Проверить system/routing/plugin sections
+3. Проверить collapsible plugin settings
+4. Проверить, что password отображается как `*****`
+5. Проверить DevTools `Fetch/XHR`
+6. Проверить `?ui_debug=1`
 
-```text
-JavaMemoryService/test_e2e/12_settings_plugins.md
-```
+## Связанные CR
 
-Сценарии:
-
-1. `GET /api/settings/system` возвращает active profile.
-2. `GET /api/settings/plugins` возвращает список plugins.
-3. `PUT /api/settings/plugins/mail` сохраняет mail config.
-4. `GET /api/settings/plugins/mail` возвращает config без plain password.
-5. `GET /api/plugins/mail/config` возвращает enabled config для MailAgent.
-6. `POST /api/settings/plugins/mail/heartbeat` обновляет plugin status.
-7. `/ui/settings` открывается и содержит `Settings`, `Mail Plugin`, `Active profile`.
-
-## Риски
-
-1. Хранение пароля в БД может быть небезопасным.
-   - Решение: для MVP masked output, далее отдельный CR на secret storage.
-
-2. MailAgent может стартовать раньше MemoryService.
-   - Решение: fallback на локальный config + retry получения remote config.
-
-3. Слишком рано усложнить plugin architecture.
-   - Решение: сделать простой JSONB-based config без абстрактного plugin framework на первом этапе.
-
-4. UI настроек может стать свалкой.
-   - Решение: разделить System / Plugins / Routing.
+- `CR-MEM-010-universal-plugin-control-ui.md`
+- `CR-MAIL-004-plugin-control-api.md`
+- `CR-RAG-001-plugin-control-api.md`
 
 ## Out of Scope
 
-В этот CR не входит:
-
-- полноценная реализация ChatAgent;
-- secret vault;
+- полноценный secret vault;
 - multi-user / multi-tenant settings;
-- динамическое hot reload конфигурации без рестарта агента;
-- сложный rule engine для routing;
-- прямое управление RAG настройками.
-
-## Следующие CR
-
-1. `CR-MAIL-004-remote-config-from-memory-service.md`  
-   Перевести `JavaMailAgent` на получение настроек из MemoryService.
-
-2. `CR-MEM-010-secret-storage.md`  
-   Безопасное хранение секретов для plugin settings.
-
-3. `CR-CHAT-001-chat-agent-plugin.md`  
-   Новый ChatAgent как источник сообщений.
-
-4. `CR-MEM-011-routing-policy-ui.md`  
-   Настройка правил маршрутизации событий из UI.
+- управление JVM lifecycle plugin-процессов;
+- Kubernetes/systemd/docker process management;
+- ChatAgent runtime control API.

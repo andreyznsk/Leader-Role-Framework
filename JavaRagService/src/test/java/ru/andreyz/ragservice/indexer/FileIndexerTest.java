@@ -10,6 +10,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import ru.andreyz.ragservice.client.OllamaClient;
 import ru.andreyz.ragservice.client.OpenSearchClient;
+import ru.andreyz.ragservice.control.RagControlAuditStore;
+import ru.andreyz.ragservice.control.RagRuntimeConfigService;
 import ru.andreyz.ragservice.db.IndexedDocument;
 import ru.andreyz.ragservice.db.IndexedDocumentRepository;
 import ru.andreyz.ragservice.indexer.FileIndexer.IndexResult;
@@ -43,7 +45,14 @@ class FileIndexerTest {
     @BeforeEach
     void setUp() {
         RagChunkProperties chunkProperties = new RagChunkProperties();
-        indexer = new FileIndexer(new ChunkSplitter(chunkProperties), ollama, openSearch, repository, new DocumentValidator());
+        indexer = new FileIndexer(
+                new ChunkSplitter(chunkProperties),
+                ollama,
+                openSearch,
+                repository,
+                new DocumentValidator(),
+                runtimeConfigService(true, tempDir.toString(), true, 10)
+        );
         lenient().when(ollama.embed(anyString())).thenReturn(new float[1024]);
         lenient().when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -176,6 +185,46 @@ class FileIndexerTest {
         ));
     }
 
+    @Test
+    void indexFile_disabledRuntime_returnsDisabledWithoutTouchingDependencies() throws IOException {
+        RagChunkProperties chunkProperties = new RagChunkProperties();
+        FileIndexer disabledIndexer = new FileIndexer(
+                new ChunkSplitter(chunkProperties),
+                ollama,
+                openSearch,
+                repository,
+                new DocumentValidator(),
+                runtimeConfigService(false, tempDir.toString(), true, 10)
+        );
+        Path file = writeFile("disabled.md", validServiceCard("Disabled"));
+
+        IndexResult result = disabledIndexer.indexFile(file.toString());
+
+        assertThat(result.status()).isEqualTo("disabled");
+        verifyNoInteractions(ollama, openSearch, repository);
+    }
+
+    @Test
+    void indexFile_validationDisabled_indexesInvalidDocument() throws IOException {
+        RagChunkProperties chunkProperties = new RagChunkProperties();
+        FileIndexer validationOffIndexer = new FileIndexer(
+                new ChunkSplitter(chunkProperties),
+                ollama,
+                openSearch,
+                repository,
+                new DocumentValidator(),
+                runtimeConfigService(true, tempDir.toString(), false, 10)
+        );
+        Path file = writeFile("no-frontmatter.md", "# Just markdown\n\nText");
+        when(repository.findByFilePath(file.toString())).thenReturn(Optional.empty());
+
+        IndexResult result = validationOffIndexer.indexFile(file.toString());
+
+        assertThat(result.status()).isEqualTo("indexed");
+        verify(ollama, atLeastOnce()).embed(anyString());
+        verify(repository).save(argThat(doc -> "indexed".equals(doc.status())));
+    }
+
     // --- helpers ---
 
     private Path writeFile(String name, String content) throws IOException {
@@ -250,5 +299,22 @@ class FileIndexerTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private RagRuntimeConfigService runtimeConfigService(boolean enabled,
+                                                         String inboxPath,
+                                                         boolean validationEnabled,
+                                                         int topK) {
+        return new RagRuntimeConfigService(
+                enabled,
+                true,
+                60000,
+                inboxPath,
+                "mxbai-embed-large",
+                topK,
+                "http://localhost:9200",
+                validationEnabled,
+                mock(RagControlAuditStore.class)
+        );
     }
 }

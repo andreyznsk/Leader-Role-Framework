@@ -113,13 +113,12 @@
             priority: form.querySelector('input[name="priority"]:checked').value,
             dueDate: dueDate.value || null
         };
-        fetch('/api/tasks/pending', {
+        window.LeaderUiApi.request('/api/tasks/pending', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
-        }).then(response => {
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            window.location.href = '/ui/today';
+        }).then((result) => {
+            window.LeaderUiApi.handleSuccess('redirect:/ui/today', result);
         }).catch(err => {
             error.textContent = 'Не удалось создать задачу: ' + err.message;
             error.classList.remove('d-none');

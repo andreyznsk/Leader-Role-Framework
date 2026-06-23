@@ -135,13 +135,12 @@
         if (!window.confirm('Удалить "' + label + '" из knowledge index и с диска?')) {
             return;
         }
-        fetch('/api/knowledge/documents/' + documentId, {
+        window.LeaderUiApi.request('/api/knowledge/documents/' + documentId, {
             method: 'DELETE'
-        }).then(function (response) {
-            if (!response.ok) throw new Error('HTTP ' + response.status);
+        }).then(function (result) {
             const url = new URL(window.location.href);
             url.searchParams.delete('id');
-            window.location.href = url.pathname + url.search;
+            window.LeaderUiApi.handleSuccess('redirect:' + (url.pathname + url.search), result);
         }).catch(function (error) {
             showDeleteError('Ошибка удаления: ' + error.message);
         });
@@ -151,12 +150,11 @@
         form.addEventListener('submit', function (event) {
             event.preventDefault();
             const documentId = form.dataset.documentId;
-            fetch('/api/knowledge/documents/' + documentId, {
+            window.LeaderUiApi.request('/api/knowledge/documents/' + documentId, {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({content: document.getElementById('knowledgeContent').value})
-            }).then(function (response) {
-                if (!response.ok) throw new Error('HTTP ' + response.status);
+            }).then(function () {
                 feedback.textContent = 'Сохранено. Документ помечен для переиндексации.';
                 feedback.className = 'small mt-2 text-success';
             }).catch(function (error) {
@@ -169,11 +167,10 @@
     if (reindexButton) {
         reindexButton.addEventListener('click', function () {
             const documentId = reindexButton.dataset.documentId;
-            fetch('/api/knowledge/documents/' + documentId + '/reindex', {
+            window.LeaderUiApi.request('/api/knowledge/documents/' + documentId + '/reindex', {
                 method: 'POST'
-            }).then(function (response) {
-                if (!response.ok) throw new Error('HTTP ' + response.status);
-                window.location.reload();
+            }).then(function (result) {
+                window.LeaderUiApi.handleSuccess('reload', result);
             }).catch(function (error) {
                 feedback.textContent = 'Ошибка переиндексации: ' + error.message;
                 feedback.className = 'small mt-2 text-danger';

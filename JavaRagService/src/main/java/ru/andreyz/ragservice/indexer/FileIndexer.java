@@ -5,8 +5,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.andreyz.ragservice.client.OllamaClient;
 import ru.andreyz.ragservice.client.OpenSearchClient;
+import ru.andreyz.ragservice.control.RagRuntimeConfig;
+import ru.andreyz.ragservice.control.RagRuntimeConfigService;
 import ru.andreyz.ragservice.db.IndexedDocument;
 import ru.andreyz.ragservice.db.IndexedDocumentRepository;
+import ru.andreyz.ragservice.validation.DocType;
 import ru.andreyz.ragservice.validation.DocumentValidator;
 import ru.andreyz.ragservice.validation.ValidationResult;
 
@@ -16,7 +19,9 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Component
@@ -29,18 +34,27 @@ public class FileIndexer {
     private final OpenSearchClient openSearch;
     private final IndexedDocumentRepository repository;
     private final DocumentValidator validator;
+    private final RagRuntimeConfigService runtimeConfigService;
 
     public FileIndexer(ChunkSplitter splitter, OllamaClient ollama,
                        OpenSearchClient openSearch, IndexedDocumentRepository repository,
-                       DocumentValidator validator) {
+                       DocumentValidator validator,
+                       RagRuntimeConfigService runtimeConfigService) {
         this.splitter = splitter;
         this.ollama = ollama;
         this.openSearch = openSearch;
         this.repository = repository;
         this.validator = validator;
+        this.runtimeConfigService = runtimeConfigService;
     }
 
     public IndexResult indexFile(String filePath) throws IOException {
+        RagRuntimeConfig runtime = runtimeConfigService.snapshot();
+        if (!runtime.enabled()) {
+            log.info("[INDEX] skipped because RAG plugin is disabled: {}", filePath);
+            return new IndexResult(0, "disabled", filePath);
+        }
+
         Path path = Path.of(filePath);
         if (!Files.exists(path)) {
             throw new IOException("File not found: " + filePath);
@@ -48,7 +62,9 @@ public class FileIndexer {
         String content = Files.readString(path);
         String hash = sha256(content);
 
-        ValidationResult validation = validator.validate(content);
+        ValidationResult validation = runtime.validationEnabled()
+                ? validator.validate(content)
+                : ValidationResult.ok(extractDocType(content));
         String docType = validation.docType() != null ? validation.docType().name() : null;
         if (!validation.valid()) {
             Optional<IndexedDocument> existing = repository.findByFilePath(filePath);
@@ -105,6 +121,35 @@ public class FileIndexer {
             log.error("❌ Indexing error: {} — {}", filePath, errMsg);
             return new IndexResult(0, "failed: " + errMsg, filePath);
         }
+    }
+
+    private DocType extractDocType(String content) {
+        Map<String, String> frontmatter = parseFrontmatter(content);
+        String typeRaw = frontmatter.get("type");
+        if (typeRaw == null || typeRaw.isBlank()) {
+            return null;
+        }
+        try {
+            return DocType.valueOf(typeRaw.trim().toUpperCase().replace("-", "_"));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private Map<String, String> parseFrontmatter(String content) {
+        int end = content.indexOf("---", 3);
+        if (!content.startsWith("---") || end == -1) {
+            return Map.of();
+        }
+        String fm = content.substring(3, end).trim();
+        Map<String, String> result = new LinkedHashMap<>();
+        for (String line : fm.split("\n")) {
+            int colon = line.indexOf(':');
+            if (colon > 0) {
+                result.put(line.substring(0, colon).trim(), line.substring(colon + 1).trim());
+            }
+        }
+        return result;
     }
 
     private String sha256(String content) {

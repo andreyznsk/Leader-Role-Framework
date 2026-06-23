@@ -73,7 +73,8 @@
                         <h5 class="modal-title">Edit: <span th:text="${risk.title}"></span></h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <form method="post" th:action="@{/ui/risks/{id}/edit(id=${risk.id})}">
+                    <form method="post" th:action="@{/ui/risks/{id}/edit(id=${risk.id})}"
+                          th:attr="data-api-url=@{/api/risks/{id}(id=${risk.id})},data-api-method='PUT',data-api-success='reload'">
                         <input type="hidden" name="_method" value="PUT">
                         <div class="modal-body">
                             <div class="mb-3">
@@ -151,7 +152,8 @@
                 <h5 class="modal-title">Новый риск</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post" action="/ui/risks/add">
+            <form method="post" action="/ui/risks/add"
+                  data-api-url="/api/risks" data-api-method="POST" data-api-success="reload">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Название</label>
@@ -216,13 +218,12 @@
             priority: form.querySelector('input[name="riskPriority"]:checked').value,
             dueDate: dueDate.value || null
         };
-        fetch('/api/tasks/pending', {
+        window.LeaderUiApi.request('/api/tasks/pending', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
-        }).then(response => {
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            window.location.href = '/ui/today';
+        }).then((result) => {
+            window.LeaderUiApi.handleSuccess('redirect:/ui/today', result);
         }).catch(err => {
             error.textContent = 'Не удалось создать задачу: ' + err.message;
             error.classList.remove('d-none');

@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
     <link rel="stylesheet" th:href="@{/style.css}"/>
     <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}"/>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body>
 <nav th:fragment="nav" class="los-navbar">
@@ -39,7 +40,154 @@
                 a.classList.add('active');
             }
         });
+
+        window.LeaderUiApi = {
+            isDebugMode: function() {
+                return new URLSearchParams(window.location.search).get('ui_debug') === '1';
+            },
+            notifyDebugHold: function(message) {
+                console.info(message);
+                const node = document.getElementById('leader-ui-debug-banner');
+                if (!node) return;
+                node.textContent = message;
+                node.classList.remove('d-none');
+            },
+            request: async function(url, options) {
+                const requestOptions = options ? {...options} : {};
+                const method = (requestOptions.method || 'GET').toUpperCase();
+                const body = requestOptions.body;
+
+                console.group('LeaderOS API request');
+                console.log('URL:', url);
+                console.log('Method:', method);
+                if (body != null) {
+                    try {
+                        console.log('Request body:', typeof body === 'string' ? JSON.parse(body) : body);
+                    } catch (ignored) {
+                        console.log('Request body:', body);
+                    }
+                }
+
+                try {
+                    const response = await fetch(url, requestOptions);
+                    const raw = await response.text();
+                    let parsed = raw;
+                    try {
+                        parsed = JSON.parse(raw);
+                    } catch (ignored) {
+                    }
+
+                    console.log('Status:', response.status);
+                    console.log('Response:', parsed);
+                    window.__leaderUiLastResponse = {
+                        url: url,
+                        method: method,
+                        status: response.status,
+                        raw: raw,
+                        data: parsed
+                    };
+                    console.groupEnd();
+
+                    if (!response.ok) {
+                        const error = new Error('HTTP ' + response.status);
+                        error.response = response;
+                        error.raw = raw;
+                        error.data = parsed;
+                        throw error;
+                    }
+
+                    return {response: response, raw: raw, data: parsed};
+                } catch (error) {
+                    console.error('LeaderOS API request failed', error);
+                    console.groupEnd();
+                    throw error;
+                }
+            },
+            handleSuccess: function(success, result) {
+                if (this.isDebugMode() && (success === 'reload' || success.startsWith('redirect:'))) {
+                    this.notifyDebugHold('UI debug mode enabled: navigation skipped, inspect Fetch/XHR and window.__leaderUiLastResponse');
+                    return;
+                }
+
+                if (success === 'reload') {
+                    window.location.reload();
+                } else if (success.startsWith('redirect:')) {
+                    window.location.href = success.substring('redirect:'.length);
+                }
+            },
+            formToJson: function(form) {
+                const formData = new FormData(form);
+                const payload = {};
+                for (const [key, value] of formData.entries()) {
+                    if (key.startsWith('_')) continue;
+                    payload[key] = value;
+                }
+                return payload;
+            },
+            bindApiForms: function(selector) {
+                document.querySelectorAll(selector || 'form[data-api-url]').forEach(function(form) {
+                    if (form.dataset.apiBound === 'true') return;
+                    if (form.dataset.apiCustomHandler === 'true') return;
+                    form.dataset.apiBound = 'true';
+
+                    form.addEventListener('submit', async function(event) {
+                        event.preventDefault();
+
+                        const apiUrl = form.dataset.apiUrl;
+                        const apiMethod = (form.dataset.apiMethod || 'POST').toUpperCase();
+                        const success = form.dataset.apiSuccess || 'reload';
+                        const contentType = form.dataset.apiContentType || 'application/json';
+                        const bodyMode = form.dataset.apiBody || 'json';
+
+                        let body = null;
+                        if (bodyMode === 'json') {
+                            const json = window.LeaderUiApi.formToJson(form);
+                            if (Object.keys(json).length > 0) {
+                                body = JSON.stringify(json);
+                            }
+                        } else if (bodyMode === 'text') {
+                            const field = form.querySelector('[data-api-text-field]');
+                            body = field ? field.value : '';
+                        }
+
+                        try {
+                            const result = await window.LeaderUiApi.request(apiUrl, {
+                                method: apiMethod,
+                                headers: body != null ? {'Content-Type': contentType} : {},
+                                body: body
+                            });
+
+                            if (success === 'none') {
+                                const eventName = form.dataset.apiEvent;
+                                if (eventName) {
+                                    window.dispatchEvent(new CustomEvent(eventName, {detail: {form, response: result.data}}));
+                                }
+                            } else {
+                                window.LeaderUiApi.handleSuccess(success, result);
+                            }
+                        } catch (error) {
+                            const message = form.dataset.apiErrorTarget
+                                ? document.querySelector(form.dataset.apiErrorTarget)
+                                : null;
+                            if (message) {
+                                message.textContent = 'API request failed: ' + error.message;
+                                message.classList.remove('d-none');
+                            }
+                        }
+                    });
+                });
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', function () {
+            window.LeaderUiApi.bindApiForms('form[data-api-url]');
+        });
     </script>
 </nav>
+<div id="leader-ui-debug-banner"
+     class="alert alert-info rounded-0 border-0 text-center py-2 px-3 mb-0 d-none"
+     style="position:sticky;top:56px;z-index:999;">
+    UI debug mode enabled
+</div>
 </body>
 </html>

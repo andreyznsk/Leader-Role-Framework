@@ -87,12 +87,12 @@ class RagMcpToolsTest {
     // --- ragSearch ---
 
     @Test
-    void ragSearch_nullTopK_usesDefaultFive() {
-        when(searchService.search("архитектура", 5)).thenReturn(List.of());
+    void ragSearch_nullTopK_passesNullToService() {
+        when(searchService.search("архитектура", null)).thenReturn(List.of());
 
         tools.ragSearch("архитектура", null);
 
-        verify(searchService).search("архитектура", 5);
+        verify(searchService).search("архитектура", null);
     }
 
     @Test

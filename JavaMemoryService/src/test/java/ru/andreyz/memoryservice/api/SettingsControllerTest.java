@@ -1,5 +1,7 @@
 package ru.andreyz.memoryservice.api;
 
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -7,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import ru.andreyz.memoryservice.support.ControlPluginStubServers;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -25,6 +28,16 @@ class SettingsControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @BeforeAll
+    static void startStubs() throws Exception {
+        ControlPluginStubServers.ensureStarted();
+    }
+
+    @BeforeEach
+    void resetStubs() {
+        ControlPluginStubServers.reset();
+    }
+
     @Test
     void systemSettingsExposesProfileAndAgentProvider() throws Exception {
         mockMvc.perform(get("/api/settings/system"))
@@ -36,7 +49,79 @@ class SettingsControllerTest {
     }
 
     @Test
-    void mailPluginSettingsCanBeSavedAndSecretsAreMasked() throws Exception {
+    void controlPluginEndpointsReturnMailAndRagDescriptors() throws Exception {
+        mockMvc.perform(get("/api/settings/control/plugins"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.code == 'mail')]").exists())
+                .andExpect(jsonPath("$[?(@.code == 'mail')].status").value(org.hamcrest.Matchers.hasItem("UP")))
+                .andExpect(jsonPath("$[?(@.code == 'rag')]").exists())
+                .andExpect(jsonPath("$[?(@.code == 'rag')].status").value(org.hamcrest.Matchers.hasItem("UP")));
+
+        mockMvc.perform(get("/api/settings/control/plugins/mail/settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pluginCode").value("mail"))
+                .andExpect(jsonPath("$.settings.protocol.options[0]").value("maildev"));
+
+        mockMvc.perform(get("/api/settings/control/plugins/rag/settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pluginCode").value("rag"))
+                .andExpect(jsonPath("$.settings.scanIntervalSeconds.type").value("number"));
+    }
+
+    @Test
+    void controlPluginEndpointsApplyMailAndRagSettings() throws Exception {
+        mockMvc.perform(put("/api/settings/control/plugins/mail/settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "settings": {
+                                    "enabled": "false",
+                                    "protocol": "ews"
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pluginCode").value("mail"))
+                .andExpect(jsonPath("$.status").value("APPLIED"))
+                .andExpect(jsonPath("$.applied.protocol").value("ews"));
+
+        mockMvc.perform(put("/api/settings/control/plugins/rag/settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "settings": {
+                                    "enabled": "true",
+                                    "scanIntervalSeconds": "120"
+                                  }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pluginCode").value("rag"))
+                .andExpect(jsonPath("$.status").value("APPLIED"))
+                .andExpect(jsonPath("$.applied.scanIntervalSeconds").value("120"));
+
+        mockMvc.perform(get("/api/settings/control/plugins/mail/audit"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("APPLIED"));
+    }
+
+    @Test
+    void unavailableControlPluginReturnsServiceUnavailable() throws Exception {
+        ControlPluginStubServers.setRagUnavailable(true);
+
+        mockMvc.perform(get("/api/settings/control/plugins"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.code == 'rag')].status").value(org.hamcrest.Matchers.hasItem("DOWN")));
+
+        mockMvc.perform(get("/api/settings/control/plugins/rag/settings"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.pluginCode").value("rag"))
+                .andExpect(jsonPath("$.status").value("UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").value(containsString("Plugin settings fetch failed")));
+    }
+
+    @Test
+    void legacyMailPluginSettingsCanStillBeSavedAndSecretsAreMasked() throws Exception {
         mockMvc.perform(put("/api/settings/plugins/mail")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -62,49 +147,15 @@ class SettingsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(true))
                 .andExpect(jsonPath("$.config.passwordConfigured").value(true))
-                .andExpect(jsonPath("$.config.passwordMasked").value("********"))
-                .andExpect(content().string(not(containsString("plain-value-only-on-write"))));
-
-        mockMvc.perform(get("/api/settings/plugins"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.code == 'mail')].enabled").value(true));
-
-        mockMvc.perform(get("/api/settings/plugins/mail"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.config.login").value("user@example.com"))
-                .andExpect(jsonPath("$.config.passwordMasked").value("********"))
-                .andExpect(content().string(not(containsString("plain-value-only-on-write"))));
-
-        mockMvc.perform(get("/api/plugins/mail/config"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.protocol").value("ews"))
-                .andExpect(jsonPath("$.passwordConfigured").value(true))
-                .andExpect(jsonPath("$.passwordMasked").value("********"))
+                .andExpect(jsonPath("$.config.passwordMasked").value("*****"))
                 .andExpect(content().string(not(containsString("plain-value-only-on-write"))));
     }
 
     @Test
-    void heartbeatUpdatesPluginStatus() throws Exception {
-        mockMvc.perform(post("/api/plugins/mail/heartbeat")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"status":"UP","message":"poller running"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("mail"))
-                .andExpect(jsonPath("$.status").value("UP"))
-                .andExpect(jsonPath("$.lastHeartbeatAt").isString());
-
-        mockMvc.perform(get("/api/settings/plugins"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.code == 'mail')].status").value("UP"));
-    }
-
-    @Test
-    void testMailConnectionReturnsFailureWhenMailAgentUnavailable() throws Exception {
+    void legacyTestMailConnectionUsesStubbedMailAgent() throws Exception {
         mockMvc.perform(post("/api/settings/plugins/mail/test-connection"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").isString());
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("MailAgent stub OK"));
     }
 }

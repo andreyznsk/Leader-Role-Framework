@@ -13,11 +13,15 @@ import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.ProcessedEmail;
 import ru.andreyz.mailagent.repository.ProcessedEmailRepository;
+import ru.andreyz.mailagent.service.MailRuntimeConfig;
+import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Component
 public class MailAgentJob {
@@ -30,9 +34,10 @@ public class MailAgentJob {
     private final ActionExecutor actionExecutor;
     private final MailConfig.MailProperties mailProperties;
     private final MailConfig.PathProperties pathProperties;
-    private final MailConfig.FolderProperties folderProperties;
     private final ProcessedEmailRepository processedEmailRepository;
     private final ObjectMapper objectMapper;
+    private final MailRuntimeConfigService runtimeConfigService;
+    private LocalDateTime lastPollFinishedAt;
 
     public MailAgentJob(
         MailClient mailClient,
@@ -41,9 +46,9 @@ public class MailAgentJob {
         ActionExecutor actionExecutor,
         MailConfig.MailProperties mailProperties,
         MailConfig.PathProperties pathProperties,
-        MailConfig.FolderProperties folderProperties,
         ProcessedEmailRepository processedEmailRepository,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        MailRuntimeConfigService runtimeConfigService
     ) {
         this.mailClient = mailClient;
         this.promptBuilder = promptBuilder;
@@ -51,21 +56,29 @@ public class MailAgentJob {
         this.actionExecutor = actionExecutor;
         this.mailProperties = mailProperties;
         this.pathProperties = pathProperties;
-        this.folderProperties = folderProperties;
         this.processedEmailRepository = processedEmailRepository;
         this.objectMapper = objectMapper;
+        this.runtimeConfigService = runtimeConfigService;
     }
 
-    @Scheduled(fixedDelayString = "${mail.poll-interval-seconds:60}000")
+    @Scheduled(fixedDelay = 5000)
     public void poll() {
+        LocalDateTime now = LocalDateTime.now();
+        if (!runtimeConfigService.shouldPoll(now, lastPollFinishedAt)) {
+            return;
+        }
+
+        MailRuntimeConfig runtime = runtimeConfigService.snapshot();
         int limit = mailProperties.getFetchLimit();
-        List<String> excludeFolders = folderProperties.getExclude();
+        List<String> excludeFolders = runtime.foldersExclude();
 
         List<String> folders;
         try {
             folders = mailClient.listFolders(excludeFolders);
+            folders = filterIncludedFolders(folders, runtime.foldersInclude());
         } catch (Exception e) {
             log.error("Failed to list folders: {}", e.getMessage());
+            runtimeConfigService.registerPollResult("Folder list failed: " + e.getMessage());
             return;
         }
 
@@ -113,8 +126,11 @@ public class MailAgentJob {
             }
         }
 
-        log.info("Poll finished: {} processed ({} REQUEST, {} DRAFT, {} NOISE, {} CAPTURE, {} NOTICE, {} errors)",
-            total - errors, counts[0], counts[1], counts[2], counts[3], counts[4], errors);
+        String result = "%d processed (%d REQUEST, %d DRAFT, %d NOISE, %d CAPTURE, %d NOTICE, %d errors)"
+                .formatted(total - errors, counts[0], counts[1], counts[2], counts[3], counts[4], errors);
+        log.info("Poll finished: {}", result);
+        runtimeConfigService.registerPollResult(result);
+        lastPollFinishedAt = LocalDateTime.now();
     }
 
     private AgentResponse processEmail(Email email) throws Exception {
@@ -147,5 +163,24 @@ public class MailAgentJob {
         Files.createDirectories(inboxDir);
         Path file = inboxDir.resolve(ActionExecutor.sanitize(email.id()) + ".json");
         Files.writeString(file, objectMapper.writeValueAsString(email));
+    }
+
+    private List<String> filterIncludedFolders(List<String> folders, List<String> includeFolders) {
+        if (includeFolders == null || includeFolders.isEmpty()) {
+            return folders;
+        }
+        List<String> normalizedIncludes = includeFolders.stream()
+                .map(this::normalizeFolder)
+                .toList();
+        return folders.stream()
+                .filter(folder -> normalizedIncludes.contains(normalizeFolder(folder)))
+                .toList();
+    }
+
+    private String normalizeFolder(String folder) {
+        return folder == null ? "" : folder.trim()
+                .replace('\\', '/')
+                .replaceAll("/+", "/")
+                .toLowerCase(Locale.ROOT);
     }
 }

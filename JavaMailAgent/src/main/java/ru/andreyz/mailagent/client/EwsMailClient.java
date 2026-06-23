@@ -1,6 +1,5 @@
 package ru.andreyz.mailagent.client;
 
-import jakarta.annotation.PostConstruct;
 import microsoft.exchange.webservices.data.core.ExchangeService;
 import microsoft.exchange.webservices.data.core.PropertySet;
 import microsoft.exchange.webservices.data.core.enumeration.misc.ExchangeVersion;
@@ -28,8 +27,6 @@ import microsoft.exchange.webservices.data.search.ItemView;
 import microsoft.exchange.webservices.data.search.filter.SearchFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
@@ -46,8 +43,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-@Component
-@ConditionalOnProperty(name = "mail.protocol", havingValue = "ews")
 public class EwsMailClient implements MailClient {
 
     private static final Logger log = LoggerFactory.getLogger(EwsMailClient.class);
@@ -63,16 +58,6 @@ public class EwsMailClient implements MailClient {
         this.mailProperties = mailProperties;
         this.ewsProperties = ewsProperties;
         this.service = createService(mailProperties, ewsProperties);
-    }
-
-    @PostConstruct
-    public void checkConnection() {
-        MailConnectionTestResult result = testConnection();
-        if (result.success()) {
-            log.info("EWS connection OK - {}: {}", result.target(), result.message());
-        } else {
-            log.error("EWS connection FAILED - {}: {}", result.target(), result.message());
-        }
     }
 
     @Override

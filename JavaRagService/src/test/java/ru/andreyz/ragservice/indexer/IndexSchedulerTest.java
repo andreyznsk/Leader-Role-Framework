@@ -5,6 +5,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ru.andreyz.ragservice.control.RagControlAuditStore;
+import ru.andreyz.ragservice.control.RagRuntimeConfigService;
 import ru.andreyz.ragservice.db.IndexedDocument;
 import ru.andreyz.ragservice.db.IndexedDocumentRepository;
 
@@ -31,7 +33,8 @@ class IndexSchedulerTest {
 
     @Test
     void scanAndIndex_nonExistentInbox_doesNothing() throws IOException {
-        IndexScheduler scheduler = new IndexScheduler("/no/such/directory", fileIndexer, repository);
+        IndexScheduler scheduler = new IndexScheduler(fileIndexer, repository,
+                runtimeConfigService("/no/such/directory", true, true, 60));
 
         scheduler.scanAndIndex();
 
@@ -40,7 +43,8 @@ class IndexSchedulerTest {
 
     @Test
     void scanAndIndex_emptyInbox_doesNothing() {
-        IndexScheduler scheduler = new IndexScheduler(inbox.toString(), fileIndexer, repository);
+        IndexScheduler scheduler = new IndexScheduler(fileIndexer, repository,
+                runtimeConfigService(inbox.toString(), true, true, 60));
 
         scheduler.scanAndIndex();
 
@@ -51,8 +55,10 @@ class IndexSchedulerTest {
     void scanAndIndex_newFile_callsFileIndexer() throws Exception {
         Files.writeString(inbox.resolve("doc.md"), "New document content here for indexing purposes.");
         when(repository.findByFilePath(anyString())).thenReturn(Optional.empty());
+        when(fileIndexer.indexFile(anyString())).thenReturn(new FileIndexer.IndexResult(1, "indexed", "doc.md"));
 
-        IndexScheduler scheduler = new IndexScheduler(inbox.toString(), fileIndexer, repository);
+        IndexScheduler scheduler = new IndexScheduler(fileIndexer, repository,
+                runtimeConfigService(inbox.toString(), true, true, 60));
         scheduler.scanAndIndex();
 
         verify(fileIndexer).indexFile(anyString());
@@ -67,7 +73,8 @@ class IndexSchedulerTest {
         IndexedDocument existing = new IndexedDocument(1L, file.toString(), "SERVICE_CARD", hash, null, 1, "indexed", null);
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.of(existing));
 
-        IndexScheduler scheduler = new IndexScheduler(inbox.toString(), fileIndexer, repository);
+        IndexScheduler scheduler = new IndexScheduler(fileIndexer, repository,
+                runtimeConfigService(inbox.toString(), true, true, 60));
         scheduler.scanAndIndex();
 
         verify(fileIndexer, never()).indexFile(anyString());
@@ -80,8 +87,10 @@ class IndexSchedulerTest {
         Files.writeString(file, content);
         IndexedDocument stale = new IndexedDocument(1L, file.toString(), "SERVICE_CARD", "old-hash", null, 1, "indexed", null);
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.of(stale));
+        when(fileIndexer.indexFile(file.toString())).thenReturn(new FileIndexer.IndexResult(1, "indexed", file.toString()));
 
-        IndexScheduler scheduler = new IndexScheduler(inbox.toString(), fileIndexer, repository);
+        IndexScheduler scheduler = new IndexScheduler(fileIndexer, repository,
+                runtimeConfigService(inbox.toString(), true, true, 60));
         scheduler.scanAndIndex();
 
         verify(fileIndexer).indexFile(file.toString());
@@ -91,7 +100,8 @@ class IndexSchedulerTest {
     void scanAndIndex_nonMdFile_ignored() throws Exception {
         Files.writeString(inbox.resolve("notes.txt"), "This is a text file, not markdown.");
 
-        IndexScheduler scheduler = new IndexScheduler(inbox.toString(), fileIndexer, repository);
+        IndexScheduler scheduler = new IndexScheduler(fileIndexer, repository,
+                runtimeConfigService(inbox.toString(), true, true, 60));
         scheduler.scanAndIndex();
 
         verifyNoInteractions(fileIndexer, repository);
@@ -102,8 +112,10 @@ class IndexSchedulerTest {
         Files.writeString(inbox.resolve("adr-001.md"), "ADR content for architecture decision one.");
         Files.writeString(inbox.resolve("adr-002.md"), "ADR content for architecture decision two.");
         when(repository.findByFilePath(anyString())).thenReturn(Optional.empty());
+        when(fileIndexer.indexFile(anyString())).thenReturn(new FileIndexer.IndexResult(1, "indexed", "doc.md"));
 
-        IndexScheduler scheduler = new IndexScheduler(inbox.toString(), fileIndexer, repository);
+        IndexScheduler scheduler = new IndexScheduler(fileIndexer, repository,
+                runtimeConfigService(inbox.toString(), true, true, 60));
         scheduler.scanAndIndex();
 
         verify(fileIndexer, times(2)).indexFile(anyString());
@@ -118,12 +130,49 @@ class IndexSchedulerTest {
                 .doReturn(new FileIndexer.IndexResult(1, "indexed", "good.md"))
                 .when(fileIndexer).indexFile(anyString());
 
-        IndexScheduler scheduler = new IndexScheduler(inbox.toString(), fileIndexer, repository);
+        IndexScheduler scheduler = new IndexScheduler(fileIndexer, repository,
+                runtimeConfigService(inbox.toString(), true, true, 60));
 
         // Should not throw, should process both files
         scheduler.scanAndIndex();
 
         verify(fileIndexer, times(2)).indexFile(anyString());
+    }
+
+    @Test
+    void scanAndIndex_disabledRuntime_skipsWork() throws Exception {
+        Files.writeString(inbox.resolve("doc.md"), "New document content here for indexing purposes.");
+
+        IndexScheduler scheduler = new IndexScheduler(fileIndexer, repository,
+                runtimeConfigService(inbox.toString(), false, true, 60));
+        scheduler.scanAndIndex();
+
+        verifyNoInteractions(fileIndexer, repository);
+    }
+
+    @Test
+    void scanAndIndex_schedulerDisabled_skipsWork() throws Exception {
+        Files.writeString(inbox.resolve("doc.md"), "New document content here for indexing purposes.");
+
+        IndexScheduler scheduler = new IndexScheduler(fileIndexer, repository,
+                runtimeConfigService(inbox.toString(), true, false, 60));
+        scheduler.scanAndIndex();
+
+        verifyNoInteractions(fileIndexer, repository);
+    }
+
+    @Test
+    void scanAndIndex_respectsRuntimeInterval() throws Exception {
+        Files.writeString(inbox.resolve("doc.md"), "New document content here for indexing purposes.");
+        when(repository.findByFilePath(anyString())).thenReturn(Optional.empty());
+        when(fileIndexer.indexFile(anyString())).thenReturn(new FileIndexer.IndexResult(1, "indexed", "doc.md"));
+
+        IndexScheduler scheduler = new IndexScheduler(fileIndexer, repository,
+                runtimeConfigService(inbox.toString(), true, true, 600));
+        scheduler.scanAndIndex();
+        scheduler.scanAndIndex();
+
+        verify(fileIndexer, times(1)).indexFile(anyString());
     }
 
     private String sha256(String content) {
@@ -133,5 +182,22 @@ class IndexSchedulerTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private RagRuntimeConfigService runtimeConfigService(String inboxPath,
+                                                         boolean enabled,
+                                                         boolean schedulerEnabled,
+                                                         int intervalSeconds) {
+        return new RagRuntimeConfigService(
+                enabled,
+                schedulerEnabled,
+                intervalSeconds * 1000,
+                inboxPath,
+                "mxbai-embed-large",
+                10,
+                "http://localhost:9200",
+                true,
+                mock(RagControlAuditStore.class)
+        );
     }
 }

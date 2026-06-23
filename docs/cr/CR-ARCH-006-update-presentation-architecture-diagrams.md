@@ -103,6 +103,10 @@ flowchart TB
 | `POST /api/capture` | Capture Bot сохраняет raw заметки |
 | `POST /api/knowledge/search` | Memory-owned proxy к RAG search + usage events |
 | `GET/PUT/POST /api/knowledge/documents/**` | Browser-facing proxy управления RAG-документами |
+| `GET /api/settings/control/plugins` | MemoryService control plane registry for runtime plugins |
+| `GET/PUT /api/settings/control/plugins/{code}/settings` | Browser-facing proxy управления runtime plugin settings |
+| `GET /api/settings/control/plugins/{code}/audit` | Browser-facing proxy истории применения plugin settings |
+| `GET /ui/settings` | Universal Plugin Control UI |
 | `GET /api/stats/usage?period=...` | Usage Statistics |
 | `GET /ui/stats` | UI статистики использования и saved time |
 | `GET /ui/knowledge` | Knowledge Gateway UI |

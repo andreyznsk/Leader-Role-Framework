@@ -77,7 +77,8 @@ public class RagMcpTools {
                     continue;
                 }
                 IndexResult r = fileIndexer.indexFile(fp);
-                if (r.status().startsWith("error")) failed++;
+                if ("disabled".equals(r.status())) failed++;
+                else if (r.status().startsWith("error")) failed++;
                 else if ("invalid".equals(r.status())) invalid++;
                 else indexed++;
             } catch (Exception e) {
@@ -90,8 +91,8 @@ public class RagMcpTools {
     @Tool(description = "Semantic search in the RAG knowledge base. Returns top-K most relevant text chunks.")
     public List<SearchResult> ragSearch(
             @ToolParam(description = "Search query in natural language") String query,
-            @ToolParam(description = "Number of results to return (default 5)", required = false) Integer topK) {
-        return searchService.search(query, topK != null ? topK : 5);
+            @ToolParam(description = "Number of results to return", required = false) Integer topK) {
+        return searchService.search(query, topK);
     }
 
     @Tool(description = "List all documents indexed in the RAG knowledge base with their status.")
