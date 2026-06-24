@@ -116,7 +116,7 @@ agent:
 | `GET` | `/api/control/status` | Статус: `{pluginCode,pluginName,enabled,schedulerEnabled,configVersion,...}` |
 | `GET` | `/api/control/audit` | История изменений настроек |
 | `POST` | `/api/control/plugin-state` | `{enabled:true/false}` — включить/выключить polling внутри JVM (без остановки процесса) |
-| `POST` | `/api/control/test-connection` | Тест подключения к почтовому серверу. **200** `{success:true}` / **500** `{success:false}` |
+| `POST` | `/api/control/test-connection` | Тест подключения к почтовому серверу. Может принять runtime override (`protocol`, `ewsUrl`, `username`, `password`, `authType`, `folderExclude`). Ответ: `success/status`, `exchangeVersion`, `authType`, `foldersFound`, `errorType`, `details`. |
 
 **Важно:** `enabled=false` останавливает polling/классификацию внутри JVM. Процесс mail-agent продолжает работать.
 
@@ -124,6 +124,9 @@ agent:
 - `maildev` → `MaildevClient` (статические свойства из конфига)
 - `ews` → `EwsMailClient` (runtime `serverUrl` из базы)
 - `imap` → `MailException` (not implemented)
+
+**EWS authentication settings:** Mail Agent control descriptor теперь отдаёт `authType = BASIC | NTLM | OAUTH2`.
+Для MVP backend реально выполняет `BASIC` и `NTLM`. `OAUTH2` пока только отражён в UI и возвращает `NOT_SUPPORTED`.
 
 **Новые таблицы БД:**
 
@@ -199,7 +202,7 @@ MemoryService выступает единой точкой управления 
 | `GET` | `/api/settings/control/plugins/{code}/settings` | Получить настройки плагина через proxy (503 если недоступен) |
 | `PUT` | `/api/settings/control/plugins/{code}/settings` | Обновить настройки плагина через proxy |
 | `GET` | `/api/settings/control/plugins/{code}/audit` | История изменений плагина через proxy |
-| `POST` | `/api/settings/plugins/mail/test-connection` | Тест подключения почты. **200** `{success:true}` / **500** `{success:false}` |
+| `POST` | `/api/settings/control/plugins/mail/test-connection` | Единый endpoint для кнопки `Test Connection` в UI MemoryService. Проксирует вызов в MailAgent, не запускает polling и не меняет состояние писем. |
 
 **UI Settings:** `/ui/settings` — Thymeleaf-страница `settings.html`. Рендерит форму настроек на сервере через `ControlSettingsDescriptor`. Данные полностью server-side (Thymeleaf), без client-side API fetch при загрузке. Форма сохраняется через browser fetch → `PUT /api/settings/control/plugins/{code}/settings`.
 

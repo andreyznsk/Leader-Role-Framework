@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.model.MailConnectionErrorType;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
 import java.net.URI;
@@ -87,11 +88,13 @@ public class MaildevClient implements MailClient {
                 .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 200) {
-                return new MailConnectionTestResult(true, "HTTP 200", apiUrl);
+                return MailConnectionTestResult.connected("maildev", null, null, null, false, false, "HTTP 200", apiUrl);
             }
-            return new MailConnectionTestResult(false, "HTTP " + response.statusCode(), apiUrl);
+            return MailConnectionTestResult.failed("maildev", null, MailConnectionErrorType.UNKNOWN,
+                    "HTTP " + response.statusCode(), "Maildev returned HTTP " + response.statusCode(), apiUrl);
         } catch (Exception e) {
-            return new MailConnectionTestResult(false, e.getMessage(), apiUrl);
+            return MailConnectionTestResult.failed("maildev", null, MailConnectionErrorType.UNKNOWN,
+                    "Connection failed", e.getMessage(), apiUrl);
         }
     }
 

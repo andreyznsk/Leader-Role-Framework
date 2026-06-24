@@ -48,8 +48,16 @@ class SettingsUiTest {
                 .andExpect(content().string(containsString("data-plugin-field=\"login\"")))
                 .andExpect(content().string(containsString("data-plugin-field=\"password\"")))
                 .andExpect(content().string(containsString("data-plugin-field=\"serverUrl\"")))
+                .andExpect(content().string(containsString("data-plugin-field=\"authType\"")))
                 .andExpect(content().string(containsString("data-plugin-field=\"host\"")))
                 .andExpect(content().string(containsString("data-plugin-field=\"port\"")))
+                .andExpect(content().string(containsString("Test Connection")))
+                .andExpect(content().string(containsString("data-test-url=\"/api/settings/control/plugins/mail/test-connection\"")))
+                .andExpect(content().string(containsString("mail-test-connection-modal")))
+                .andExpect(content().string(containsString("data-mail-test-modal-title")))
+                .andExpect(content().string(containsString("data-mail-test-modal-message")))
+                .andExpect(content().string(containsString("Success")))
+                .andExpect(content().string(containsString("Fail")))
                 .andExpect(content().string(containsString("Folders exclude")))
                 .andExpect(content().string(containsString("Scan interval seconds")));
     }

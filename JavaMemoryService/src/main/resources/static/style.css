@@ -324,3 +324,40 @@ body {
   font-size: 16px;
   line-height: 1.5;
 }
+
+/* ─── TASK TITLE CLICKABLE (CR-MEM-009) ──────────── */
+.task-title-clickable {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+.task-title-clickable:hover {
+  text-decoration: underline;
+  color: var(--accent);
+}
+
+/* ─── TASK EDITOR LINKS PREVIEW (CR-MEM-009) ─────── */
+.task-editor-links {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: var(--bg3);
+  font-size: 14px;
+}
+.task-editor-links-label {
+  color: var(--text2);
+  font-size: 13px;
+  font-family: var(--mono);
+  margin-bottom: 4px;
+}
+.task-editor-links ul {
+  margin: 0;
+  padding-left: 16px;
+}
+.task-editor-links a {
+  color: var(--accent2);
+  word-break: break-all;
+}
+.task-editor-links a:hover {
+  color: var(--accent);
+}

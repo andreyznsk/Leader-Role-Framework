@@ -14,6 +14,7 @@ import java.util.List;
     MailConfig.MaildevProperties.class,
     MailConfig.ImapProperties.class,
     MailConfig.EwsProperties.class,
+    MailConfig.TestConnectionProperties.class,
     MailConfig.AgentProperties.class,
     MailConfig.FolderProperties.class
 })
@@ -100,6 +101,7 @@ public class MailConfig {
         private String url;
         private boolean autodiscover = false;
         private String domain;
+        private String authType = "BASIC";
         private String version = "Exchange2010_SP2";
         private int timeoutSeconds = 30;
 
@@ -109,10 +111,23 @@ public class MailConfig {
         public void setAutodiscover(boolean v) { this.autodiscover = v; }
         public String getDomain() { return domain; }
         public void setDomain(String v) { this.domain = v; }
+        public String getAuthType() { return authType; }
+        public void setAuthType(String v) { this.authType = v; }
         public String getVersion() { return version; }
         public void setVersion(String v) { this.version = v; }
         public int getTimeoutSeconds() { return timeoutSeconds; }
         public void setTimeoutSeconds(int v) { this.timeoutSeconds = v; }
+    }
+
+    @ConfigurationProperties(prefix = "mail.test-connection")
+    public static class TestConnectionProperties {
+        private int timeoutSeconds = 15;
+        private int maxFoldersToScan = 500;
+
+        public int getTimeoutSeconds() { return timeoutSeconds; }
+        public void setTimeoutSeconds(int v) { this.timeoutSeconds = v; }
+        public int getMaxFoldersToScan() { return maxFoldersToScan; }
+        public void setMaxFoldersToScan(int v) { this.maxFoldersToScan = v; }
     }
 
     @ConfigurationProperties(prefix = "agent")

@@ -13,6 +13,7 @@ import ru.andreyz.memoryservice.dto.ControlPluginDto;
 import ru.andreyz.memoryservice.dto.ControlPluginSettingsResponse;
 import ru.andreyz.memoryservice.dto.ControlPluginSettingsUpdateRequest;
 import ru.andreyz.memoryservice.dto.ControlPluginSettingsUpdateResponse;
+import ru.andreyz.memoryservice.dto.MailAgentConnectionTestRequestDto;
 import ru.andreyz.memoryservice.dto.MailAgentConnectionTestResultDto;
 import ru.andreyz.memoryservice.dto.PluginSettingsDto;
 import ru.andreyz.memoryservice.dto.PluginSummaryDto;
@@ -93,9 +94,17 @@ public class SettingsController {
         return ResponseEntity.ok(pluginSettingsService.updateMailSettings(request));
     }
 
+    @PostMapping("/control/plugins/mail/test-connection")
+    public ResponseEntity<MailAgentConnectionTestResultDto> testMailConnectionFromControlPlane(@RequestBody(required = false) MailAgentConnectionTestRequestDto request) {
+        MailAgentConnectionTestResultDto result = pluginSettingsService.testMailAgentConnection(request);
+        return result.success()
+                ? ResponseEntity.ok(result)
+                : ResponseEntity.status(500).body(result);
+    }
+
     @PostMapping("/plugins/mail/test-connection")
-    public ResponseEntity<MailAgentConnectionTestResultDto> testMailConnection() {
-        MailAgentConnectionTestResultDto result = pluginSettingsService.testMailAgentConnection();
+    public ResponseEntity<MailAgentConnectionTestResultDto> testMailConnection(@RequestBody(required = false) MailAgentConnectionTestRequestDto request) {
+        MailAgentConnectionTestResultDto result = pluginSettingsService.testMailAgentConnection(request);
         return result.success()
                 ? ResponseEntity.ok(result)
                 : ResponseEntity.status(500).body(result);

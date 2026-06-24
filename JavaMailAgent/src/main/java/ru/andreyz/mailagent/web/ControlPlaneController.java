@@ -12,6 +12,7 @@ import ru.andreyz.mailagent.model.ControlSettingsResponse;
 import ru.andreyz.mailagent.model.ControlSettingsStatusResponse;
 import ru.andreyz.mailagent.model.ControlSettingsUpdateRequest;
 import ru.andreyz.mailagent.model.ControlStatusResponse;
+import ru.andreyz.mailagent.model.MailConnectionTestRequest;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 import ru.andreyz.mailagent.model.MailPluginStateRequest;
 import ru.andreyz.mailagent.service.MailAgentControlService;
@@ -56,8 +57,8 @@ public class ControlPlaneController {
     }
 
     @PostMapping("/test-connection")
-    public ResponseEntity<MailConnectionTestResult> testConnection() {
-        MailConnectionTestResult result = controlService.testConnection();
+    public ResponseEntity<MailConnectionTestResult> testConnection(@RequestBody(required = false) MailConnectionTestRequest request) {
+        MailConnectionTestResult result = controlService.testConnection(request);
         return result.success()
                 ? ResponseEntity.ok(result)
                 : ResponseEntity.status(500).body(result);

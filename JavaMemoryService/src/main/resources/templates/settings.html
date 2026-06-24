@@ -117,7 +117,7 @@
             <form th:if="${panel.descriptor() != null}"
                   method="post"
                   th:action="'/ui/settings/plugins/' + ${panel.plugin().code()}"
-                  th:attr="data-plugin-code=${panel.plugin().code()},data-api-url=${'/api/settings/control/plugins/' + panel.plugin().code() + '/settings'},data-api-custom-handler='true'"
+                  th:attr="data-plugin-code=${panel.plugin().code()},data-api-url=${'/api/settings/control/plugins/' + panel.plugin().code() + '/settings'},data-test-url=${panel.plugin().code() == 'mail' ? '/api/settings/control/plugins/mail/test-connection' : null},data-api-custom-handler='true'"
                   class="row g-3">
                 <div th:each="entry : ${panel.descriptor().settings()}" class="col-12">
                     <div class="los-plugin-field" th:with="field=${entry.value}, key=${entry.key}">
@@ -201,6 +201,9 @@
                         Version <span th:text="${panel.descriptor().version()}">1</span>
                     </div>
                     <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <button th:if="${panel.plugin().code() == 'mail'}" type="button" class="btn btn-outline-secondary" data-test-connection-button>
+                            Test Connection
+                        </button>
                         <div class="small text-muted los-api-status" th:attr="data-plugin-status=${panel.plugin().code()}">
                             Save uses browser fetch. Inspect in Chrome DevTools.
                         </div>
@@ -225,8 +228,31 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="mail-test-connection-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" data-mail-test-modal-title>Connection test</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small mb-3" data-mail-test-modal-message></div>
+                <div class="small text-muted" data-mail-test-modal-details></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
     (function () {
+        const modalElement = document.getElementById('mail-test-connection-modal');
+        const modalTitle = document.querySelector('[data-mail-test-modal-title]');
+        const modalMessage = document.querySelector('[data-mail-test-modal-message]');
+        const modalDetails = document.querySelector('[data-mail-test-modal-details]');
+        const testConnectionModal = modalElement ? new bootstrap.Modal(modalElement) : null;
+
         function formToPayload(form) {
             const formData = new FormData(form);
             const settings = {};
@@ -254,6 +280,51 @@
             node.classList.toggle('text-muted', !isError);
         }
 
+        function mailTestPayload(form) {
+            const payload = formToPayload(form).settings;
+            const splitLines = function (value) {
+                return (value || '')
+                    .split(/\r?\n/)
+                    .map(function (item) { return item.trim(); })
+                    .filter(Boolean);
+            };
+            return {
+                protocol: payload.protocol || null,
+                ewsUrl: payload.serverUrl || null,
+                username: payload.login || null,
+                password: payload.password || null,
+                authType: payload.authType || null,
+                host: payload.host || null,
+                port: payload.port ? Number(payload.port) : null,
+                ssl: payload.ssl === 'true',
+                folderExclude: splitLines(payload.foldersExclude)
+            };
+        }
+
+        function showTestResultModal(result) {
+            if (!testConnectionModal || !modalTitle || !modalMessage || !modalDetails) {
+                return;
+            }
+            const lines = [];
+            if (result.success) {
+                modalTitle.textContent = 'Success';
+                lines.push('Connected');
+                if (result.exchangeVersion) lines.push('Exchange Version: ' + result.exchangeVersion);
+                if (result.authType) lines.push('Auth: ' + result.authType);
+                if (result.foldersFound !== null && result.foldersFound !== undefined) lines.push('Folders found: ' + result.foldersFound);
+                modalDetails.textContent = result.endpoint ? 'Endpoint: ' + result.endpoint : '';
+            } else {
+                modalTitle.textContent = 'Fail';
+                lines.push(result.message || 'Connection failed');
+                if (result.authType) lines.push('Auth: ' + result.authType);
+                if (result.endpoint) lines.push('Endpoint: ' + result.endpoint);
+                if (result.details) lines.push('Details: ' + result.details);
+                modalDetails.textContent = result.errorType ? 'Error Type: ' + result.errorType : '';
+            }
+            modalMessage.textContent = lines.join('\n');
+            testConnectionModal.show();
+        }
+
         document.querySelectorAll('form[data-api-url]').forEach(function (form) {
             form.addEventListener('submit', async function (event) {
                 event.preventDefault();
@@ -275,6 +346,32 @@
                     updateStatus(pluginCode, 'Fetch failed — see DevTools Console', true);
                 }
             });
+
+            const testButton = form.querySelector('[data-test-connection-button]');
+            if (testButton && form.dataset.testUrl) {
+                testButton.addEventListener('click', async function () {
+                    const pluginCode = form.dataset.pluginCode || 'plugin';
+                    updateStatus(pluginCode, 'Testing connection...', false);
+                    testButton.disabled = true;
+                    try {
+                        const result = await window.LeaderUiApi.request(form.dataset.testUrl, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(mailTestPayload(form))
+                        });
+                        showTestResultModal(result.data);
+                        updateStatus(pluginCode, 'Connection test completed. HTTP ' + result.response.status + '.', !result.data.success);
+                    } catch (error) {
+                        const response = error && error.data ? error.data : null;
+                        if (response) {
+                            showTestResultModal(response);
+                        }
+                        updateStatus(pluginCode, 'Connection test failed.', true);
+                    } finally {
+                        testButton.disabled = false;
+                    }
+                });
+            }
         });
     })();
 </script>

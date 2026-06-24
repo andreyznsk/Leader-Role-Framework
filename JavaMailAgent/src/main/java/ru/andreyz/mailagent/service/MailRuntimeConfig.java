@@ -1,5 +1,7 @@
 package ru.andreyz.mailagent.service;
 
+import ru.andreyz.mailagent.model.MailAuthType;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -9,6 +11,7 @@ public record MailRuntimeConfig(
         String login,
         String password,
         String serverUrl,
+        MailAuthType authType,
         String host,
         int port,
         boolean ssl,

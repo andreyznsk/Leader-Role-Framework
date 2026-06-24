@@ -2,7 +2,6 @@ package ru.andreyz.mailagent.client;
 
 import microsoft.exchange.webservices.data.core.ExchangeService;
 import microsoft.exchange.webservices.data.core.PropertySet;
-import microsoft.exchange.webservices.data.core.enumeration.misc.ExchangeVersion;
 import microsoft.exchange.webservices.data.core.enumeration.property.BasePropertySet;
 import microsoft.exchange.webservices.data.core.enumeration.property.BodyType;
 import microsoft.exchange.webservices.data.core.enumeration.property.WellKnownFolderName;
@@ -15,7 +14,6 @@ import microsoft.exchange.webservices.data.core.service.item.Item;
 import microsoft.exchange.webservices.data.core.service.schema.EmailMessageSchema;
 import microsoft.exchange.webservices.data.core.service.schema.FolderSchema;
 import microsoft.exchange.webservices.data.core.service.schema.ItemSchema;
-import microsoft.exchange.webservices.data.credential.WebCredentials;
 import microsoft.exchange.webservices.data.property.complex.EmailAddress;
 import microsoft.exchange.webservices.data.property.complex.FolderId;
 import microsoft.exchange.webservices.data.property.complex.ItemId;
@@ -57,7 +55,7 @@ public class EwsMailClient implements MailClient {
                          MailConfig.EwsProperties ewsProperties) {
         this.mailProperties = mailProperties;
         this.ewsProperties = ewsProperties;
-        this.service = createService(mailProperties, ewsProperties);
+        this.service = EwsSupport.createService(mailProperties, ewsProperties);
     }
 
     @Override
@@ -124,13 +122,25 @@ public class EwsMailClient implements MailClient {
     public MailConnectionTestResult testConnection() {
         try {
             Folder inbox = Folder.bind(service, WellKnownFolderName.Inbox, folderPropertySet());
-            return new MailConnectionTestResult(
-                    true,
+            return MailConnectionTestResult.connected(
+                    "ews",
+                    ewsProperties.getVersion(),
+                    ewsProperties.getAuthType(),
+                    null,
+                    false,
+                    inbox != null,
                     "Inbox unread: " + inbox.getUnreadCount(),
-                    connectionTarget()
+                    EwsSupport.connectionTarget(mailProperties, ewsProperties)
             );
         } catch (Exception e) {
-            return new MailConnectionTestResult(false, e.getMessage(), connectionTarget());
+            return MailConnectionTestResult.failed(
+                    "ews",
+                    ewsProperties.getAuthType(),
+                    null,
+                    "Connection failed",
+                    e.getMessage(),
+                    EwsSupport.connectionTarget(mailProperties, ewsProperties)
+            );
         }
     }
 
@@ -254,46 +264,4 @@ public class EwsMailClient implements MailClient {
         return propertySet;
     }
 
-    private static ExchangeService createService(MailConfig.MailProperties mailProperties,
-                                                 MailConfig.EwsProperties ewsProperties) {
-        ExchangeService service = new ExchangeService(exchangeVersion(ewsProperties.getVersion()));
-        service.setCredentials(webCredentials(mailProperties, ewsProperties));
-        service.setTimeout(Math.max(1, ewsProperties.getTimeoutSeconds()) * 1000);
-        service.setPreAuthenticate(true);
-
-        try {
-            if (ewsProperties.isAutodiscover()) {
-                service.autodiscoverUrl(mailProperties.getUsername(), url -> url != null && url.startsWith("https://"));
-            } else if (ewsProperties.getUrl() != null && !ewsProperties.getUrl().isBlank()) {
-                service.setUrl(URI.create(ewsProperties.getUrl()));
-            }
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to configure EWS endpoint", e);
-        }
-
-        return service;
-    }
-
-    private static WebCredentials webCredentials(MailConfig.MailProperties mailProperties,
-                                                 MailConfig.EwsProperties ewsProperties) {
-        String domain = ewsProperties.getDomain();
-        if (domain != null && !domain.isBlank()) {
-            return new WebCredentials(mailProperties.getUsername(), mailProperties.getPassword(), domain);
-        }
-        return new WebCredentials(mailProperties.getUsername(), mailProperties.getPassword());
-    }
-
-    private static ExchangeVersion exchangeVersion(String value) {
-        if (value == null || value.isBlank()) {
-            return ExchangeVersion.Exchange2010_SP2;
-        }
-        return ExchangeVersion.valueOf(value);
-    }
-
-    private String connectionTarget() {
-        if (ewsProperties.isAutodiscover()) {
-            return "autodiscover:" + mailProperties.getUsername();
-        }
-        return ewsProperties.getUrl();
-    }
 }

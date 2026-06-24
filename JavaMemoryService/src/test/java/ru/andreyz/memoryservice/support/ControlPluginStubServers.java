@@ -18,6 +18,7 @@ public final class ControlPluginStubServers {
 
     private static final AtomicReference<String> mailProtocol = new AtomicReference<>("maildev");
     private static final AtomicReference<String> mailEnabled = new AtomicReference<>("true");
+    private static final AtomicReference<String> mailAuthType = new AtomicReference<>("BASIC");
     private static final AtomicReference<String> ragEnabled = new AtomicReference<>("true");
     private static final AtomicReference<String> ragScanInterval = new AtomicReference<>("60");
     private static final AtomicBoolean ragUnavailable = new AtomicBoolean(false);
@@ -43,9 +44,7 @@ public final class ControlPluginStubServers {
                     ]
                     """));
             mailServer.createContext("/api/control/plugin-state", exchange -> json(exchange, 200, "{\"accepted\":true}"));
-            mailServer.createContext("/api/control/test-connection", exchange -> json(exchange, 200, """
-                    {"success":true,"message":"MailAgent stub OK","target":"http://localhost:19999"}
-                    """));
+            mailServer.createContext("/api/control/test-connection", ControlPluginStubServers::handleMailTestConnection);
             mailServer.setExecutor(Executors.newCachedThreadPool());
             mailServer.start();
         }
@@ -80,6 +79,7 @@ public final class ControlPluginStubServers {
     public static void reset() {
         mailProtocol.set("maildev");
         mailEnabled.set("true");
+        mailAuthType.set("BASIC");
         ragEnabled.set("true");
         ragScanInterval.set("60");
         ragUnavailable.set(false);
@@ -140,6 +140,16 @@ public final class ControlPluginStubServers {
                           "secret": false,
                           "required": false
                         },
+                        "authType": {
+                          "value": "%s",
+                          "type": "select",
+                          "label": "Authentication Type",
+                          "description": "BASIC and NTLM are supported. OAUTH2 is planned.",
+                          "editable": true,
+                          "secret": false,
+                          "required": true,
+                          "options": ["BASIC", "NTLM", "OAUTH2"]
+                        },
                         "host": {
                           "value": "imap.example.com",
                           "type": "string",
@@ -183,7 +193,7 @@ public final class ControlPluginStubServers {
                         }
                       }
                     }
-                    """.formatted(mailEnabled.get(), mailProtocol.get()));
+                    """.formatted(mailEnabled.get(), mailProtocol.get(), mailAuthType.get()));
             return;
         }
 
@@ -201,6 +211,12 @@ public final class ControlPluginStubServers {
             if (request.contains("\"protocol\":\"imap\"")) {
                 mailProtocol.set("imap");
             }
+            if (request.contains("\"authType\":\"NTLM\"")) {
+                mailAuthType.set("NTLM");
+            }
+            if (request.contains("\"authType\":\"BASIC\"")) {
+                mailAuthType.set("BASIC");
+            }
             json(exchange, 200, """
                     {
                       "pluginCode": "mail",
@@ -208,12 +224,13 @@ public final class ControlPluginStubServers {
                       "appliedAt": "2026-06-22T20:30:00",
                       "applied": {
                         "enabled": "%s",
-                        "protocol": "%s"
+                        "protocol": "%s",
+                        "authType": "%s"
                       },
                       "ignored": {},
                       "message": "Mail settings applied"
                     }
-                    """.formatted(mailEnabled.get(), mailProtocol.get()));
+                    """.formatted(mailEnabled.get(), mailProtocol.get(), mailAuthType.get()));
             return;
         }
 
@@ -290,6 +307,28 @@ public final class ControlPluginStubServers {
             return;
         }
         json(exchange, 405, "{\"error\":\"Method not allowed\"}");
+    }
+
+    private static void handleMailTestConnection(HttpExchange exchange) throws IOException {
+        String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        String authType = request.contains("\"authType\":\"NTLM\"") ? "NTLM" : mailAuthType.get();
+        json(exchange, 200, """
+                {
+                  "success": true,
+                  "status": "CONNECTED",
+                  "protocol": "ews",
+                  "exchangeVersion": "Exchange2010_SP2",
+                  "authType": "%s",
+                  "foldersFound": 127,
+                  "foldersScanLimited": false,
+                  "inboxFound": true,
+                  "message": "Connected",
+                  "errorType": null,
+                  "details": null,
+                  "endpoint": "https://exchange.example.com/EWS/Exchange.asmx",
+                  "target": "https://exchange.example.com/EWS/Exchange.asmx"
+                }
+                """.formatted(authType));
     }
 
     private static void json(HttpExchange exchange, int status, String body) throws IOException {

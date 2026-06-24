@@ -91,6 +91,7 @@ LeaderOS — система из трёх Java-сервисов, оркестр�
 - NOISE → пометить прочитанным, переместить в processed/
 - Дедупликация через таблицу processed_emails
 - Web UI: http://localhost:8080/ui/status
+- Control Plane test endpoint: `POST /api/settings/control/plugins/mail/test-connection`
 
 ### JavaMemoryService
 - Ежедневный план задач с приоритетами и статусами
@@ -168,6 +169,32 @@ JavaRagService: 44 PASS / 0 FAIL (2026-06-12)
 local → Maildev (Docker), разработка
 dev   → IMAP, тестовый сервер
 prod  → Exchange EWS, рабочий ПК
+
+### EWS test connection
+
+Mail Agent settings in `http://localhost:8082/ui/settings` now expose `Authentication Type` (`BASIC`, `NTLM`, `OAUTH2`) and a `Test Connection` action.
+
+Browser-facing endpoint:
+
+```http
+POST /api/settings/control/plugins/mail/test-connection
+Content-Type: application/json
+```
+
+Example payload:
+
+```json
+{
+  "protocol": "ews",
+  "ewsUrl": "https://outlook.domain.ru/EWS/Exchange.asmx",
+  "username": "user@domain.ru",
+  "password": "",
+  "authType": "NTLM",
+  "folderExclude": ["Inbox/CI/CD"]
+}
+```
+
+The request validates connectivity only. It does not start polling, write `processed_emails`, or flip read/unread state. Empty `password` means reuse the already stored secret. `OAUTH2` is visible in UI as planned and currently returns a not-supported result from backend.
 
 
 ## Структура проекта

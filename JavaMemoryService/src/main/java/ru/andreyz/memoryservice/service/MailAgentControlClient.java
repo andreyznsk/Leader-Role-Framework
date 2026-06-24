@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import ru.andreyz.memoryservice.dto.MailAgentConnectionTestRequestDto;
 import ru.andreyz.memoryservice.dto.MailAgentConnectionTestResultDto;
 
 import java.net.URI;
@@ -49,21 +50,23 @@ public class MailAgentControlClient {
         }
     }
 
-    public MailAgentConnectionTestResultDto testConnection() {
+    public MailAgentConnectionTestResultDto testConnection(MailAgentConnectionTestRequestDto requestDto) {
         try {
+            String body = requestDto != null ? objectMapper.writeValueAsString(requestDto) : "";
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/api/control/test-connection"))
                     .timeout(Duration.ofSeconds(10))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .POST(body.isEmpty() ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body))
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
                 return objectMapper.readValue(response.body(), MailAgentConnectionTestResultDto.class);
             }
-            return new MailAgentConnectionTestResultDto(false, "MailAgent returned HTTP " + response.statusCode(), baseUrl);
+            return objectMapper.readValue(response.body(), MailAgentConnectionTestResultDto.class);
         } catch (Exception e) {
-            return new MailAgentConnectionTestResultDto(false, fallbackMessage(e), baseUrl);
+            return new MailAgentConnectionTestResultDto(false, "FAILED", null, null, null, null, null, null,
+                    fallbackMessage(e), "UNKNOWN", fallbackMessage(e), baseUrl, baseUrl);
         }
     }
 

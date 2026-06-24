@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.model.MailConnectionErrorType;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
 import java.time.LocalDateTime;
@@ -119,9 +120,11 @@ public class ImapMailClient implements MailClient {
             inbox.open(Folder.READ_ONLY);
             int unread = inbox.getUnreadMessageCount();
             inbox.close(false);
-            return new MailConnectionTestResult(true, "INBOX unread: " + unread, connectionTarget());
+            return MailConnectionTestResult.connected("imap", null, null, null, false, true,
+                    "INBOX unread: " + unread, connectionTarget());
         } catch (Exception e) {
-            return new MailConnectionTestResult(false, e.getMessage(), connectionTarget());
+            return MailConnectionTestResult.failed("imap", null, MailConnectionErrorType.UNKNOWN,
+                    "Connection failed", e.getMessage(), connectionTarget());
         }
     }
 

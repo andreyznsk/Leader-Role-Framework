@@ -7,6 +7,7 @@ import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.model.ControlAuditEntry;
 import ru.andreyz.mailagent.model.ControlSettingsResponse;
 import ru.andreyz.mailagent.model.ControlSettingsStatusResponse;
+import ru.andreyz.mailagent.model.MailConnectionTestRequest;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 import ru.andreyz.mailagent.model.ControlStatusResponse;
 
@@ -19,11 +20,14 @@ public class MailAgentControlService {
 
     private final MailClient mailClient;
     private final MailRuntimeConfigService runtimeConfigService;
+    private final MailConnectionTestService mailConnectionTestService;
 
     public MailAgentControlService(MailClient mailClient,
-                                   MailRuntimeConfigService runtimeConfigService) {
+                                   MailRuntimeConfigService runtimeConfigService,
+                                   MailConnectionTestService mailConnectionTestService) {
         this.mailClient = mailClient;
         this.runtimeConfigService = runtimeConfigService;
+        this.mailConnectionTestService = mailConnectionTestService;
     }
 
     public void applyEnabled(Boolean enabled) {
@@ -48,8 +52,8 @@ public class MailAgentControlService {
         return runtimeConfigService.audit();
     }
 
-    public MailConnectionTestResult testConnection() {
-        MailConnectionTestResult result = mailClient.testConnection();
+    public MailConnectionTestResult testConnection(MailConnectionTestRequest request) {
+        MailConnectionTestResult result = mailConnectionTestService.testConnection(request);
         if (result.success()) {
             log.info("Mail plugin connection test succeeded: {} ({})", result.message(), result.target());
         } else {

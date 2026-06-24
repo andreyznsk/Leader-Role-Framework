@@ -8,6 +8,7 @@ import ru.andreyz.mailagent.model.ControlAuditEntry;
 import ru.andreyz.mailagent.model.ControlSettingsDescriptor;
 import ru.andreyz.mailagent.model.ControlSettingsResponse;
 import ru.andreyz.mailagent.model.ControlSettingsStatusResponse;
+import ru.andreyz.mailagent.model.MailAuthType;
 import ru.andreyz.mailagent.model.ControlStatusResponse;
 
 import java.time.LocalDateTime;
@@ -26,6 +27,7 @@ public class MailRuntimeConfigService {
 
     public static final String SECRET_MASK = "*****";
     private static final List<String> PROTOCOL_OPTIONS = List.of("maildev", "imap", "ews");
+    private static final List<String> AUTH_TYPE_OPTIONS = List.of("BASIC", "NTLM", "OAUTH2");
     private static final String PLUGIN_CODE = "mail";
     private static final String PLUGIN_NAME = "Mail Agent";
 
@@ -48,6 +50,7 @@ public class MailRuntimeConfigService {
                 blankToEmpty(mailProperties.getUsername()),
                 blankToNull(mailProperties.getPassword()),
                 blankToEmpty(ewsProperties.getUrl()),
+                MailAuthType.fromValue(ewsProperties.getAuthType(), MailAuthType.BASIC),
                 blankToEmpty(imapProperties.getHost()),
                 imapProperties.getPort(),
                 imapProperties.isSsl(),
@@ -74,6 +77,8 @@ public class MailRuntimeConfigService {
         settings.put("password", descriptor(hasPassword(config) ? SECRET_MASK : "", "secret",
                 "Password / secret", null, true, true, false, null));
         settings.put("serverUrl", descriptor(config.serverUrl(), "string", "Server URL", null, true, false, false, null));
+        settings.put("authType", descriptor(config.authType().name(), "select", "Authentication Type",
+                "BASIC and NTLM are supported. OAUTH2 is planned.", true, false, true, AUTH_TYPE_OPTIONS));
         settings.put("host", descriptor(config.host(), "string", "Host", null, true, false, false, null));
         settings.put("port", descriptor(String.valueOf(config.port()), "number", "Port", null, true, false, false, null));
         settings.put("ssl", descriptor(bool(config.ssl()), "boolean", "Use SSL / TLS", null, true, false, false, null));
@@ -104,6 +109,7 @@ public class MailRuntimeConfigService {
         String login = parseString(incoming, "login", previous.login());
         String password = parseSecret(incoming, "password", previous.password());
         String serverUrl = parseString(incoming, "serverUrl", previous.serverUrl());
+        MailAuthType authType = parseAuthType(incoming.get("authType"), previous.authType());
         String host = parseString(incoming, "host", previous.host());
         int port = parseInt(incoming, "port", previous.port(), false);
         boolean ssl = parseBoolean(incoming, "ssl", previous.ssl());
@@ -121,6 +127,7 @@ public class MailRuntimeConfigService {
                 login,
                 password,
                 serverUrl,
+                authType,
                 host,
                 port,
                 ssl,
@@ -217,6 +224,7 @@ public class MailRuntimeConfigService {
         maybeAdd(changed, "login", previous.login(), updated.login());
         maybeAdd(changed, "password", previous.password(), updated.password());
         maybeAdd(changed, "serverUrl", previous.serverUrl(), updated.serverUrl());
+        maybeAdd(changed, "authType", previous.authType(), updated.authType());
         maybeAdd(changed, "host", previous.host(), updated.host());
         maybeAdd(changed, "port", previous.port(), updated.port());
         maybeAdd(changed, "ssl", previous.ssl(), updated.ssl());
@@ -242,6 +250,7 @@ public class MailRuntimeConfigService {
         applied.put("protocol", config.protocol());
         applied.put("login", config.login());
         applied.put("serverUrl", config.serverUrl());
+        applied.put("authType", config.authType().name());
         applied.put("host", config.host());
         applied.put("port", String.valueOf(config.port()));
         applied.put("ssl", bool(config.ssl()));
@@ -265,6 +274,17 @@ public class MailRuntimeConfigService {
 
     private boolean hasPassword(MailRuntimeConfig config) {
         return config.password() != null && !config.password().isBlank();
+    }
+
+    private MailAuthType parseAuthType(String value, MailAuthType fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        try {
+            return MailAuthType.fromValue(value, fallback);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Unsupported authType: " + value);
+        }
     }
 
     private String parseProtocol(String value, String fallback) {

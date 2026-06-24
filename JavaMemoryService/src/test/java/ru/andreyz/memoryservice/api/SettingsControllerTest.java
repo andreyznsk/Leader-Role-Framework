@@ -60,7 +60,8 @@ class SettingsControllerTest {
         mockMvc.perform(get("/api/settings/control/plugins/mail/settings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pluginCode").value("mail"))
-                .andExpect(jsonPath("$.settings.protocol.options[0]").value("maildev"));
+                .andExpect(jsonPath("$.settings.protocol.options[0]").value("maildev"))
+                .andExpect(jsonPath("$.settings.authType.options[1]").value("NTLM"));
 
         mockMvc.perform(get("/api/settings/control/plugins/rag/settings"))
                 .andExpect(status().isOk())
@@ -153,9 +154,22 @@ class SettingsControllerTest {
 
     @Test
     void legacyTestMailConnectionUsesStubbedMailAgent() throws Exception {
-        mockMvc.perform(post("/api/settings/plugins/mail/test-connection"))
+        mockMvc.perform(post("/api/settings/control/plugins/mail/test-connection")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "protocol": "ews",
+                                  "ewsUrl": "https://exchange.example.com/EWS/Exchange.asmx",
+                                  "username": "reader@example.com",
+                                  "authType": "NTLM",
+                                  "folderExclude": ["Inbox/CI/CD"]
+                                }
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("MailAgent stub OK"));
+                .andExpect(jsonPath("$.status").value("CONNECTED"))
+                .andExpect(jsonPath("$.authType").value("NTLM"))
+                .andExpect(jsonPath("$.foldersFound").value(127))
+                .andExpect(jsonPath("$.message").value("Connected"));
     }
 }

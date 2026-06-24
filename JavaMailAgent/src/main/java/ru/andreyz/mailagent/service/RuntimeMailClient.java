@@ -9,6 +9,7 @@ import ru.andreyz.mailagent.client.MailException;
 import ru.andreyz.mailagent.client.MaildevClient;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.model.MailConnectionErrorType;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
 import java.util.List;
@@ -54,7 +55,14 @@ public class RuntimeMailClient implements MailClient {
         try {
             return delegateChecked().testConnection();
         } catch (Exception e) {
-            return new MailConnectionTestResult(false, e.getMessage(), runtimeConfigService.snapshot().protocol());
+            return MailConnectionTestResult.failed(
+                    runtimeConfigService.snapshot().protocol(),
+                    runtimeConfigService.snapshot().authType().name(),
+                    MailConnectionErrorType.UNKNOWN,
+                    "Connection failed",
+                    e.getMessage(),
+                    runtimeConfigService.snapshot().protocol()
+            );
         }
     }
 
@@ -86,6 +94,7 @@ public class RuntimeMailClient implements MailClient {
         properties.setUrl(config.serverUrl());
         properties.setAutodiscover(baseEwsProperties.isAutodiscover());
         properties.setDomain(baseEwsProperties.getDomain());
+        properties.setAuthType(config.authType().name());
         properties.setVersion(baseEwsProperties.getVersion());
         properties.setTimeoutSeconds(baseEwsProperties.getTimeoutSeconds());
         return properties;

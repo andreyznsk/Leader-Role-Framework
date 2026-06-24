@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.dto.MailPluginConfigDto;
+import ru.andreyz.memoryservice.dto.MailAgentConnectionTestRequestDto;
 import ru.andreyz.memoryservice.dto.PluginHeartbeatRequest;
 import ru.andreyz.memoryservice.dto.PluginSettingsDto;
 import ru.andreyz.memoryservice.dto.PluginSummaryDto;
@@ -149,8 +150,8 @@ public class PluginSettingsService {
         return getPluginSettings(plugin.code());
     }
 
-    public ru.andreyz.memoryservice.dto.MailAgentConnectionTestResultDto testMailAgentConnection() {
-        return mailAgentControlClient.testConnection();
+    public ru.andreyz.memoryservice.dto.MailAgentConnectionTestResultDto testMailAgentConnection(MailAgentConnectionTestRequestDto request) {
+        return mailAgentControlClient.testConnection(request);
     }
 
     public MailPluginConfigDto getMailAgentConfig() {

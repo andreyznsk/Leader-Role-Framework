@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.ControlSettingsResponse;
 import ru.andreyz.mailagent.model.ControlSettingsStatusResponse;
+import ru.andreyz.mailagent.model.MailAuthType;
 import ru.andreyz.mailagent.model.ControlStatusResponse;
 
 import java.util.List;
@@ -51,6 +52,7 @@ class MailRuntimeConfigServiceTest {
         assertTrue(response.settings().containsKey("enabled"));
         assertEquals("*****", response.settings().get("password").value());
         assertEquals(List.of("maildev", "imap", "ews"), response.settings().get("protocol").options());
+        assertEquals(List.of("BASIC", "NTLM", "OAUTH2"), response.settings().get("authType").options());
     }
 
     @Test
@@ -60,18 +62,21 @@ class MailRuntimeConfigServiceTest {
                 "protocol", "ews",
                 "password", "new-secret",
                 "serverUrl", "https://exchange.example.com/EWS/Exchange.asmx",
+                "authType", "NTLM",
                 "foldersExclude", "Inbox/CI/CD\nJunk Email"
         ));
 
         assertEquals("APPLIED", response.status());
         assertEquals("false", response.applied().get("enabled"));
         assertEquals("ews", response.applied().get("protocol"));
+        assertEquals("NTLM", response.applied().get("authType"));
         assertFalse(response.applied().containsKey("password"));
         assertEquals("secret value accepted but not returned", response.ignored().get("password"));
 
         ControlStatusResponse status = service.status();
         assertFalse(status.enabled());
         assertEquals("ews", status.protocol());
+        assertEquals(MailAuthType.NTLM, service.snapshot().authType());
 
         verify(auditStore).save(eq(2L), any(), any(), any(), eq("APPLIED"), any());
     }

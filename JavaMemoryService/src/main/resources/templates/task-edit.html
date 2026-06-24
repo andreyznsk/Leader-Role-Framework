@@ -40,6 +40,11 @@
                 <textarea id="md-input" name="description" class="form-control"
                           rows="10" style="font-family:monospace"
                           th:text="${description}"></textarea>
+                <!-- Links preview (CR-MEM-009) -->
+                <div id="task-editor-links" class="task-editor-links mt-2 d-none">
+                    <div class="task-editor-links-label">Ссылки из описания:</div>
+                    <ul id="task-editor-links-list"></ul>
+                </div>
             </div>
             <div id="pane-preview" class="border rounded p-3 d-none" style="min-height:200px">
                 <div id="md-preview-content"></div>
@@ -122,10 +127,11 @@ function showTab(tab) {
     }
 }
 
-// Minimal markdown renderer (headings, bold, italic, lists, code, newlines)
+// Minimal markdown renderer (headings, bold, italic, lists, code, links, newlines)
 function simpleMarkdown(md) {
     return md
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/(https?:\/\/[^\s<>"']+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
         .replace(/^#{3} (.+)$/gm, '<h5>$1</h5>')
         .replace(/^#{2} (.+)$/gm, '<h4>$1</h4>')
         .replace(/^# (.+)$/gm, '<h3>$1</h3>')
@@ -136,6 +142,32 @@ function simpleMarkdown(md) {
         .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
         .replace(/\n\n/g, '</p><p>')
         .replace(/\n/g, '<br>');
+}
+
+// Links preview: extract URLs from textarea, render as clickable links
+function updateLinksPreview() {
+    const text = document.getElementById('md-input').value;
+    const urlRegex = /https?:\/\/[^\s<>"']+/g;
+    const matches = text.match(urlRegex) || [];
+    const unique = [...new Set(matches)];
+    const container = document.getElementById('task-editor-links');
+    const list = document.getElementById('task-editor-links-list');
+    while (list.firstChild) list.removeChild(list.firstChild);
+    if (unique.length === 0) {
+        container.classList.add('d-none');
+        return;
+    }
+    unique.forEach(function(url) {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = url;
+        a.textContent = url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        li.appendChild(a);
+        list.appendChild(li);
+    });
+    container.classList.remove('d-none');
 }
 
 // Double-confirm delete
@@ -159,6 +191,12 @@ function confirmDelete(btn) {
         btn.classList.replace('btn-danger', 'btn-outline-danger');
     }, 3000);
 }
+
+// Wire links preview to textarea changes and initial load
+document.addEventListener('DOMContentLoaded', function() {
+    updateLinksPreview();
+    document.getElementById('md-input').addEventListener('input', updateLinksPreview);
+});
 
 // Status radio pill styling
 document.querySelectorAll('.status-radio').forEach(radio => {
