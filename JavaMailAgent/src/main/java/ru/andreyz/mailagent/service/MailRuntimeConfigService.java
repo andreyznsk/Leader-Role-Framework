@@ -77,12 +77,16 @@ public class MailRuntimeConfigService {
         settings.put("login", descriptor(config.login(), "string", "Login", null, true, false, false, null));
         settings.put("password", descriptor(hasPassword(config) ? SECRET_MASK : "", "secret",
                 "Password / secret", null, true, true, false, null));
-        settings.put("serverUrl", descriptor(config.serverUrl(), "string", "Server URL", null, true, false, false, null));
+        settings.put("serverUrl", descriptor(config.serverUrl(), "string", "Server URL",
+                "Used for Exchange EWS only. Example: https://outlook.domain.ru/EWS/Exchange.asmx", true, false, false, null));
         settings.put("authType", descriptor(config.authType().name(), "select", "Authentication Type",
-                "BASIC and NTLM are supported. OAUTH2 is planned.", true, false, true, AUTH_TYPE_OPTIONS));
-        settings.put("host", descriptor(config.host(), "string", "Host", null, true, false, false, null));
-        settings.put("port", descriptor(String.valueOf(config.port()), "number", "Port", null, true, false, false, null));
-        settings.put("ssl", descriptor(bool(config.ssl()), "boolean", "Use SSL / TLS", null, true, false, false, null));
+                "Used for Exchange EWS authentication. BASIC and NTLM are supported. OAUTH2 is planned.", true, false, true, AUTH_TYPE_OPTIONS));
+        settings.put("host", descriptor(config.host(), "string", "Host",
+                "Used for IMAP only. Example: imap.company.com", true, false, false, null));
+        settings.put("port", descriptor(String.valueOf(config.port()), "number", "Port",
+                "Used for IMAP only. Typical value: 993 for IMAPS.", true, false, false, null));
+        settings.put("ssl", descriptor(bool(config.ssl()), "boolean", "Use SSL / TLS",
+                "Used for IMAP only. Enable for secure IMAPS connection.", true, false, false, null));
         settings.put("pollIntervalSeconds", descriptor(String.valueOf(config.pollIntervalSeconds()), "number",
                 "Poll interval seconds", null, true, false, true, null));
         settings.put("foldersInclude", descriptor(joinLines(config.foldersInclude()), "list", "Folders include",

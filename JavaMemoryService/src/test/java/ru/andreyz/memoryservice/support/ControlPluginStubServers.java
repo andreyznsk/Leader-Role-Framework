@@ -137,6 +137,7 @@ public final class ControlPluginStubServers {
                           "value": "https://exchange.example.com/EWS/Exchange.asmx",
                           "type": "string",
                           "label": "Server URL",
+                          "description": "Used for Exchange EWS only. Example: https://outlook.domain.ru/EWS/Exchange.asmx",
                           "editable": true,
                           "secret": false,
                           "required": false
@@ -145,7 +146,7 @@ public final class ControlPluginStubServers {
                           "value": "%s",
                           "type": "select",
                           "label": "Authentication Type",
-                          "description": "BASIC and NTLM are supported. OAUTH2 is planned.",
+                          "description": "Used for Exchange EWS authentication. BASIC and NTLM are supported. OAUTH2 is planned.",
                           "editable": true,
                           "secret": false,
                           "required": true,
@@ -155,6 +156,7 @@ public final class ControlPluginStubServers {
                           "value": "imap.example.com",
                           "type": "string",
                           "label": "Host",
+                          "description": "Used for IMAP only. Example: imap.company.com",
                           "editable": true,
                           "secret": false,
                           "required": false
@@ -163,6 +165,7 @@ public final class ControlPluginStubServers {
                           "value": "993",
                           "type": "number",
                           "label": "Port",
+                          "description": "Used for IMAP only. Typical value: 993 for IMAPS.",
                           "editable": true,
                           "secret": false,
                           "required": false
@@ -171,6 +174,7 @@ public final class ControlPluginStubServers {
                           "value": "true",
                           "type": "boolean",
                           "label": "Use SSL / TLS",
+                          "description": "Used for IMAP only. Enable for secure IMAPS connection.",
                           "editable": true,
                           "secret": false,
                           "required": false

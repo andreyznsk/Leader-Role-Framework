@@ -51,6 +51,9 @@ class SettingsUiTest {
                 .andExpect(content().string(containsString("data-plugin-field=\"authType\"")))
                 .andExpect(content().string(containsString("data-plugin-field=\"host\"")))
                 .andExpect(content().string(containsString("data-plugin-field=\"port\"")))
+                .andExpect(content().string(containsString("data-protocol-scope=\"ews\"")))
+                .andExpect(content().string(containsString("data-protocol-scope=\"imap\"")))
+                .andExpect(content().string(containsString("updateProtocolScopedFields")))
                 .andExpect(content().string(containsString("Detect Endpoint")))
                 .andExpect(content().string(containsString("Test Connection")))
                 .andExpect(content().string(containsString("data-detect-url=\"/api/settings/control/plugins/mail/detect-endpoint\"")))
@@ -60,6 +63,8 @@ class SettingsUiTest {
                 .andExpect(content().string(containsString("data-mail-test-modal-message")))
                 .andExpect(content().string(containsString("Success")))
                 .andExpect(content().string(containsString("Fail")))
+                .andExpect(content().string(containsString("Used for Exchange EWS only")))
+                .andExpect(content().string(containsString("Used for IMAP only")))
                 .andExpect(content().string(containsString("Folders exclude")))
                 .andExpect(content().string(containsString("Scan interval seconds")));
     }
