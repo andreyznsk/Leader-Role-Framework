@@ -18,8 +18,10 @@ spring:
           top-k: 20
 
 mail:
-  protocol: maildev
+  protocol: ews
   poll-interval-seconds: 30
+  username: test
+  password: test
 
 maildev:
   api-url: http://172.80.2.1:18080
