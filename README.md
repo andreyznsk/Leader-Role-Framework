@@ -170,9 +170,32 @@ local → Maildev (Docker), разработка
 dev   → IMAP, тестовый сервер
 prod  → Exchange EWS, рабочий ПК
 
-### EWS test connection
+### EWS diagnostics
 
-Mail Agent settings in `http://localhost:8082/ui/settings` now expose `Authentication Type` (`BASIC`, `NTLM`, `OAUTH2`) and a `Test Connection` action.
+Mail Agent settings in `http://localhost:8082/ui/settings` now expose:
+- `Authentication Type` (`BASIC`, `NTLM`, `OAUTH2`)
+- `Detect Endpoint`
+- `Test Connection`
+
+For `Protocol = EWS`, UI defaults `Authentication Type` to `NTLM`.
+
+Endpoint detection:
+
+```http
+POST /api/settings/control/plugins/mail/detect-endpoint
+Content-Type: application/json
+```
+
+Example payload:
+
+```json
+{
+  "protocol": "ews",
+  "ewsUrl": "https://outlook.domain.ru/EWS/Exchange.asmx"
+}
+```
+
+This checks HTTPS reachability and whether the URL looks like a real EWS/WCF service. It does not require credentials and recommends `NTLM` for EWS.
 
 Browser-facing endpoint:
 
@@ -194,7 +217,7 @@ Example payload:
 }
 ```
 
-The request validates connectivity only. It does not start polling, write `processed_emails`, or flip read/unread state. Empty `password` means reuse the already stored secret. `OAUTH2` is visible in UI as planned and currently returns a not-supported result from backend.
+The authenticated test validates connectivity only. It does not start polling, write `processed_emails`, or flip read/unread state. Empty `password` means reuse the already stored secret. `OAUTH2` is visible in UI as planned and currently returns a not-supported result from backend.
 
 
 ## Структура проекта

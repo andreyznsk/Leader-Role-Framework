@@ -101,7 +101,7 @@ public class MailConfig {
         private String url;
         private boolean autodiscover = false;
         private String domain;
-        private String authType = "BASIC";
+        private String authType = "NTLM";
         private String version = "Exchange2010_SP2";
         private int timeoutSeconds = 30;
 

@@ -12,6 +12,8 @@ import ru.andreyz.mailagent.model.ControlSettingsResponse;
 import ru.andreyz.mailagent.model.ControlSettingsStatusResponse;
 import ru.andreyz.mailagent.model.ControlSettingsUpdateRequest;
 import ru.andreyz.mailagent.model.ControlStatusResponse;
+import ru.andreyz.mailagent.model.MailEndpointDetectRequest;
+import ru.andreyz.mailagent.model.MailEndpointDetectResult;
 import ru.andreyz.mailagent.model.MailConnectionTestRequest;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 import ru.andreyz.mailagent.model.MailPluginStateRequest;
@@ -54,6 +56,14 @@ public class ControlPlaneController {
     public ResponseEntity<Map<String, Object>> pluginState(@RequestBody(required = false) MailPluginStateRequest request) {
         controlService.applyEnabled(request != null ? request.enabled() : null);
         return ResponseEntity.ok(Map.of("accepted", true));
+    }
+
+    @PostMapping("/detect-endpoint")
+    public ResponseEntity<MailEndpointDetectResult> detectEndpoint(@RequestBody(required = false) MailEndpointDetectRequest request) {
+        MailEndpointDetectResult result = controlService.detectEndpoint(request);
+        return result.success()
+                ? ResponseEntity.ok(result)
+                : ResponseEntity.status(500).body(result);
     }
 
     @PostMapping("/test-connection")

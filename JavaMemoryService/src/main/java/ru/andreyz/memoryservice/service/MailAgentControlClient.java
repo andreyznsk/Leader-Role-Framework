@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import ru.andreyz.memoryservice.dto.MailAgentEndpointDetectRequestDto;
+import ru.andreyz.memoryservice.dto.MailAgentEndpointDetectResultDto;
 import ru.andreyz.memoryservice.dto.MailAgentConnectionTestRequestDto;
 import ru.andreyz.memoryservice.dto.MailAgentConnectionTestResultDto;
 
@@ -65,8 +67,25 @@ public class MailAgentControlClient {
             }
             return objectMapper.readValue(response.body(), MailAgentConnectionTestResultDto.class);
         } catch (Exception e) {
-            return new MailAgentConnectionTestResultDto(false, "FAILED", null, null, null, null, null, null,
-                    fallbackMessage(e), "UNKNOWN", fallbackMessage(e), baseUrl, baseUrl);
+            return new MailAgentConnectionTestResultDto(false, "FAILED", null, null, null, null, false,
+                    null, null, null, null, null, null, fallbackMessage(e), "UNKNOWN", fallbackMessage(e), baseUrl, baseUrl);
+        }
+    }
+
+    public MailAgentEndpointDetectResultDto detectEndpoint(MailAgentEndpointDetectRequestDto requestDto) {
+        try {
+            String body = requestDto != null ? objectMapper.writeValueAsString(requestDto) : "";
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/control/detect-endpoint"))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Content-Type", "application/json")
+                    .POST(body.isEmpty() ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            return objectMapper.readValue(response.body(), MailAgentEndpointDetectResultDto.class);
+        } catch (Exception e) {
+            return new MailAgentEndpointDetectResultDto(false, "FAILED", null, false, false, false,
+                    null, "NTLM", fallbackMessage(e), "UNKNOWN", fallbackMessage(e), baseUrl);
         }
     }
 

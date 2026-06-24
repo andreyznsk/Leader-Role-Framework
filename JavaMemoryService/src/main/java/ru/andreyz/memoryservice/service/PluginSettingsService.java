@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.dto.MailPluginConfigDto;
+import ru.andreyz.memoryservice.dto.MailAgentEndpointDetectRequestDto;
+import ru.andreyz.memoryservice.dto.MailAgentEndpointDetectResultDto;
 import ru.andreyz.memoryservice.dto.MailAgentConnectionTestRequestDto;
 import ru.andreyz.memoryservice.dto.PluginHeartbeatRequest;
 import ru.andreyz.memoryservice.dto.PluginSettingsDto;
@@ -152,6 +154,10 @@ public class PluginSettingsService {
 
     public ru.andreyz.memoryservice.dto.MailAgentConnectionTestResultDto testMailAgentConnection(MailAgentConnectionTestRequestDto request) {
         return mailAgentControlClient.testConnection(request);
+    }
+
+    public MailAgentEndpointDetectResultDto detectMailEndpoint(MailAgentEndpointDetectRequestDto request) {
+        return mailAgentControlClient.detectEndpoint(request);
     }
 
     public MailPluginConfigDto getMailAgentConfig() {

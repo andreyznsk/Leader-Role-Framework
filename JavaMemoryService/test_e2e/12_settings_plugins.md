@@ -62,8 +62,18 @@ curl -s "http://localhost:8082/api/settings/plugins"
 ```
 **Expected:** Mail plugin status becomes `UP` and `lastHeartbeatAt` is populated
 
-### Step 6 — Trigger connection test
+### Step 6 — Detect endpoint
 ```bash
-curl -s -X POST "http://localhost:8082/api/settings/plugins/mail/test-connection"
+curl -s -X POST "http://localhost:8082/api/settings/control/plugins/mail/detect-endpoint" \
+  -H "Content-Type: application/json" \
+  -d '{"protocol":"ews","ewsUrl":"https://exchange.example.com/EWS/Exchange.asmx"}'
 ```
-**Expected:** response contains `success` boolean and `message`
+**Expected:** response contains `success`, `status=DETECTED`, `recommendedAuthType`
+
+### Step 7 — Trigger connection test
+```bash
+curl -s -X POST "http://localhost:8082/api/settings/control/plugins/mail/test-connection" \
+  -H "Content-Type: application/json" \
+  -d '{"protocol":"ews","ewsUrl":"https://exchange.example.com/EWS/Exchange.asmx","username":"reader@example.com","authType":"NTLM"}'
+```
+**Expected:** response contains `success`, `status=CONNECTED`, `authType`, `foldersFound`

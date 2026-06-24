@@ -4,8 +4,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.config.MailConfig;
-import ru.andreyz.mailagent.model.MailAuthType;
 import ru.andreyz.mailagent.model.MailConnectionErrorType;
+import ru.andreyz.mailagent.model.MailEndpointDetectRequest;
+import ru.andreyz.mailagent.model.MailEndpointDetectResult;
 import ru.andreyz.mailagent.model.MailConnectionTestRequest;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
@@ -19,6 +20,7 @@ class MailConnectionTestServiceTest {
     private MailRuntimeConfigService runtimeConfigService;
     private MailConnectionTestService service;
     private CapturingEwsConnectionTester ewsConnectionTester;
+    private StubEwsEndpointDetector endpointDetector;
 
     @BeforeEach
     void setUp() {
@@ -31,17 +33,19 @@ class MailConnectionTestServiceTest {
         MailConfig.ImapProperties imap = new MailConfig.ImapProperties();
         MailConfig.EwsProperties ews = new MailConfig.EwsProperties();
         ews.setUrl("https://exchange.example.com/EWS/Exchange.asmx");
-        ews.setAuthType("BASIC");
+        ews.setAuthType("NTLM");
         MailConfig.FolderProperties folders = new MailConfig.FolderProperties();
 
         runtimeConfigService = new MailRuntimeConfigService(mail, paths, imap, ews, folders, mock(MailControlAuditStore.class));
         ewsConnectionTester = new CapturingEwsConnectionTester();
+        endpointDetector = new StubEwsEndpointDetector();
         service = new MailConnectionTestService(
                 runtimeConfigService,
                 mock(MailClient.class),
                 ews,
                 imap,
-                ewsConnectionTester
+                ewsConnectionTester,
+                endpointDetector
         );
     }
 
@@ -67,7 +71,8 @@ class MailConnectionTestServiceTest {
                 mock(MailClient.class),
                 ews,
                 imap,
-                ewsConnectionTester
+                ewsConnectionTester,
+                endpointDetector
         );
 
         MailConnectionTestResult result = blankUrlService.testConnection(new MailConnectionTestRequest(
@@ -128,6 +133,19 @@ class MailConnectionTestServiceTest {
             }
             return MailConnectionTestResult.connected("ews", "Exchange2010_SP2", ewsProperties.getAuthType(),
                     1, false, true, "Connected", ewsProperties.getUrl());
+        }
+    }
+
+    private static class StubEwsEndpointDetector extends EwsEndpointDetector {
+        @Override
+        public MailEndpointDetectResult detect(MailEndpointDetectRequest request) {
+            String endpoint = request != null ? request.ewsUrl() : null;
+            if (endpoint == null || endpoint.isBlank()) {
+                return MailEndpointDetectResult.failed("ews", false, false, false, null,
+                        MailConnectionErrorType.INVALID_ENDPOINT, "EWS endpoint is required", "Endpoint URL is blank", endpoint);
+            }
+            return MailEndpointDetectResult.detected("ews", true, true, true, 200, "NTLM",
+                    "EWS endpoint detected", endpoint);
         }
     }
 }

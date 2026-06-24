@@ -117,7 +117,7 @@
             <form th:if="${panel.descriptor() != null}"
                   method="post"
                   th:action="'/ui/settings/plugins/' + ${panel.plugin().code()}"
-                  th:attr="data-plugin-code=${panel.plugin().code()},data-api-url=${'/api/settings/control/plugins/' + panel.plugin().code() + '/settings'},data-test-url=${panel.plugin().code() == 'mail' ? '/api/settings/control/plugins/mail/test-connection' : null},data-api-custom-handler='true'"
+                  th:attr="data-plugin-code=${panel.plugin().code()},data-api-url=${'/api/settings/control/plugins/' + panel.plugin().code() + '/settings'},data-detect-url=${panel.plugin().code() == 'mail' ? '/api/settings/control/plugins/mail/detect-endpoint' : null},data-test-url=${panel.plugin().code() == 'mail' ? '/api/settings/control/plugins/mail/test-connection' : null},data-api-custom-handler='true'"
                   class="row g-3">
                 <div th:each="entry : ${panel.descriptor().settings()}" class="col-12">
                     <div class="los-plugin-field" th:with="field=${entry.value}, key=${entry.key}">
@@ -201,6 +201,9 @@
                         Version <span th:text="${panel.descriptor().version()}">1</span>
                     </div>
                     <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <button th:if="${panel.plugin().code() == 'mail'}" type="button" class="btn btn-outline-secondary" data-detect-endpoint-button>
+                            Detect Endpoint
+                        </button>
                         <button th:if="${panel.plugin().code() == 'mail'}" type="button" class="btn btn-outline-secondary" data-test-connection-button>
                             Test Connection
                         </button>
@@ -301,22 +304,50 @@
             };
         }
 
-        function showTestResultModal(result) {
+        function mailDetectPayload(form) {
+            const payload = formToPayload(form).settings;
+            return {
+                protocol: payload.protocol || null,
+                ewsUrl: payload.serverUrl || null
+            };
+        }
+
+        function showResultModal(result, mode) {
             if (!testConnectionModal || !modalTitle || !modalMessage || !modalDetails) {
                 return;
             }
             const lines = [];
-            if (result.success) {
+            if (result.success && mode === 'detect') {
+                modalTitle.textContent = 'Success';
+                lines.push('Endpoint detected');
+                lines.push('Endpoint: OK');
+                lines.push('HTTPS: ' + (result.httpsOk ? 'OK' : 'Fail'));
+                lines.push('EWS Service: ' + (result.ewsDetected ? 'Detected' : 'Not detected'));
+                if (result.recommendedAuthType) {
+                    lines.push('Recommended Auth: ' + result.recommendedAuthType);
+                }
+                modalDetails.textContent = result.endpoint ? 'Endpoint: ' + result.endpoint : '';
+            } else if (result.success) {
                 modalTitle.textContent = 'Success';
                 lines.push('Connected');
+                lines.push('Endpoint: ' + (result.endpointReachable ? 'OK' : 'Fail'));
+                lines.push('Authentication: ' + (result.authenticationOk ? 'OK' : 'Fail'));
                 if (result.exchangeVersion) lines.push('Exchange Version: ' + result.exchangeVersion);
                 if (result.authType) lines.push('Auth: ' + result.authType);
+                if (result.mailbox) lines.push('Mailbox: ' + result.mailbox);
+                if (result.inboxFound !== null && result.inboxFound !== undefined) lines.push('Inbox: ' + (result.inboxFound ? 'OK' : 'Fail'));
                 if (result.foldersFound !== null && result.foldersFound !== undefined) lines.push('Folders found: ' + result.foldersFound);
                 modalDetails.textContent = result.endpoint ? 'Endpoint: ' + result.endpoint : '';
             } else {
                 modalTitle.textContent = 'Fail';
                 lines.push(result.message || 'Connection failed');
-                if (result.authType) lines.push('Auth: ' + result.authType);
+                if (mode === 'detect') {
+                    if (result.httpsOk !== undefined) lines.push('HTTPS: ' + (result.httpsOk ? 'OK' : 'Fail'));
+                    if (result.ewsDetected !== undefined) lines.push('EWS Service: ' + (result.ewsDetected ? 'Detected' : 'Not detected'));
+                } else {
+                    if (result.endpointReachable !== null && result.endpointReachable !== undefined) lines.push('Endpoint: ' + (result.endpointReachable ? 'OK' : 'Fail'));
+                    if (result.authType) lines.push('Auth: ' + result.authType);
+                }
                 if (result.endpoint) lines.push('Endpoint: ' + result.endpoint);
                 if (result.details) lines.push('Details: ' + result.details);
                 modalDetails.textContent = result.errorType ? 'Error Type: ' + result.errorType : '';
@@ -326,6 +357,23 @@
         }
 
         document.querySelectorAll('form[data-api-url]').forEach(function (form) {
+            const protocolSelect = form.querySelector('[data-plugin-field="protocol"]');
+            const authTypeSelect = form.querySelector('[data-plugin-field="authType"]');
+            if (authTypeSelect) {
+                authTypeSelect.dataset.userTouched = 'false';
+                authTypeSelect.addEventListener('change', function () {
+                    authTypeSelect.dataset.userTouched = 'true';
+                });
+            }
+            if (protocolSelect && authTypeSelect) {
+                protocolSelect.addEventListener('change', function () {
+                    const isEws = (protocolSelect.value || '').toLowerCase() === 'ews';
+                    if (isEws && authTypeSelect.dataset.userTouched !== 'true') {
+                        authTypeSelect.value = 'NTLM';
+                    }
+                });
+            }
+
             form.addEventListener('submit', async function (event) {
                 event.preventDefault();
 
@@ -347,6 +395,36 @@
                 }
             });
 
+            const detectButton = form.querySelector('[data-detect-endpoint-button]');
+            if (detectButton && form.dataset.detectUrl) {
+                detectButton.addEventListener('click', async function () {
+                    const pluginCode = form.dataset.pluginCode || 'plugin';
+                    updateStatus(pluginCode, 'Detecting endpoint...', false);
+                    detectButton.disabled = true;
+                    try {
+                        const result = await window.LeaderUiApi.request(form.dataset.detectUrl, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(mailDetectPayload(form))
+                        });
+                        showResultModal(result.data, 'detect');
+                        const authTypeField = form.querySelector('[data-plugin-field="authType"]');
+                        if (authTypeField && !authTypeField.value) {
+                            authTypeField.value = result.data.recommendedAuthType || 'NTLM';
+                        }
+                        updateStatus(pluginCode, 'Endpoint detection completed. HTTP ' + result.response.status + '.', !result.data.success);
+                    } catch (error) {
+                        const response = error && error.data ? error.data : null;
+                        if (response) {
+                            showResultModal(response, 'detect');
+                        }
+                        updateStatus(pluginCode, 'Endpoint detection failed.', true);
+                    } finally {
+                        detectButton.disabled = false;
+                    }
+                });
+            }
+
             const testButton = form.querySelector('[data-test-connection-button]');
             if (testButton && form.dataset.testUrl) {
                 testButton.addEventListener('click', async function () {
@@ -359,12 +437,12 @@
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify(mailTestPayload(form))
                         });
-                        showTestResultModal(result.data);
+                        showResultModal(result.data, 'test');
                         updateStatus(pluginCode, 'Connection test completed. HTTP ' + result.response.status + '.', !result.data.success);
                     } catch (error) {
                         const response = error && error.data ? error.data : null;
                         if (response) {
-                            showTestResultModal(response);
+                            showResultModal(response, 'test');
                         }
                         updateStatus(pluginCode, 'Connection test failed.', true);
                     } finally {

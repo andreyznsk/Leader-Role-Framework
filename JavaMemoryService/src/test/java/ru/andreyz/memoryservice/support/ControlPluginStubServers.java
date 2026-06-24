@@ -18,7 +18,7 @@ public final class ControlPluginStubServers {
 
     private static final AtomicReference<String> mailProtocol = new AtomicReference<>("maildev");
     private static final AtomicReference<String> mailEnabled = new AtomicReference<>("true");
-    private static final AtomicReference<String> mailAuthType = new AtomicReference<>("BASIC");
+    private static final AtomicReference<String> mailAuthType = new AtomicReference<>("NTLM");
     private static final AtomicReference<String> ragEnabled = new AtomicReference<>("true");
     private static final AtomicReference<String> ragScanInterval = new AtomicReference<>("60");
     private static final AtomicBoolean ragUnavailable = new AtomicBoolean(false);
@@ -44,6 +44,7 @@ public final class ControlPluginStubServers {
                     ]
                     """));
             mailServer.createContext("/api/control/plugin-state", exchange -> json(exchange, 200, "{\"accepted\":true}"));
+            mailServer.createContext("/api/control/detect-endpoint", ControlPluginStubServers::handleMailDetectEndpoint);
             mailServer.createContext("/api/control/test-connection", ControlPluginStubServers::handleMailTestConnection);
             mailServer.setExecutor(Executors.newCachedThreadPool());
             mailServer.start();
@@ -79,7 +80,7 @@ public final class ControlPluginStubServers {
     public static void reset() {
         mailProtocol.set("maildev");
         mailEnabled.set("true");
-        mailAuthType.set("BASIC");
+        mailAuthType.set("NTLM");
         ragEnabled.set("true");
         ragScanInterval.set("60");
         ragUnavailable.set(false);
@@ -317,8 +318,13 @@ public final class ControlPluginStubServers {
                   "success": true,
                   "status": "CONNECTED",
                   "protocol": "ews",
+                  "endpointReachable": true,
+                  "httpsOk": true,
+                  "ewsDetected": true,
+                  "authenticationOk": true,
                   "exchangeVersion": "Exchange2010_SP2",
                   "authType": "%s",
+                  "mailbox": "reader@example.com",
                   "foldersFound": 127,
                   "foldersScanLimited": false,
                   "inboxFound": true,
@@ -329,6 +335,25 @@ public final class ControlPluginStubServers {
                   "target": "https://exchange.example.com/EWS/Exchange.asmx"
                 }
                 """.formatted(authType));
+    }
+
+    private static void handleMailDetectEndpoint(HttpExchange exchange) throws IOException {
+        json(exchange, 200, """
+                {
+                  "success": true,
+                  "status": "DETECTED",
+                  "protocol": "ews",
+                  "endpointReachable": true,
+                  "httpsOk": true,
+                  "ewsDetected": true,
+                  "httpStatus": 200,
+                  "recommendedAuthType": "NTLM",
+                  "message": "EWS endpoint detected",
+                  "errorType": null,
+                  "details": null,
+                  "endpoint": "https://exchange.example.com/EWS/Exchange.asmx"
+                }
+                """);
     }
 
     private static void json(HttpExchange exchange, int status, String body) throws IOException {

@@ -61,6 +61,7 @@ class SettingsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pluginCode").value("mail"))
                 .andExpect(jsonPath("$.settings.protocol.options[0]").value("maildev"))
+                .andExpect(jsonPath("$.settings.authType.value").value("NTLM"))
                 .andExpect(jsonPath("$.settings.authType.options[1]").value("NTLM"));
 
         mockMvc.perform(get("/api/settings/control/plugins/rag/settings"))
@@ -171,5 +172,22 @@ class SettingsControllerTest {
                 .andExpect(jsonPath("$.authType").value("NTLM"))
                 .andExpect(jsonPath("$.foldersFound").value(127))
                 .andExpect(jsonPath("$.message").value("Connected"));
+    }
+
+    @Test
+    void detectMailEndpointUsesStubbedMailAgent() throws Exception {
+        mockMvc.perform(post("/api/settings/control/plugins/mail/detect-endpoint")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "protocol": "ews",
+                                  "ewsUrl": "https://exchange.example.com/EWS/Exchange.asmx"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.status").value("DETECTED"))
+                .andExpect(jsonPath("$.recommendedAuthType").value("NTLM"))
+                .andExpect(jsonPath("$.message").value("EWS endpoint detected"));
     }
 }

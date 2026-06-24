@@ -7,6 +7,8 @@ import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.model.ControlAuditEntry;
 import ru.andreyz.mailagent.model.ControlSettingsResponse;
 import ru.andreyz.mailagent.model.ControlSettingsStatusResponse;
+import ru.andreyz.mailagent.model.MailEndpointDetectRequest;
+import ru.andreyz.mailagent.model.MailEndpointDetectResult;
 import ru.andreyz.mailagent.model.MailConnectionTestRequest;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 import ru.andreyz.mailagent.model.ControlStatusResponse;
@@ -50,6 +52,16 @@ public class MailAgentControlService {
 
     public List<ControlAuditEntry> getAudit() {
         return runtimeConfigService.audit();
+    }
+
+    public MailEndpointDetectResult detectEndpoint(MailEndpointDetectRequest request) {
+        MailEndpointDetectResult result = mailConnectionTestService.detectEndpoint(request);
+        if (result.success()) {
+            log.info("Mail plugin endpoint detection succeeded: {} ({})", result.message(), result.endpoint());
+        } else {
+            log.warn("Mail plugin endpoint detection failed: {} ({})", result.message(), result.endpoint());
+        }
+        return result;
     }
 
     public MailConnectionTestResult testConnection(MailConnectionTestRequest request) {

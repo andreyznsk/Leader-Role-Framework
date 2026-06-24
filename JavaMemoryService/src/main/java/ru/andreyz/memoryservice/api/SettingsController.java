@@ -13,6 +13,8 @@ import ru.andreyz.memoryservice.dto.ControlPluginDto;
 import ru.andreyz.memoryservice.dto.ControlPluginSettingsResponse;
 import ru.andreyz.memoryservice.dto.ControlPluginSettingsUpdateRequest;
 import ru.andreyz.memoryservice.dto.ControlPluginSettingsUpdateResponse;
+import ru.andreyz.memoryservice.dto.MailAgentEndpointDetectRequestDto;
+import ru.andreyz.memoryservice.dto.MailAgentEndpointDetectResultDto;
 import ru.andreyz.memoryservice.dto.MailAgentConnectionTestRequestDto;
 import ru.andreyz.memoryservice.dto.MailAgentConnectionTestResultDto;
 import ru.andreyz.memoryservice.dto.PluginSettingsDto;
@@ -92,6 +94,22 @@ public class SettingsController {
     @PutMapping("/plugins/mail")
     public ResponseEntity<PluginSettingsDto> updateMail(@RequestBody UpdateMailPluginSettingsRequest request) {
         return ResponseEntity.ok(pluginSettingsService.updateMailSettings(request));
+    }
+
+    @PostMapping("/control/plugins/mail/detect-endpoint")
+    public ResponseEntity<MailAgentEndpointDetectResultDto> detectMailEndpointFromControlPlane(@RequestBody(required = false) MailAgentEndpointDetectRequestDto request) {
+        MailAgentEndpointDetectResultDto result = pluginSettingsService.detectMailEndpoint(request);
+        return result.success()
+                ? ResponseEntity.ok(result)
+                : ResponseEntity.status(500).body(result);
+    }
+
+    @PostMapping("/plugins/mail/detect-endpoint")
+    public ResponseEntity<MailAgentEndpointDetectResultDto> detectMailEndpoint(@RequestBody(required = false) MailAgentEndpointDetectRequestDto request) {
+        MailAgentEndpointDetectResultDto result = pluginSettingsService.detectMailEndpoint(request);
+        return result.success()
+                ? ResponseEntity.ok(result)
+                : ResponseEntity.status(500).body(result);
     }
 
     @PostMapping("/control/plugins/mail/test-connection")

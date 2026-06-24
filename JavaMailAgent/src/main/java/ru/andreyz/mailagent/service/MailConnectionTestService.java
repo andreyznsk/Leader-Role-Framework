@@ -5,6 +5,8 @@ import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.MailAuthType;
 import ru.andreyz.mailagent.model.MailConnectionErrorType;
+import ru.andreyz.mailagent.model.MailEndpointDetectRequest;
+import ru.andreyz.mailagent.model.MailEndpointDetectResult;
 import ru.andreyz.mailagent.model.MailConnectionTestRequest;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
@@ -18,26 +20,79 @@ public class MailConnectionTestService {
     private final MailConfig.EwsProperties baseEwsProperties;
     private final MailConfig.ImapProperties baseImapProperties;
     private final EwsConnectionTester ewsConnectionTester;
+    private final EwsEndpointDetector ewsEndpointDetector;
 
     public MailConnectionTestService(MailRuntimeConfigService runtimeConfigService,
                                      MailClient runtimeMailClient,
                                      MailConfig.EwsProperties baseEwsProperties,
                                      MailConfig.ImapProperties baseImapProperties,
-                                     EwsConnectionTester ewsConnectionTester) {
+                                     EwsConnectionTester ewsConnectionTester,
+                                     EwsEndpointDetector ewsEndpointDetector) {
         this.runtimeConfigService = runtimeConfigService;
         this.runtimeMailClient = runtimeMailClient;
         this.baseEwsProperties = baseEwsProperties;
         this.baseImapProperties = baseImapProperties;
         this.ewsConnectionTester = ewsConnectionTester;
+        this.ewsEndpointDetector = ewsEndpointDetector;
+    }
+
+    public MailEndpointDetectResult detectEndpoint(MailEndpointDetectRequest request) {
+        return ewsEndpointDetector.detect(request);
     }
 
     public MailConnectionTestResult testConnection(MailConnectionTestRequest request) {
         MailRuntimeConfig snapshot = runtimeConfigService.snapshot();
         String protocol = selectProtocol(request, snapshot);
         if ("ews".equals(protocol)) {
+            MailEndpointDetectResult endpointDetect = detectEndpoint(new MailEndpointDetectRequest(
+                    protocol,
+                    request != null ? request.ewsUrl() : snapshot.serverUrl()
+            ));
+            if (!endpointDetect.success()) {
+                return new MailConnectionTestResult(
+                        false,
+                        ru.andreyz.mailagent.model.MailConnectionStatus.FAILED,
+                        "ews",
+                        endpointDetect.endpointReachable(),
+                        endpointDetect.httpsOk(),
+                        endpointDetect.ewsDetected(),
+                        false,
+                        null,
+                        selectAuthType(request, snapshot),
+                        request != null ? request.username() : snapshot.login(),
+                        null,
+                        null,
+                        null,
+                        endpointDetect.message(),
+                        endpointDetect.errorType(),
+                        endpointDetect.details(),
+                        endpointDetect.endpoint(),
+                        endpointDetect.endpoint()
+                );
+            }
             MailConfig.MailProperties mailProperties = toMailProperties(snapshot, request);
             MailConfig.EwsProperties ewsProperties = toEwsProperties(snapshot, request);
-            return ewsConnectionTester.test(mailProperties, ewsProperties, selectExcludeFolders(request, snapshot));
+            MailConnectionTestResult result = ewsConnectionTester.test(mailProperties, ewsProperties, selectExcludeFolders(request, snapshot));
+            return new MailConnectionTestResult(
+                    result.success(),
+                    result.status(),
+                    result.protocol(),
+                    endpointDetect.endpointReachable(),
+                    endpointDetect.httpsOk(),
+                    endpointDetect.ewsDetected(),
+                    result.authenticationOk(),
+                    result.exchangeVersion(),
+                    result.authType(),
+                    mailProperties.getUsername(),
+                    result.foldersFound(),
+                    result.foldersScanLimited(),
+                    result.inboxFound(),
+                    result.message(),
+                    result.errorType(),
+                    result.details(),
+                    result.endpoint(),
+                    result.target()
+            );
         }
         if ("imap".equals(protocol) || "maildev".equals(protocol)) {
             MailConnectionTestResult result = runtimeMailClient.testConnection();

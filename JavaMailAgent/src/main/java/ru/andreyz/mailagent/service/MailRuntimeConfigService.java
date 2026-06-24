@@ -44,13 +44,14 @@ public class MailRuntimeConfigService {
                                     MailConfig.FolderProperties folderProperties,
                                     MailControlAuditStore auditStore) {
         this.auditStore = auditStore;
+        String initialProtocol = normalizeProtocol(mailProperties.getProtocol());
         this.current = new AtomicReference<>(new MailRuntimeConfig(
                 true,
-                normalizeProtocol(mailProperties.getProtocol()),
+                initialProtocol,
                 blankToEmpty(mailProperties.getUsername()),
                 blankToNull(mailProperties.getPassword()),
                 blankToEmpty(ewsProperties.getUrl()),
-                MailAuthType.fromValue(ewsProperties.getAuthType(), MailAuthType.BASIC),
+                defaultAuthType(initialProtocol, ewsProperties.getAuthType()),
                 blankToEmpty(imapProperties.getHost()),
                 imapProperties.getPort(),
                 imapProperties.isSsl(),
@@ -109,7 +110,7 @@ public class MailRuntimeConfigService {
         String login = parseString(incoming, "login", previous.login());
         String password = parseSecret(incoming, "password", previous.password());
         String serverUrl = parseString(incoming, "serverUrl", previous.serverUrl());
-        MailAuthType authType = parseAuthType(incoming.get("authType"), previous.authType());
+        MailAuthType authType = parseAuthType(incoming.get("authType"), defaultAuthType(protocol, previous.authType().name()));
         String host = parseString(incoming, "host", previous.host());
         int port = parseInt(incoming, "port", previous.port(), false);
         boolean ssl = parseBoolean(incoming, "ssl", previous.ssl());
@@ -285,6 +286,11 @@ public class MailRuntimeConfigService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unsupported authType: " + value);
         }
+    }
+
+    private MailAuthType defaultAuthType(String protocol, String configuredValue) {
+        MailAuthType fallback = "ews".equals(protocol) ? MailAuthType.NTLM : MailAuthType.BASIC;
+        return MailAuthType.fromValue(configuredValue, fallback);
     }
 
     private String parseProtocol(String value, String fallback) {
