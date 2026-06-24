@@ -83,6 +83,7 @@ agent:
 |---------|----------|--------|--------|
 | local | Maildev HTTP API | `MaildevClient` | ✅ реализован |
 | dev | IMAP | `ImapMailClient` | 🔜 planned |
+| ews | Exchange EWS | `EwsMailClient` | ✅ реализован |
 | prod | EWS (Exchange on-premise) | `EwsMailClient` | ✅ реализован |
 
 **Prod Exchange scan:** `EwsMailClient` рекурсивно сканирует `Inbox` и все подпапки.

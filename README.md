@@ -168,7 +168,38 @@ JavaRagService: 44 PASS / 0 FAIL (2026-06-12)
 
 local → Maildev (Docker), разработка
 dev   → IMAP, тестовый сервер
+ews   → Exchange EWS, отдельный профиль подключения
 prod  → Exchange EWS, рабочий ПК
+
+### EWS profile
+
+For a dedicated Exchange setup use:
+
+```bash
+SPRING_PROFILES_ACTIVE=ews java -jar JavaMailAgent/target/mail-agent.jar
+```
+
+Config file:
+- `JavaMailAgent/src/main/resources/application-ews.yml`
+- example overrides: `JavaMailAgent/application-ews.properties.example`
+
+Required settings for EWS:
+- `mail.protocol=ews`
+- `mail.username`
+- `mail.password`
+- `ews.url`
+
+Recommended settings:
+- `ews.auth-type=NTLM`
+- `ews.autodiscover=false`
+- `ews.timeout-seconds=30`
+- `mail.test-connection.timeout-seconds=15`
+- `mail.test-connection.max-folders-to-scan=500`
+
+Optional settings:
+- `ews.domain` for `DOMAIN\\user` auth
+- `ews.version` if your Exchange requires a specific EWS version hint
+- `mail.folders.exclude` to skip CI/CD and service folders
 
 ### EWS diagnostics
 
