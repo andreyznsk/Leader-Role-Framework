@@ -78,6 +78,7 @@ public class MailAgentJob {
             folders = filterIncludedFolders(folders, runtime.foldersInclude());
         } catch (Exception e) {
             log.error("Failed to list folders: {}", e.getMessage());
+            log.debug("", e);
             runtimeConfigService.registerPollResult("Folder list failed: " + e.getMessage());
             return;
         }

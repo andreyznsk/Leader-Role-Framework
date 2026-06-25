@@ -6,7 +6,6 @@ import microsoft.exchange.webservices.data.core.enumeration.property.BasePropert
 import microsoft.exchange.webservices.data.core.enumeration.property.BodyType;
 import microsoft.exchange.webservices.data.core.enumeration.property.WellKnownFolderName;
 import microsoft.exchange.webservices.data.core.enumeration.search.FolderTraversal;
-import microsoft.exchange.webservices.data.core.enumeration.search.SortDirection;
 import microsoft.exchange.webservices.data.core.enumeration.service.ConflictResolutionMode;
 import microsoft.exchange.webservices.data.core.service.folder.Folder;
 import microsoft.exchange.webservices.data.core.service.item.EmailMessage;
@@ -40,6 +39,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.lang.Nullable;
 
 public class EwsMailClient implements MailClient {
 
@@ -49,47 +49,90 @@ public class EwsMailClient implements MailClient {
     private final MailConfig.MailProperties mailProperties;
     private final MailConfig.EwsProperties ewsProperties;
     private final ExchangeService service;
+    private final List<String> excludeFolders;
     private final Map<String, FolderId> folderIdsByPath = new HashMap<>();
+    private volatile boolean foldersInitialized;
 
     public EwsMailClient(MailConfig.MailProperties mailProperties,
                          MailConfig.EwsProperties ewsProperties) {
+        this(mailProperties, ewsProperties, List.of());
+    }
+
+    public EwsMailClient(MailConfig.MailProperties mailProperties,
+                         MailConfig.EwsProperties ewsProperties,
+                         List<String> excludeFolders) {
         this.mailProperties = mailProperties;
         this.ewsProperties = ewsProperties;
+        this.excludeFolders = excludeFolders != null ? excludeFolders : List.of();
         this.service = EwsSupport.createService(mailProperties, ewsProperties);
+    }
+
+    /**
+     * Lazily initialises the folder-id map so that both {@link #listFolders}
+     * and {@link #listUnread} work regardless of whether a new instance was
+     * created by {@code RuntimeMailClient.delegateChecked()}.
+     */
+    private void ensureFoldersInitialized() throws MailException {
+        if (foldersInitialized) {
+            return;
+        }
+        synchronized (folderIdsByPath) {
+            if (foldersInitialized) {
+                return;
+            }
+            try {
+                URI ewsUrl = service.getUrl();
+                log.info("EWS lazy init folders: connecting to {}, autodiscover={}, version={}",
+                        ewsUrl, ewsProperties.isAutodiscover(), ewsProperties.getVersion());
+
+                Folder inbox = Folder.bind(service, WellKnownFolderName.Inbox, folderPropertySet());
+                folderIdsByPath.put(INBOX, inbox.getId());
+                collectChildFolders(inbox, INBOX, excludeFolders, null);
+                foldersInitialized = true;
+                log.debug("EWS folder cache initialized with {} folders", folderIdsByPath.size());
+            } catch (MailException e) {
+                throw e;
+            } catch (Exception e) {
+                URI ewsUrl = service.getUrl();
+                log.error("EWS lazy init failed at {}. Target: {}. Auth: {}. Error: {}",
+                        ewsUrl, ewsProperties.getUrl(), ewsProperties.getAuthType(), e.getMessage(), e);
+                throw new MailException("Failed to initialize EWS folders at %s: %s"
+                        .formatted(ewsUrl != null ? ewsUrl : "unknown", e.getMessage()), e);
+            }
+        }
     }
 
     @Override
     public List<String> listFolders(List<String> excludeFolders) throws MailException {
-        try {
-            folderIdsByPath.clear();
-
-            Folder inbox = Folder.bind(service, WellKnownFolderName.Inbox, folderPropertySet());
-            folderIdsByPath.put(INBOX, inbox.getId());
-
+        ensureFoldersInitialized();
+        synchronized (folderIdsByPath) {
             List<String> folders = new ArrayList<>();
-            if (!isExcluded(INBOX, excludeFolders)) {
-                folders.add(INBOX);
+            for (String path : folderIdsByPath.keySet()) {
+                String leaf = leafName(path);
+                if (!isExcluded(path, excludeFolders) && !isExcluded(leaf, excludeFolders)) {
+                    folders.add(path);
+                }
             }
-
-            collectChildFolders(inbox, INBOX, excludeFolders, folders);
-            log.debug("EWS folders selected for scan: {}", folders);
+            log.debug("EWS folders selected for scan (from cache): {}", folders);
             return folders;
-        } catch (Exception e) {
-            throw new MailException("Failed to list EWS folders: " + e.getMessage(), e);
         }
     }
 
     @Override
     public List<Email> listUnread(String folder, int limit) throws MailException {
-        FolderId folderId = folderIdsByPath.get(folder);
+        ensureFoldersInitialized();
+        FolderId folderId;
+        synchronized (folderIdsByPath) {
+            folderId = folderIdsByPath.get(folder);
+        }
         if (folderId == null) {
+            log.warn("EWS listUnread: folder '{}' not found in cache; keys={}", folder, folderIdsByPath.keySet());
             throw new MailException("Unknown EWS folder: " + folder);
         }
 
         try {
             ItemView view = new ItemView(limit);
             view.setPropertySet(emailListPropertySet());
-            view.getOrderBy().add(ItemSchema.DateTimeReceived, SortDirection.Ascending);
 
             SearchFilter unreadOnly = new SearchFilter.IsEqualTo(EmailMessageSchema.IsRead, false);
             FindItemsResults<Item> items = service.findItems(folderId, unreadOnly, view);
@@ -120,8 +163,11 @@ public class EwsMailClient implements MailClient {
 
     @Override
     public MailConnectionTestResult testConnection() {
+        URI ewsUrl = service.getUrl();
         try {
+            log.info("EWS testConnection: checking {}", ewsUrl);
             Folder inbox = Folder.bind(service, WellKnownFolderName.Inbox, folderPropertySet());
+            log.info("EWS testConnection OK: {} unread={}", ewsUrl, inbox.getUnreadCount());
             return MailConnectionTestResult.connected(
                     "ews",
                     ewsProperties.getVersion(),
@@ -133,6 +179,7 @@ public class EwsMailClient implements MailClient {
                     EwsSupport.connectionTarget(mailProperties, ewsProperties)
             );
         } catch (Exception e) {
+            log.warn("EWS testConnection FAILED at {}: {}", ewsUrl, e.getMessage());
             return MailConnectionTestResult.failed(
                     "ews",
                     ewsProperties.getAuthType(),
@@ -152,7 +199,7 @@ public class EwsMailClient implements MailClient {
     private void collectChildFolders(Folder parent,
                                      String parentPath,
                                      List<String> excludeFolders,
-                                     List<String> selectedFolders) throws Exception {
+                                     @Nullable List<String> selectedFolders) throws Exception {
         FolderView view = new FolderView(100);
         view.setTraversal(FolderTraversal.Shallow);
         view.setPropertySet(folderPropertySet());
@@ -166,9 +213,11 @@ public class EwsMailClient implements MailClient {
                 String path = parentPath + "/" + child.getDisplayName();
                 folderIdsByPath.put(path, child.getId());
 
-                if (!isExcluded(path, excludeFolders)) {
+                if (selectedFolders != null && !isExcluded(path, excludeFolders)) {
                     selectedFolders.add(path);
                     collectChildFolders(child, path, excludeFolders, selectedFolders);
+                } else if (selectedFolders == null) {
+                    collectChildFolders(child, path, excludeFolders, null);
                 } else {
                     log.debug("EWS folder excluded from scan: {}", path);
                 }
@@ -219,9 +268,33 @@ public class EwsMailClient implements MailClient {
         String id = message.getId().getUniqueId();
         String subject = defaultString(message.getSubject(), "(no subject)");
         String from = fromAddress(message);
-        String body = MessageBody.getStringFromMessageBody(message.getBody());
+        String body = extractBody(message);
         LocalDateTime receivedAt = toLocalDateTime(message.getDateTimeReceived());
         return new Email(id, subject, from, defaultString(body, ""), receivedAt, folder);
+    }
+
+    /**
+     * Safely extracts the body text. The body may not be loaded via FindItem,
+     * so we load it lazily using a separate bind request if needed.
+     */
+    private String extractBody(EmailMessage message) throws Exception {
+        try {
+            microsoft.exchange.webservices.data.property.complex.MessageBody mb = message.getBody();
+            if (mb != null) {
+                return MessageBody.getStringFromMessageBody(mb);
+            }
+        } catch (Exception ignored) {
+            // body not loaded via FindItem — fall through to lazy load
+        }
+        try {
+            PropertySet bodyOnly = new PropertySet(ItemSchema.Body);
+            bodyOnly.setRequestedBodyType(BodyType.Text);
+            EmailMessage loaded = EmailMessage.bind(service, message.getId(), bodyOnly);
+            return MessageBody.getStringFromMessageBody(loaded.getBody());
+        } catch (Exception e) {
+            log.debug("Could not load body for email {}: {}", message.getId(), e.getMessage());
+            return "";
+        }
     }
 
     private String fromAddress(EmailMessage message) throws Exception {
@@ -256,11 +329,9 @@ public class EwsMailClient implements MailClient {
     private PropertySet emailListPropertySet() {
         PropertySet propertySet = new PropertySet(BasePropertySet.IdOnly,
                 ItemSchema.Subject,
-                ItemSchema.Body,
                 ItemSchema.DateTimeReceived,
                 EmailMessageSchema.From,
                 EmailMessageSchema.IsRead);
-        propertySet.setRequestedBodyType(BodyType.Text);
         return propertySet;
     }
 
