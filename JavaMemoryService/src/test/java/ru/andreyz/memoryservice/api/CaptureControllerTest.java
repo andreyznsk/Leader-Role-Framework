@@ -41,6 +41,33 @@ class CaptureControllerTest {
     }
 
     @Test
+    void postCaptureIsIdempotentBySourceId() throws Exception {
+        String first = mockMvc.perform(post("/api/capture")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"text": "mail capture", "source": "email", "sourceId": "mail-123"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String second = mockMvc.perform(post("/api/capture")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"text": "mail capture", "source": "email", "sourceId": "mail-123"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String firstId = first.replaceAll(".*\"captureId\":(\\d+).*", "$1");
+        String secondId = second.replaceAll(".*\"captureId\":(\\d+).*", "$1");
+        org.junit.jupiter.api.Assertions.assertEquals(firstId, secondId);
+    }
+
+    @Test
     void postCapture_withoutSource_defaultsToCli() throws Exception {
         mockMvc.perform(post("/api/capture")
                         .contentType(MediaType.APPLICATION_JSON)

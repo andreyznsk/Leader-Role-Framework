@@ -7,6 +7,7 @@ import ru.andreyz.memoryservice.domain.Task;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface TaskRepository extends CrudRepository<Task, Long> {
     List<Task> findByPlanIdOrderBySortOrder(Long planId);
@@ -24,4 +25,6 @@ public interface TaskRepository extends CrudRepository<Task, Long> {
            "WHEN 'BLOCKED' THEN 3 " +
            "WHEN 'DONE' THEN 4 END, sort_order")
     List<Task> findCurrentTasks();
+
+    Optional<Task> findFirstByEmailId(String emailId);
 }

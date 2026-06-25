@@ -1,24 +1,33 @@
 package ru.andreyz.mailagent.scheduler;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import ru.andreyz.mailagent.config.MailConfig;
+import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.integration.MemoryServiceClient;
 import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.model.MailProcessingRoute;
+import ru.andreyz.mailagent.model.ProcessedEmail;
 import ru.andreyz.mailagent.service.MailControlAuditStore;
+import ru.andreyz.mailagent.service.MailProcessingStateService;
 import ru.andreyz.mailagent.service.MailRuntimeConfigService;
+import ru.andreyz.mailagent.repository.ProcessedEmailRepository;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 class ActionExecutorTest {
 
@@ -27,7 +36,11 @@ class ActionExecutorTest {
 
     ActionExecutor executor;
     MemoryServiceClient memoryServiceClient;
+    MailClient mailClient;
     MailRuntimeConfigService runtimeConfigService;
+    ProcessedEmailRepository processedEmailRepository;
+    MailProcessingStateService processingStateService;
+    ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
@@ -39,17 +52,32 @@ class ActionExecutorTest {
         paths.setRagInbox(tempDir.resolve("rag-inbox").toString());
 
         memoryServiceClient = mock(MemoryServiceClient.class);
+        mailClient = mock(MailClient.class);
         MailConfig.MailProperties mail = new MailConfig.MailProperties();
         MailConfig.ImapProperties imap = new MailConfig.ImapProperties();
         MailConfig.EwsProperties ews = new MailConfig.EwsProperties();
         MailConfig.FolderProperties folders = new MailConfig.FolderProperties();
         MailControlAuditStore auditStore = mock(MailControlAuditStore.class);
         runtimeConfigService = new MailRuntimeConfigService(mail, paths, imap, ews, folders, auditStore);
-        executor = new ActionExecutor(memoryServiceClient, paths, new NoticeDocumentWriter(paths), runtimeConfigService);
+        processedEmailRepository = mock(ProcessedEmailRepository.class);
+        when(processedEmailRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(processedEmailRepository.findByEmailId(any())).thenReturn(Optional.empty());
+        when(processedEmailRepository.findByStatusOrderByLastAttemptAtAscCreatedAtAsc(any())).thenReturn(List.of());
+        objectMapper = new ObjectMapper().findAndRegisterModules();
+        processingStateService = new MailProcessingStateService(processedEmailRepository, objectMapper);
+        executor = new ActionExecutor(
+            memoryServiceClient,
+            mailClient,
+            paths,
+            new NoticeDocumentWriter(paths),
+            runtimeConfigService,
+            processingStateService,
+            objectMapper
+        );
     }
 
     @Test
-    void noiseMovesEmailToProcessed() throws IOException {
+    void noiseMovesEmailToProcessed() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
         String emailId = "test-noise-001";
@@ -66,7 +94,7 @@ class ActionExecutorTest {
     }
 
     @Test
-    void requestAppendsToplan() throws IOException {
+    void requestAppendsToplan() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
         String emailId = "test-request-001";
@@ -92,7 +120,47 @@ class ActionExecutorTest {
     }
 
     @Test
-    void captureCreatesMemoryCaptureAndMovesEmailToProcessed() throws IOException {
+    void requestRetryFromMemoryCheckpointDoesNotDuplicatePlanLine() throws Exception {
+        Path inbox = tempDir.resolve("inbox");
+        Files.createDirectories(inbox);
+        String emailId = "test-request-retry-001";
+        Files.writeString(inbox.resolve(emailId + ".json"), "{}");
+
+        AgentResponse response = new AgentResponse(
+            AgentResponseType.REQUEST, emailId,
+            "requires review",
+            "- [ ] [HIGH] Review PR #42 — от ivanov@test.com",
+            "Review PR #42",
+            "HIGH",
+            "ivanov@test.com",
+            null,
+            null
+        );
+
+        doThrow(new IllegalStateException("memory down"))
+            .doNothing()
+            .when(memoryServiceClient)
+            .createPendingTask(any());
+
+        assertThrows(IllegalStateException.class, () -> executor.execute(email(emailId), response));
+
+        ArgumentCaptor<ProcessedEmail> emailCaptor = ArgumentCaptor.forClass(ProcessedEmail.class);
+        verify(processedEmailRepository, atLeastOnce()).save(emailCaptor.capture());
+        ProcessedEmail errorRecord = emailCaptor.getAllValues().get(emailCaptor.getAllValues().size() - 1);
+        assertEquals("REQUEST", errorRecord.responseType());
+        assertEquals(MailProcessingRoute.MEMORY_PENDING_TASK, errorRecord.failedRoute());
+        assertEquals("ERROR", errorRecord.status().name());
+
+        executor.retry(errorRecord);
+
+        Path planFile = tempDir.resolve("plans/today.md");
+        String content = Files.readString(planFile);
+        assertEquals(1, content.lines().filter(line -> line.contains("Review PR #42")).count());
+        verify(memoryServiceClient, times(2)).createPendingTask(any());
+    }
+
+    @Test
+    void captureCreatesMemoryCaptureAndMovesEmailToProcessed() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
         String emailId = "test-capture-001";
@@ -107,13 +175,13 @@ class ActionExecutorTest {
 
         executor.execute(email(emailId), response);
 
-        verify(memoryServiceClient).createCapture("К сведению: переезд на новый кластер с 1 июля", "email");
+        verify(memoryServiceClient).createCapture("К сведению: переезд на новый кластер с 1 июля", "email", emailId);
         assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
     }
 
     @Test
-    void noticeCreatesRagDocumentAndMovesEmailToProcessed() throws IOException {
+    void noticeCreatesRagDocumentAndMovesEmailToProcessed() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
         String emailId = "test-notice-001";
@@ -124,14 +192,16 @@ class ActionExecutorTest {
                 "Новая release-практика команды", null, null, null, null, null, null
         );
 
-        ActionExecutor.ActionResult result = executor.execute(
-                email(emailId, "NOTICE: Новый порядок релизов", "architect@example.com", "Согласование через release calendar"),
-                response
+        executor.execute(
+            email(emailId, "NOTICE: Новый порядок релизов", "architect@example.com", "Согласование через release calendar"),
+            response
         );
 
-        assertTrue(result.markAsRead());
-        assertNotNull(result.outputPath());
-        Path noticeFile = Path.of(result.outputPath());
+        ArgumentCaptor<ProcessedEmail> emailCaptor = ArgumentCaptor.forClass(ProcessedEmail.class);
+        verify(processedEmailRepository, atLeastOnce()).save(emailCaptor.capture());
+        ProcessedEmail processed = emailCaptor.getAllValues().get(emailCaptor.getAllValues().size() - 1);
+        assertNotNull(processed.outputPath());
+        Path noticeFile = Path.of(processed.outputPath());
         assertTrue(Files.exists(noticeFile));
         String content = Files.readString(noticeFile);
         assertTrue(content.contains("type: NOTICE"));
@@ -139,6 +209,7 @@ class ActionExecutorTest {
         assertTrue(content.contains("release calendar"));
         assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
+        verify(mailClient).markAsRead(emailId, "INBOX");
     }
 
     @Test

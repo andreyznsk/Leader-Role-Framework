@@ -50,17 +50,23 @@ public class CaptureService {
     public CaptureSaveResult saveWithFile(CaptureRequest req) {
         Instant now = Instant.now();
         String source = req.source() != null ? req.source() : "manual";
+        if (req.sourceId() != null && !req.sourceId().isBlank()) {
+            var existing = captureRepository.findBySourceAndSourceId(source, req.sourceId());
+            if (existing.isPresent()) {
+                return new CaptureSaveResult(existing.get(), null);
+            }
+        }
 
         // Email captures are already classified by MailAgent — skip re-classification queue
         if ("email".equals(source)) {
-            Capture capture = new Capture(null, req.text(), source, "PROCESSED",
+            Capture capture = new Capture(null, req.text(), source, req.sourceId(), "PROCESSED",
                     "email", "capture", now, now);
             Capture saved = captureRepository.save(capture);
             recordCaptureCreated(saved);
             return new CaptureSaveResult(saved, null);
         }
 
-        Capture capture = new Capture(null, req.text(), source, "PENDING",
+        Capture capture = new Capture(null, req.text(), source, req.sourceId(), "PENDING",
                 null, null, now, null);
         Capture saved = captureRepository.save(capture);
         recordCaptureCreated(saved);
@@ -83,7 +89,7 @@ public class CaptureService {
     public Capture markProcessed(Long id, String classified, String routedTo) {
         Capture c = captureRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Capture not found: " + id));
-        Capture updated = new Capture(c.id(), c.rawText(), c.source(), "PROCESSED",
+        Capture updated = new Capture(c.id(), c.rawText(), c.source(), c.sourceId(), "PROCESSED",
                 classified, routedTo, c.capturedAt(), Instant.now());
         return captureRepository.save(updated);
     }

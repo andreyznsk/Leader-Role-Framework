@@ -55,6 +55,12 @@ public class TaskService {
     public Task createPending(String title, String description,
                               String emailId, String sender, String priority,
                               LocalDate dueDate, String usageSource) {
+        if (emailId != null && !emailId.isBlank()) {
+            var existing = taskRepository.findFirstByEmailId(emailId);
+            if (existing.isPresent()) {
+                return existing.get();
+            }
+        }
         String desc = description != null ? description : (sender != null ? "От: " + sender : null);
         Task task = new Task(null, null, title, desc,
                 "PENDING", priority != null ? priority : "NORMAL",

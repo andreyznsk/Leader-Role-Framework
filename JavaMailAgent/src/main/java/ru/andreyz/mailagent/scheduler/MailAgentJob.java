@@ -12,7 +12,8 @@ import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.ProcessedEmail;
-import ru.andreyz.mailagent.repository.ProcessedEmailRepository;
+import ru.andreyz.mailagent.model.EmailProcessingStatus;
+import ru.andreyz.mailagent.service.MailProcessingStateService;
 import ru.andreyz.mailagent.service.MailRuntimeConfig;
 import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 
@@ -34,7 +35,7 @@ public class MailAgentJob {
     private final ActionExecutor actionExecutor;
     private final MailConfig.MailProperties mailProperties;
     private final MailConfig.PathProperties pathProperties;
-    private final ProcessedEmailRepository processedEmailRepository;
+    private final MailProcessingStateService processingStateService;
     private final ObjectMapper objectMapper;
     private final MailRuntimeConfigService runtimeConfigService;
     private LocalDateTime lastPollFinishedAt;
@@ -46,7 +47,7 @@ public class MailAgentJob {
         ActionExecutor actionExecutor,
         MailConfig.MailProperties mailProperties,
         MailConfig.PathProperties pathProperties,
-        ProcessedEmailRepository processedEmailRepository,
+        MailProcessingStateService processingStateService,
         ObjectMapper objectMapper,
         MailRuntimeConfigService runtimeConfigService
     ) {
@@ -56,7 +57,7 @@ public class MailAgentJob {
         this.actionExecutor = actionExecutor;
         this.mailProperties = mailProperties;
         this.pathProperties = pathProperties;
-        this.processedEmailRepository = processedEmailRepository;
+        this.processingStateService = processingStateService;
         this.objectMapper = objectMapper;
         this.runtimeConfigService = runtimeConfigService;
     }
@@ -69,6 +70,26 @@ public class MailAgentJob {
         }
 
         MailRuntimeConfig runtime = runtimeConfigService.snapshot();
+        int total = 0, errors = 0;
+        int[] counts = {0, 0, 0, 0, 0}; // REQUEST, DRAFT, NOISE, CAPTURE, NOTICE
+
+        List<ProcessedEmail> errorQueue = processingStateService.findErrorQueue();
+        if (!errorQueue.isEmpty()) {
+            log.info("Retrying {} email(s) from ERROR queue", errorQueue.size());
+            for (ProcessedEmail failedEmail : errorQueue) {
+                try {
+                    actionExecutor.retry(failedEmail);
+                    total++;
+                    countByType(failedEmail.responseType(), counts);
+                } catch (Exception e) {
+                    errors++;
+                    log.warn("Retry for email {} failed: {}", failedEmail.emailId(), e.getMessage());
+                    finishPoll(total, errors, counts);
+                    return;
+                }
+            }
+        }
+
         int limit = mailProperties.getFetchLimit();
         List<String> excludeFolders = runtime.foldersExclude();
 
@@ -85,9 +106,6 @@ public class MailAgentJob {
 
         log.info("Poll started — scanning {} folder(s): {}", folders.size(), folders);
 
-        int total = 0, errors = 0;
-        int[] counts = {0, 0, 0, 0, 0}; // REQUEST, DRAFT, NOISE, CAPTURE, NOTICE
-
         for (String folder : folders) {
             List<Email> emails;
             try {
@@ -100,38 +118,25 @@ public class MailAgentJob {
             log.info("Folder [{}]: {} unread email(s)", folder, emails.size());
 
             for (Email email : emails) {
-                if (processedEmailRepository.existsByEmailId(email.id())) {
-                    log.debug("Email {} already processed, skipping", email.id());
+                if (processingStateService.findByEmailId(email.id()).isPresent()) {
+                    log.debug("Email {} already has processing state, skipping", email.id());
                     continue;
                 }
                 total++;
                 try {
                     AgentResponse resp = processEmail(email);
-                    switch (resp.type()) {
-                        case REQUEST -> counts[0]++;
-                        case DRAFT   -> counts[1]++;
-                        case NOISE   -> counts[2]++;
-                        case CAPTURE -> counts[3]++;
-                        case NOTICE  -> counts[4]++;
-                    }
-                    ActionExecutor.ActionResult actionResult = actionExecutor.execute(email, resp);
-                    if (actionResult.markAsRead()) {
-                        mailClient.markAsRead(email.id(), email.folder());
-                        log.info("Email {} marked as read ({})", email.id(), resp.type());
-                    }
-                    processedEmailRepository.save(ProcessedEmail.of(email, resp.type().name(), actionResult.outputPath()));
+                    countByType(resp.type().name(), counts);
+                    actionExecutor.execute(email, resp);
                 } catch (Exception e) {
                     errors++;
                     log.warn("Email {} failed: {}, will retry next poll", email.id(), e.getMessage());
+                    finishPoll(total, errors, counts);
+                    return;
                 }
             }
         }
 
-        String result = "%d processed (%d REQUEST, %d DRAFT, %d NOISE, %d CAPTURE, %d NOTICE, %d errors)"
-                .formatted(total - errors, counts[0], counts[1], counts[2], counts[3], counts[4], errors);
-        log.info("Poll finished: {}", result);
-        runtimeConfigService.registerPollResult(result);
-        lastPollFinishedAt = LocalDateTime.now();
+        finishPoll(total, errors, counts);
     }
 
     private AgentResponse processEmail(Email email) throws Exception {
@@ -144,6 +149,25 @@ public class MailAgentJob {
         log.info("Classified as {}{}", resp.type(),
             resp.priority() != null ? ", priority " + resp.priority() : "");
         return resp;
+    }
+
+    private void countByType(String responseType, int[] counts) {
+        AgentResponseType type = AgentResponseType.valueOf(responseType);
+        switch (type) {
+            case REQUEST -> counts[0]++;
+            case DRAFT -> counts[1]++;
+            case NOISE -> counts[2]++;
+            case CAPTURE -> counts[3]++;
+            case NOTICE -> counts[4]++;
+        }
+    }
+
+    private void finishPoll(int total, int errors, int[] counts) {
+        String result = "%d processed (%d REQUEST, %d DRAFT, %d NOISE, %d CAPTURE, %d NOTICE, %d errors)"
+            .formatted(Math.max(0, total - errors), counts[0], counts[1], counts[2], counts[3], counts[4], errors);
+        log.info("Poll finished: {}", result);
+        runtimeConfigService.registerPollResult(result);
+        lastPollFinishedAt = LocalDateTime.now();
     }
 
     private AgentResponse parseAgentResponse(String raw) throws IOException {

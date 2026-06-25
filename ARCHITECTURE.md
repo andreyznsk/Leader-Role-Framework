@@ -94,14 +94,18 @@ agent:
 
 | Тип | Действие |
 |-----|----------|
-| `REQUEST` | Добавить в `plans/today.md` + POST `/api/tasks/pending` в JavaMemoryService |
-| `DRAFT` | Сохранить черновик в `drafts/` |
-| `NOISE` | Пометить прочитанным на сервере, переместить в `processed/` |
-| `CAPTURE` | POST `/api/capture` в JavaMemoryService, переместить файл в `processed/` |
+| `REQUEST` | `PLAN_APPEND` -> POST `/api/tasks/pending` -> move в `processed/` |
+| `DRAFT` | move в `processed/` |
+| `NOISE` | move в `processed/` -> `MARK_AS_READ` |
+| `CAPTURE` | POST `/api/capture` -> move в `processed/` |
+| `NOTICE` | записать NOTICE markdown -> move в `processed/` -> `MARK_AS_READ` |
 
-**Трекинг обработанных писем:** таблица `mailagent.processed_emails`
-- `REQUEST` и `DRAFT` — письмо остаётся непрочитанным на сервере
-- `NOISE` — помечается прочитанным на сервере
+**Трекинг обработанных писем:** таблица `mailagent.processed_emails` теперь хранит не только dedup, но и checkpoint state-machine:
+- `status`: `NEW | PROCESSING | ERROR | PROCESSED`
+- `failed_route`: checkpoint следующего side-effect (`PLAN_APPEND`, `MEMORY_PENDING_TASK`, `MEMORY_CAPTURE`, `NOTICE_WRITE`, `MOVE_TO_PROCESSED`, `MARK_AS_READ`)
+- `route_payload_json`: сериализованный payload для retry без повторного чтения письма с сервера и без повторного вызова LLM
+
+**Retry flow:** каждый poll сначала обрабатывает очередь `status=ERROR` по `last_attempt_at, created_at`. Пока очередь ошибок не пуста, новые письма не имеют приоритета. При падении любого route batch останавливается, запись письма остаётся в `ERROR`, а следующий запуск продолжает цепочку с сохранённого checkpoint.
 
 **Исходящие вызовы:**
 - `POST http://localhost:8082/api/tasks/pending` — создать PENDING задачу

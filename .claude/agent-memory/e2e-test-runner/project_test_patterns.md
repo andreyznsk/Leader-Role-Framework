@@ -79,3 +79,36 @@ Workaround: использовать `python3 json.loads(strict=False)` вмес
 - Локальная Ollama: localhost:11434 (рабочая)
 - Docker Ollama: 11435 (недоступен, не используется)
 - Модели: mxbai-embed-large, zylonai/multilingual-e5-large, qwen3:8b
+
+## MailAgent E2E — инфраструктурные паттерны (2026-06-25)
+
+### Maildev доступ
+- HTTP API (для MailAgent и тестов): `http://172.80.2.1:18080` — корректный URL
+- Тестовый сценарий 08 использует `http://localhost:1080` — неверно, maildev UI порт это 18080 на host
+- Удаление всех писем: `curl -X DELETE http://172.80.2.1:18080/email/all`
+- SMTP для отправки: `python3 smtplib` через `172.80.2.1:1025` (docker bridge gateway)
+- SMTP через `localhost:1025` не работает надёжно (curl exit 56, python3 "Connection unexpectedly closed")
+- psql не установлен на хосте — использовать `docker exec leader-postgres psql`
+
+### Баги ветки feature/mailAg-001 (ИСПРАВЛЕНЫ в сессии 2026-06-25)
+
+1. **MemoryServiceClient — нет @Autowired**: два конструктора без аннотации → Spring 6 STARTUP FAILED
+   - Фикс: `@Autowired` на публичный конструктор
+2. **processed_at NOT NULL**: V1 migration: NOT NULL + DEFAULT NOW(), но `newProcessing()` передаёт null → INSERT FAILS
+   - Фикс: V5 migration `ALTER COLUMN processed_at DROP NOT NULL`
+
+### Дефекты сценария 08
+
+- **Step 5**: `grep -c "Retry memory delivery task" plans/today.md` → 0 (ожидается 1)
+  - MockAgentClient пишет `"Mock task from email <emailId>"`, не subject письма
+  - Правильный grep: `grep -c "Mock task from email" plans/today.md`
+- **Step 8**: `PROCESSED|NONE|1` → фактически `PROCESSED|NONE|2`
+  - При медленном старте memory-service происходит 2 неудачных retry вместо 1
+  - Тест должен проверять `attempts_count >= 1`, не точно `= 1`
+
+### Retry flow — ключевые факты
+
+- Retry-очередь обрабатывается РАНЬШЕ новых писем в каждом poll
+- Задача в memory-service создаётся ровно 1 раз даже при multiple retries
+- Plan line добавляется на PLAN_APPEND-маршруте — до MEMORY_PENDING_TASK — 1 раз, не дублируется
+- attempts_count = число неудачных попыток (не включает успешный retry)
