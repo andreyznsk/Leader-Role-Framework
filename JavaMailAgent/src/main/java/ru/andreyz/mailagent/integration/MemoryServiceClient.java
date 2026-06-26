@@ -137,6 +137,7 @@ public class MemoryServiceClient {
                 Duration delay = RETRY_DELAYS.get(attempt);
                 log.warn("memory-service call {} failed on attempt {}/{}: {}. Retrying in {}s",
                     path, attempt + 1, RETRY_DELAYS.size() + 1, exception.getMessage(), delay.toSeconds());
+                log.warn("httpRequest: {}", httpRequest);
                 retrySleeper.sleep(delay);
             }
         }

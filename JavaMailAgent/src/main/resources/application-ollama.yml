@@ -18,18 +18,17 @@ spring:
           top-k: 20
 
 mail:
-  protocol: ews
+  protocol: maildev
   poll-interval-seconds: 30
-  username: test
-  password: test
 
 maildev:
   api-url: http://172.80.2.1:18080
 
 memory:
   service:
-    url: http://localhost:8082
+    url: http://localhost:8090
     enabled: true
 
 agent:
-  provider: ollama
+  provider: agent
+  command: claude --print

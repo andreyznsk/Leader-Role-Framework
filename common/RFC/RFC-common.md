@@ -379,7 +379,7 @@ public class AgentClientConfig {
     public AgentClient claudeAgentClient(
             @Value("${agent.timeout-minutes:5}") int timeoutMinutes) {
         log.info("AgentClient provider: claude --print");
-        return new ClaudeProcessAgentClient(timeoutMinutes);
+        return new CodeProcessAgentClient(timeoutMinutes);
     }
 
     // ── mock ────────────────────────────────────────────────────────────────
@@ -398,13 +398,13 @@ public class AgentClientConfig {
     @ConditionalOnProperty(name = "agent.provider", havingValue = "ollama")
     public ChatClient ollamaChatClient(ChatClient.Builder builder) {
         return builder
-            .defaultAdvisors(SimpleLoggerAdvisor.builder().order(4).build())
-            .defaultOptions(OllamaOptions.builder()
-                .temperature(0.0)
-                .topP(1.0)
-                .topK(20)
-                .build())
-            .build();
+                .defaultAdvisors(SimpleLoggerAdvisor.builder().order(4).build())
+                .defaultOptions(OllamaOptions.builder()
+                        .temperature(0.0)
+                        .topP(1.0)
+                        .topK(20)
+                        .build())
+                .build();
     }
 
     @Bean
@@ -420,8 +420,8 @@ public class AgentClientConfig {
     @ConditionalOnProperty(name = "agent.provider", havingValue = "gigachat")
     public ChatClient gigaChatClient(ChatClient.Builder builder) {
         return builder
-            .defaultAdvisors(SimpleLoggerAdvisor.builder().order(4).build())
-            .build();
+                .defaultAdvisors(SimpleLoggerAdvisor.builder().order(4).build())
+                .build();
     }
 
     @Bean

@@ -20,4 +20,5 @@ mail.test-connection.timeout-seconds=15
 mail.test-connection.max-folders-to-scan=500
 memory.service.url=http://localhost:8082
 memory.service.enabled=true
-agent.provider=claude
+agent.provider=agent
+agent.command=claude --print
