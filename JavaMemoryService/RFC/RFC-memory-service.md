@@ -23,6 +23,7 @@
 - Владеет usage statistics: пишет `usage_events` для AI-agent flows, task/capture сценариев,
   отдаёт агрегаты через `/api/stats/usage` и UI `/ui/stats`
 - Даёт две UI-зоны: `Operational Memory` и `Knowledge Gateway`, не дублируя RAG-документы в своей БД
+- Выступает единым control plane UI для runtime-редактирования plugin prompts через `/ui/settings`
 
 ---
 
@@ -125,6 +126,22 @@ SPRING_PROFILES_ACTIVE=prod java -jar JavaMemoryService/target/memory-service.ja
 ---
 
 ## 4. База данных
+
+### 4.0 Prompt editing ideology
+
+`JavaMemoryService` не хранит prompt templates внешних plugin-сервисов как master-data,
+но даёт единый UI для их редактирования.
+
+Архитектурное правило:
+
+- prompt каждого plugin-а хранится в собственной БД plugin-а, в отдельной таблице;
+- стартовое значение prompt создаётся Flyway migration-ом как seed data;
+- `/ui/settings` показывает prompt как обычное descriptor field (`type=text`);
+- сохранение идёт через control plane proxy в `PUT /api/control/settings` plugin-а;
+- plugin сам сохраняет новый prompt в свою БД и использует его для следующих вызовов без рестарта;
+- audit изменений prompt-а хранится в plugin audit и в proxy history.
+
+Это позволяет править prompts в реальном времени без редактирования `.java` файлов и без redeploy.
 
 ### 4.0 Usage Statistics
 

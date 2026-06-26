@@ -81,6 +81,22 @@ public class MemoryServiceClient {
         }
     }
 
+    public void createNote(String text, String tags, String source) {
+        if (!enabled) {
+            log.debug("memory-service disabled, skipping note");
+            return;
+        }
+        try {
+            postJson("/api/notes", Map.of(
+                "text", text,
+                "tags", tags,
+                "source", source
+            ), "Note saved to memory-service");
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to save note to memory-service", e);
+        }
+    }
+
     public boolean isHealthy() {
         if (!enabled) return false;
         try {

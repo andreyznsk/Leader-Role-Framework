@@ -5,6 +5,7 @@ public enum MailProcessingRoute {
     PLAN_APPEND,
     MEMORY_PENDING_TASK,
     MEMORY_CAPTURE,
+    MEMORY_NOTE,
     NOTICE_WRITE,
     MOVE_TO_PROCESSED,
     MARK_AS_READ

@@ -20,7 +20,6 @@ import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
@@ -38,7 +37,6 @@ public class MailAgentJob {
     private final MailProcessingStateService processingStateService;
     private final ObjectMapper objectMapper;
     private final MailRuntimeConfigService runtimeConfigService;
-    private LocalDateTime lastPollFinishedAt;
 
     public MailAgentJob(
         MailClient mailClient,
@@ -62,16 +60,14 @@ public class MailAgentJob {
         this.runtimeConfigService = runtimeConfigService;
     }
 
-    @Scheduled(fixedDelay = 5000)
+    @Scheduled(fixedDelayString = "#{${mail.poll-interval-seconds:60} * 1000}")
     public void poll() {
-        LocalDateTime now = LocalDateTime.now();
-        if (!runtimeConfigService.shouldPoll(now, lastPollFinishedAt)) {
+        MailRuntimeConfig runtime = runtimeConfigService.snapshot();
+        if (!runtime.enabled()) {
             return;
         }
-
-        MailRuntimeConfig runtime = runtimeConfigService.snapshot();
         int total = 0, errors = 0;
-        int[] counts = {0, 0, 0, 0, 0}; // REQUEST, DRAFT, NOISE, CAPTURE, NOTICE
+        int[] counts = {0, 0, 0, 0, 0, 0}; // REQUEST, DRAFT, NOISE, CAPTURE, NOTICE, NOTE
 
         List<ProcessedEmail> errorQueue = processingStateService.findErrorQueue();
         if (!errorQueue.isEmpty()) {
@@ -159,15 +155,15 @@ public class MailAgentJob {
             case NOISE -> counts[2]++;
             case CAPTURE -> counts[3]++;
             case NOTICE -> counts[4]++;
+            case NOTE -> counts[5]++;
         }
     }
 
     private void finishPoll(int total, int errors, int[] counts) {
-        String result = "%d processed (%d REQUEST, %d DRAFT, %d NOISE, %d CAPTURE, %d NOTICE, %d errors)"
-            .formatted(Math.max(0, total - errors), counts[0], counts[1], counts[2], counts[3], counts[4], errors);
+        String result = "%d processed (%d REQUEST, %d DRAFT, %d NOISE, %d CAPTURE, %d NOTICE, %d NOTE, %d errors)"
+            .formatted(Math.max(0, total - errors), counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], errors);
         log.info("Poll finished: {}", result);
         runtimeConfigService.registerPollResult(result);
-        lastPollFinishedAt = LocalDateTime.now();
     }
 
     private AgentResponse parseAgentResponse(String raw) throws IOException {

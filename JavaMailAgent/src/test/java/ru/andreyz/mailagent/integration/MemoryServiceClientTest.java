@@ -49,6 +49,17 @@ class MemoryServiceClientTest {
     }
 
     @Test
+    void createNoteSkippedWhenDisabled() {
+        MailConfig.MemoryServiceProperties props = new MailConfig.MemoryServiceProperties();
+        props.setUrl("http://localhost:19999");
+        props.setEnabled(false);
+
+        MemoryServiceClient client = new MemoryServiceClient(new ObjectMapper(), props);
+
+        assertDoesNotThrow(() -> client.createNote("Read later", "mail,email", "email"));
+    }
+
+    @Test
     void isHealthyReturnsFalseWhenDisabled() {
         MailConfig.MemoryServiceProperties props = new MailConfig.MemoryServiceProperties();
         props.setUrl("http://localhost:19999");
@@ -127,5 +138,29 @@ class MemoryServiceClientTest {
         verify(httpClient, times(4)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
         assertEquals(List.of(Duration.ofSeconds(2), Duration.ofSeconds(5), Duration.ofSeconds(10)), delays);
         assertEquals("Failed to save capture to memory-service", exception.getMessage());
+    }
+
+    @Test
+    void createNotePostsToNotesEndpoint() throws Exception {
+        MailConfig.MemoryServiceProperties props = new MailConfig.MemoryServiceProperties();
+        props.setUrl("http://localhost:19999");
+        props.setEnabled(true);
+
+        HttpClient httpClient = mock(HttpClient.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> successResponse = mock(HttpResponse.class);
+        when(successResponse.statusCode()).thenReturn(201);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(successResponse);
+
+        MemoryServiceClient client = new MemoryServiceClient(
+            new ObjectMapper(), props, httpClient, duration -> {}
+        );
+
+        client.createNote("Read later", "mail,email", "email");
+
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        assertEquals("http://localhost:19999/api/notes", requestCaptor.getValue().uri().toString());
     }
 }

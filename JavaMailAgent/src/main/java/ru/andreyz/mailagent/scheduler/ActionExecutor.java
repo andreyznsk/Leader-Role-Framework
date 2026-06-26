@@ -92,6 +92,7 @@ public class ActionExecutor {
                     case REQUEST -> executeRequestRoute(route, (RequestActionPayload) routePayload);
                     case CAPTURE -> executeCaptureRoute(route, (CaptureActionPayload) routePayload);
                     case NOTICE -> executeNoticeRoute(route, email, (NoticeActionPayload) routePayload);
+                    case NOTE -> executeNoteRoute(route, (NoteActionPayload) routePayload);
                     case NOISE, DRAFT -> executeMailSideEffectRoute(route, email, (MailSideEffectPayload) routePayload);
                 };
                 route = result.nextRoute();
@@ -194,6 +195,23 @@ public class ActionExecutor {
         };
     }
 
+    private StepResult executeNoteRoute(MailProcessingRoute route, NoteActionPayload payload) throws Exception {
+        return switch (route) {
+            case MEMORY_NOTE -> {
+                memoryServiceClient.createNote(payload.text(), payload.tags(), payload.source());
+                log.info("NOTE → memory-service notes: {}", payload.text());
+                yield new StepResult(MailProcessingRoute.MOVE_TO_PROCESSED, payload, null, null);
+            }
+            case MOVE_TO_PROCESSED -> {
+                moveToProcessedIfEnabled(resolveInbox(payload.sourceId()),
+                    resolveProcessed(payload.sourceId(), payload.processedFolder()),
+                    payload.moveEnabled());
+                yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
+            }
+            default -> throw new IllegalStateException("Unsupported NOTE route: " + route);
+        };
+    }
+
     private StepResult executeMailSideEffectRoute(MailProcessingRoute route,
                                                   Email email,
                                                   MailSideEffectPayload payload) throws Exception {
@@ -245,6 +263,16 @@ public class ActionExecutor {
                 runtime.moveProcessedMail(),
                 true
             );
+            case NOTE -> new NoteActionPayload(
+                response.noteText() != null && !response.noteText().isBlank()
+                    ? response.noteText()
+                    : (response.note() != null ? response.note() : ""),
+                "email",
+                "mail,email",
+                response.emailId(),
+                runtime.processedFolder(),
+                runtime.moveProcessedMail()
+            );
             case NOISE -> new MailSideEffectPayload(
                 runtime.processedFolder(),
                 runtime.moveProcessedMail(),
@@ -263,6 +291,7 @@ public class ActionExecutor {
             case REQUEST -> processingStateService.deserialize(payloadJson, RequestActionPayload.class);
             case CAPTURE -> processingStateService.deserialize(payloadJson, CaptureActionPayload.class);
             case NOTICE -> processingStateService.deserialize(payloadJson, NoticeActionPayload.class);
+            case NOTE -> processingStateService.deserialize(payloadJson, NoteActionPayload.class);
             case NOISE, DRAFT -> processingStateService.deserialize(payloadJson, MailSideEffectPayload.class);
         };
     }
@@ -272,6 +301,7 @@ public class ActionExecutor {
             case REQUEST -> MailProcessingRoute.PLAN_APPEND;
             case CAPTURE -> MailProcessingRoute.MEMORY_CAPTURE;
             case NOTICE -> MailProcessingRoute.NOTICE_WRITE;
+            case NOTE -> MailProcessingRoute.MEMORY_NOTE;
             case NOISE, DRAFT -> MailProcessingRoute.MOVE_TO_PROCESSED;
         };
     }
@@ -297,6 +327,9 @@ public class ActionExecutor {
         }
         if (payload instanceof NoticeActionPayload noticePayload) {
             return noticePayload.processedFolder();
+        }
+        if (payload instanceof NoteActionPayload notePayload) {
+            return notePayload.processedFolder();
         }
         if (payload instanceof MailSideEffectPayload mailPayload) {
             return mailPayload.processedFolder();
@@ -343,6 +376,15 @@ public class ActionExecutor {
         String processedFolder,
         boolean moveEnabled,
         boolean markAsRead
+    ) {}
+
+    public record NoteActionPayload(
+        String text,
+        String source,
+        String tags,
+        String sourceId,
+        String processedFolder,
+        boolean moveEnabled
     ) {}
 
     public record MailSideEffectPayload(

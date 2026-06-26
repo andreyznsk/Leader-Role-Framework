@@ -18,7 +18,7 @@ public class PromptBuilder {
 
             Верни JSON строго в следующем формате (только JSON, без пояснений):
             {
-              "type": "<REQUEST|DRAFT|NOISE|CAPTURE|NOTICE>",
+              "type": "<REQUEST|DRAFT|NOISE|CAPTURE|NOTICE|NOTE>",
               "emailId": "%s",
               "note": "<краткое объяснение решения>",
               "taskLine": "<строка для plans/today.md, только для REQUEST, иначе null>",
@@ -26,7 +26,8 @@ public class PromptBuilder {
               "priority": "<LOW|NORMAL|HIGH|CRITICAL, только для REQUEST, иначе null>",
               "sender": "<email отправителя, только для REQUEST, иначе null>",
               "draftPath": "<путь к черновику drafts/..., только для DRAFT, иначе null>",
-              "captureText": "<суть письма 1-2 предложения, только для CAPTURE, иначе null>"
+              "captureText": "<суть письма 1-2 предложения, только для CAPTURE, иначе null>",
+              "noteText": "<текст заметки для /api/notes, только для NOTE, иначе null>"
             }
 
             Типы:
@@ -38,6 +39,9 @@ public class PromptBuilder {
             - NOTICE: письмо содержит полезную knowledge-информацию для RAG.
               Примеры: договорённости, изменения процессов, архитектурные решения, релизные правила, важные FYI.
               Для NOTICE в note кратко объясни, почему письмо важно для базы знаний.
+            - NOTE: письмо нужно сохранить как обычную текущую заметку в `/api/notes`, а не в RAG и не в capture inbox.
+              Используй для материалов "почитать позже", наблюдений, сырых идей и полезных фактов без явного action item.
+              noteText = короткая полезная заметка в 1-3 предложения.
 
             Приоритет (только для REQUEST):
             - CRITICAL: "срочно", "asap", "до сегодня"

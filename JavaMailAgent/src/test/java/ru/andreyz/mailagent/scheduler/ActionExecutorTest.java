@@ -84,7 +84,7 @@ class ActionExecutorTest {
         Files.writeString(inbox.resolve(emailId + ".json"), "{}");
 
         AgentResponse response = new AgentResponse(
-            AgentResponseType.NOISE, emailId, "CI notification", null, null, null, null, null, null
+            AgentResponseType.NOISE, emailId, "CI notification", null, null, null, null, null, null, null
         );
 
         executor.execute(email(emailId), response);
@@ -107,6 +107,7 @@ class ActionExecutorTest {
             "Review PR #42",
             "HIGH",
             "ivanov@test.com",
+            null,
             null,
             null
         );
@@ -133,6 +134,7 @@ class ActionExecutorTest {
             "Review PR #42",
             "HIGH",
             "ivanov@test.com",
+            null,
             null,
             null
         );
@@ -170,7 +172,8 @@ class ActionExecutorTest {
             AgentResponseType.CAPTURE, emailId,
             "Useful FYI",
             null, null, null, null, null,
-            "К сведению: переезд на новый кластер с 1 июля"
+            "К сведению: переезд на новый кластер с 1 июля",
+            null
         );
 
         executor.execute(email(emailId), response);
@@ -189,7 +192,7 @@ class ActionExecutorTest {
 
         AgentResponse response = new AgentResponse(
                 AgentResponseType.NOTICE, emailId,
-                "Новая release-практика команды", null, null, null, null, null, null
+                "Новая release-практика команды", null, null, null, null, null, null, null
         );
 
         executor.execute(
@@ -216,6 +219,31 @@ class ActionExecutorTest {
     void sanitizeReplacesSpecialChars() {
         assertEquals("AAMk-123__abc", ActionExecutor.sanitize("AAMk-123::abc"));
         assertEquals("user_test.com", ActionExecutor.sanitize("user@test.com"));
+    }
+
+    @Test
+    void noteCreatesMemoryNoteAndMovesEmailToProcessed() throws Exception {
+        Path inbox = tempDir.resolve("inbox");
+        Files.createDirectories(inbox);
+        String emailId = "test-note-001";
+        Files.writeString(inbox.resolve(emailId + ".json"), "{}");
+
+        AgentResponse response = new AgentResponse(
+            AgentResponseType.NOTE, emailId,
+            "Стоит сохранить в заметки",
+            null, null, null, null, null, null,
+            "Посмотреть практики blue-green rollout у соседней команды."
+        );
+
+        executor.execute(email(emailId), response);
+
+        verify(memoryServiceClient).createNote(
+            "Посмотреть практики blue-green rollout у соседней команды.",
+            "mail,email",
+            "email"
+        );
+        assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
+        assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
     }
 
     private Email email(String emailId) {

@@ -1,6 +1,6 @@
 # LeaderOS — Architecture - Мастер-Спека
 
-**Последнее обновление:** 2026-06-23
+**Последнее обновление:** 2026-06-26
 **Статус:** Living document — обновлять при любом изменении контрактов между сервисами
 **git:** https://github.com/andreyznsk/Leader-Role-Framework.git
 ---
@@ -99,16 +99,21 @@ agent:
 | `NOISE` | move в `processed/` -> `MARK_AS_READ` |
 | `CAPTURE` | POST `/api/capture` -> move в `processed/` |
 | `NOTICE` | записать NOTICE markdown -> move в `processed/` -> `MARK_AS_READ` |
+| `NOTE` | POST `/api/notes` -> move в `processed/` |
 
 **Трекинг обработанных писем:** таблица `mailagent.processed_emails` теперь хранит не только dedup, но и checkpoint state-machine:
 - `status`: `NEW | PROCESSING | ERROR | PROCESSED`
-- `failed_route`: checkpoint следующего side-effect (`PLAN_APPEND`, `MEMORY_PENDING_TASK`, `MEMORY_CAPTURE`, `NOTICE_WRITE`, `MOVE_TO_PROCESSED`, `MARK_AS_READ`)
+- `failed_route`: checkpoint следующего side-effect (`PLAN_APPEND`, `MEMORY_PENDING_TASK`, `MEMORY_CAPTURE`, `MEMORY_NOTE`, `NOTICE_WRITE`, `MOVE_TO_PROCESSED`, `MARK_AS_READ`)
 - `route_payload_json`: сериализованный payload для retry без повторного чтения письма с сервера и без повторного вызова LLM
 
 **Retry flow:** каждый poll сначала обрабатывает очередь `status=ERROR` по `last_attempt_at, created_at`. Пока очередь ошибок не пуста, новые письма не имеют приоритета. При падении любого route batch останавливается, запись письма остаётся в `ERROR`, а следующий запуск продолжает цепочку с сохранённого checkpoint.
 
+**Scheduler:** polling запускается через `@Scheduled(fixedDelayString = "#{${mail.poll-interval-seconds:60} * 1000}")`. Параметр `mail.poll-interval-seconds` читается из application properties при старте приложения.
+
 **Исходящие вызовы:**
 - `POST http://localhost:8082/api/tasks/pending` — создать PENDING задачу
+- `POST http://localhost:8082/api/capture` — создать raw capture
+- `POST http://localhost:8082/api/notes` — создать operational note
 
 **UI:** `http://localhost:8080/ui/status` — статус агента, счётчики, последние логи
 
@@ -212,6 +217,8 @@ MemoryService выступает единой точкой управления 
 | `POST` | `/api/settings/control/plugins/mail/test-connection` | Единый endpoint для кнопки `Test Connection` в UI MemoryService. Проксирует вызов в MailAgent, не запускает polling и не меняет состояние писем. |
 
 **UI Settings:** `/ui/settings` — Thymeleaf-страница `settings.html`. Рендерит форму настроек на сервере через `ControlSettingsDescriptor`. Данные полностью server-side (Thymeleaf), без client-side API fetch при загрузке. Форма сохраняется через browser fetch → `PUT /api/settings/control/plugins/{code}/settings`.
+
+**Live Prompt Editing Policy:** prompt templates plugin-сервисов редактируются через тот же control plane UI `/ui/settings`, что и остальные runtime settings. Каждый plugin хранит свои prompts в собственной БД, в отдельной таблице своей схемы. Начальные prompt values seed-ятся Flyway migration-ами. После этого пользователь может менять prompt в реальном времени через descriptor-driven form (`type=text`), plugin сохраняет обновлённый prompt в свою БД и использует его на следующем вызове без рестарта процесса. Snapshot в MemoryService не является source of truth для prompts, он нужен только для proxy UI и audit/history.
 
 **Статусы задачи:** `PENDING → TODO → IN_PROGRESS → DONE` / `DELETED`
 

@@ -194,18 +194,6 @@ public class MailRuntimeConfigService {
         return current.get();
     }
 
-    public boolean shouldPoll(LocalDateTime now, LocalDateTime lastFinishedAt) {
-        MailRuntimeConfig config = snapshot();
-        if (!config.enabled()) {
-            return false;
-        }
-        if (lastFinishedAt == null) {
-            return true;
-        }
-        return lastFinishedAt.plusSeconds(config.pollIntervalSeconds()).isBefore(now)
-                || lastFinishedAt.plusSeconds(config.pollIntervalSeconds()).isEqual(now);
-    }
-
     public void registerPollResult(String result) {
         lastPollAt = LocalDateTime.now();
         lastPollResult = result;

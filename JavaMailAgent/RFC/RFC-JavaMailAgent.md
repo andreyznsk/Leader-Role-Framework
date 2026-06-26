@@ -15,8 +15,11 @@
 Spring Boot 3 приложение. Подключается к корпоративному почтовому серверу,
 читает новые письма, для каждого вызывает LLM через `AgentClient` из `common`, выполняет
 детерминированное действие по результату. Интегрируется с `java-memory-service`
-для хранения задач и capture flow, а с `JavaRagService` — через файловый inbox для
-`NOTICE`-документов. Имеет минимальный Web UI для просмотра статуса.
+для хранения задач, operational notes и capture flow, а с `JavaRagService` — через
+файловый inbox для `NOTICE`-документов. Имеет минимальный Web UI для просмотра статуса.
+
+Классификационный prompt относится к runtime configuration: стартовое значение seed-ится
+миграцией БД, дальше prompt редактируется через control plane и хранится в БД MailAgent.
 
 Работает как бесконечный фоновый процесс.
 
@@ -56,6 +59,9 @@ Spring Boot поддерживает профили через `application-{ENV
 или `SPRING_PROFILES_ACTIVE`.
 
 ```
+
+`PromptBuilder` не должен быть единственным source of truth для текста prompt-а.
+Его роль — собрать финальный prompt из runtime template и данных конкретного письма.
 src/main/resources/
 ├── application.yml              ← общие настройки (в git)
 ├── application-local.yml        ← Maildev Docker
@@ -288,13 +294,13 @@ JavaMailAgent/
     │   │   ├── model/
     │   │   │   ├── Email.java                  ← record (id, subject, from, body, receivedAt, folder)
     │   │   │   ├── AgentResponse.java          ← record (@JsonInclude NON_NULL)
-    │   │   │   ├── AgentResponseType.java      ← enum: REQUEST/DRAFT/NOISE/CAPTURE/NOTICE
+    │   │   │   ├── AgentResponseType.java      ← enum: REQUEST/DRAFT/NOISE/CAPTURE/NOTICE/NOTE
     │   │   │   ├── PendingTaskRequest.java     ← record, payload для memory-service
     │   │   │   └── ProcessedEmail.java         ← Spring Data JDBC record (@Table mailagent.processed_emails)
     │   │   ├── repository/
     │   │   │   └── ProcessedEmailRepository.java ← CrudRepository, existsByEmailId()
     │   │   ├── scheduler/
-    │   │   │   ├── MailAgentJob.java           ← @Scheduled(fixedDelay), главный цикл
+    │   │   │   ├── MailAgentJob.java           ← @Scheduled(fixedDelayString), главный цикл
     │   │   │   ├── PromptBuilder.java          ← формирует промпт для Claude
     │   │   │   └── ActionExecutor.java         ← switch по AgentResponseType
     │   │   ├── integration/
@@ -343,7 +349,7 @@ logs/
 10:32:17 INFO  MailAgentJob        - Classified as NOISE
 10:32:17 INFO  ActionExecutor      - NOISE: CI уведомление, пропускаем
 10:32:17 INFO  MailAgentJob        - Email AAMk-456 marked as read (NOISE)
-10:32:18 INFO  MailAgentJob        - Poll finished: 3 processed (1 REQUEST, 0 DRAFT, 1 NOISE, 0 CAPTURE, 1 NOTICE, 0 errors)
+10:32:18 INFO  MailAgentJob        - Poll finished: 3 processed (1 REQUEST, 0 DRAFT, 1 NOISE, 0 CAPTURE, 1 NOTICE, 0 NOTE, 0 errors)
 10:32:18 WARN  MailAgentJob        - Email AAMk-789 failed: Claude timed out after 5 minutes, will retry next poll
 ```
 
@@ -382,17 +388,18 @@ logs/
 ## 7. Scheduler
 
 `fixedDelay` — следующий тик только после завершения предыдущего (один поток).
+Значение берётся из `mail.poll-interval-seconds` через Spring expression.
 
 Логика поллинга:
 1. Получить список папок (`listFolders`), исключить `mail.folders.exclude`
 2. Для каждой папки — получить непрочитанные письма (`listUnread(folder, limit)`)
 3. Пропустить письма, уже записанные в `processed_emails` (dedup по `emailId`)
 4. Обработать: Claude → ActionExecutor → записать в `processed_emails`
-5. `markAsRead` — для `NOISE` и для `NOTICE` после успешной записи markdown-файла (`REQUEST`/`DRAFT`/`CAPTURE` остаются непрочитанными)
+5. `markAsRead` — для `NOISE` и для `NOTICE` после успешной записи markdown-файла (`REQUEST`/`DRAFT`/`CAPTURE`/`NOTE` остаются непрочитанными)
 
 ```java
 // fixedDelay — следующий тик только после завершения предыдущего
-@Scheduled(fixedDelayString = "${mail.poll-interval-seconds:60}000")
+@Scheduled(fixedDelayString = "#{${mail.poll-interval-seconds:60} * 1000}")
 public void poll() {
     List<String> folders = mailClient.listFolders(folderProperties.getExclude());
 
@@ -418,6 +425,20 @@ private AgentResponse processEmail(Email email) throws Exception {
 ```
 
 `@EnableScheduling` — на `MailAgentApplication`.
+
+## 7.1 Prompt runtime editing
+
+Prompt editing ideology for MailAgent:
+
+1. Базовый classification prompt хранится в отдельной таблице схемы `mailagent`.
+2. Первая запись создаётся Flyway migration-ом как seed data.
+3. `GET /api/control/settings` отдаёт prompt в descriptor как поле `type=text`.
+4. `JavaMemoryService /ui/settings` позволяет редактировать prompt в реальном времени.
+5. `PUT /api/control/settings` сохраняет prompt в БД MailAgent.
+6. Следующий вызов `promptBuilder.build(email)` использует уже обновлённый prompt.
+7. Изменение попадает в audit trail plugin settings.
+
+Следствие: правка prompt-а не требует изменения `.java` файла, пересборки и рестарта.
 
 ---
 
@@ -470,6 +491,22 @@ Memory Service /ui/knowledge?type=NOTICE
 
 `NOTICE` используется для писем, которые уже должны стать knowledge-документом:
 release/process changes, operating rules, архитектурные договорённости, письма для RAG lifecycle.
+
+### Поток NOTE → Operational Notes
+
+```
+MailAgentJob (классифицировал как NOTE)
+        ↓
+POST http://localhost:8082/api/notes
+        ↓
+JavaMemoryService сохраняет заметку в memory.notes
+        ↓
+Пользователь читает /ui/notes или возвращается к заметке позже
+```
+
+`NOTE` используется для писем, которые не надо превращать в RAG-документ и не надо
+пускать через Capture Bot: "почитать позже", наблюдения, сырые идеи, полезные факты
+и материалы для дальнейшего изучения.
 
 ### PendingTaskRequest.java — record
 ```java
@@ -539,13 +576,17 @@ public class MemoryServiceClient {
         }
     }
 
-    public void createCapture(String text, String source) {
+    public void createCapture(String text, String source, String sourceId) {
         if (!enabled) {
             log.debug("memory-service disabled, skipping capture");
             return;
         }
         try {
-            String body = objectMapper.writeValueAsString(Map.of("text", text, "source", source));
+            String body = objectMapper.writeValueAsString(Map.of(
+                "text", text,
+                "source", source,
+                "sourceId", sourceId
+            ));
             HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + "/api/capture"))
                 .header("Content-Type", "application/json")
@@ -560,6 +601,34 @@ public class MemoryServiceClient {
             }
         } catch (Exception e) {
             log.warn("Failed to save capture to memory-service: {}", e.getMessage());
+        }
+    }
+
+    public void createNote(String text, String tags, String source) {
+        if (!enabled) {
+            log.debug("memory-service disabled, skipping note");
+            return;
+        }
+        try {
+            String body = objectMapper.writeValueAsString(Map.of(
+                "text", text,
+                "tags", tags,
+                "source", source
+            ));
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/api/notes"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .timeout(Duration.ofSeconds(5))
+                .build();
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200 || response.statusCode() == 201) {
+                log.info("Note saved to memory-service");
+            } else {
+                log.warn("memory-service /api/notes returned {}: {}", response.statusCode(), response.body());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to save note to memory-service: {}", e.getMessage());
         }
     }
 
@@ -624,7 +693,7 @@ public class ActionExecutor {
                 String text = response.captureText() != null && !response.captureText().isBlank()
                     ? response.captureText()
                     : response.note();
-                memoryServiceClient.createCapture(text, "email");
+                memoryServiceClient.createCapture(text, "email", response.emailId());
                 Files.move(inbox, processed, StandardCopyOption.REPLACE_EXISTING);
                 log.info("CAPTURE → memory-service: {}", text);
             }
@@ -632,6 +701,14 @@ public class ActionExecutor {
                 Path noticePath = noticeDocumentWriter.write(email, response.note());
                 Files.move(inbox, processed, StandardCopyOption.REPLACE_EXISTING);
                 log.info("NOTICE → rag-inbox: {}", noticePath);
+            }
+            case NOTE -> {
+                String text = response.noteText() != null && !response.noteText().isBlank()
+                    ? response.noteText()
+                    : response.note();
+                memoryServiceClient.createNote(text, "mail,email", "email");
+                Files.move(inbox, processed, StandardCopyOption.REPLACE_EXISTING);
+                log.info("NOTE → memory-service notes: {}", text);
             }
         }
     }
@@ -652,7 +729,8 @@ public record AgentResponse(
     String priority,     // LOW|NORMAL|HIGH|CRITICAL (только REQUEST)
     String sender,       // email отправителя (только REQUEST)
     String draftPath,    // путь к черновику (только DRAFT)
-    String captureText   // краткое изложение письма (только CAPTURE)
+    String captureText,  // краткое изложение письма (только CAPTURE)
+    String noteText      // текст заметки для /api/notes (только NOTE)
 ) {}
 ```
 
@@ -671,7 +749,7 @@ public interface MailClient {
 ```
 
 `markAsRead` вызывается для `NOISE`, а также для `NOTICE` после успешной записи markdown.
-`REQUEST`, `DRAFT` и `CAPTURE` остаются непрочитанными в почте, повторная обработка
+`REQUEST`, `DRAFT`, `CAPTURE` и `NOTE` остаются непрочитанными в почте, повторная обработка
 предотвращается через `processed_emails`.
 
 ### EwsMailClient — Exchange on-premise ✅ реализован
@@ -764,7 +842,7 @@ CREATE TABLE mailagent.processed_emails (
     folder        VARCHAR(255),
     sender        VARCHAR(255),
     subject       VARCHAR(512),
-    agent_type    VARCHAR(16) NOT NULL,   -- REQUEST | DRAFT | NOISE | CAPTURE | NOTICE
+    agent_type    VARCHAR(16) NOT NULL,   -- REQUEST | DRAFT | NOISE | CAPTURE | NOTICE | NOTE
     output_path   TEXT,                   -- путь до созданного RAG markdown для NOTICE
     processed_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -960,7 +1038,7 @@ SMTP нужен только для **отправки**. В MVP не реали
 13. `common.MockAgentClient` — mock с логикой по русским ключевым словам; `MockClaudeRunner` удалён
 14. `MemoryServiceClient.java` — POST /api/tasks/pending + isHealthy()
 15. `ActionExecutor.java` — switch по enum + вызов MemoryServiceClient
-16. `MailAgentJob.java` — `@Scheduled(fixedDelay)`, мульти-папки, dedup через processed_emails
+16. `MailAgentJob.java` — `@Scheduled(fixedDelayString)`, мульти-папки, dedup через processed_emails
 17. `ProcessedEmailRepository.java` + `V1__create_processed_emails.sql`
 18. `StatusController.java` + `status.html` — Web UI
 19. `logback-spring.xml` — ротация логов по профилям

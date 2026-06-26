@@ -88,6 +88,7 @@ JavaRagService
 - отдельные collapsible sections по каждому plugin;
 - universal dynamic form, построенную по descriptor `settings`;
 - audit block по каждому plugin.
+- prompt fields plugins, если plugin публикует их через descriptor.
 
 ### Список control plugins
 
@@ -133,6 +134,13 @@ JavaRagService
 - plain secret никогда не возвращается;
 - при сохраненном секрете показывается маска `*****`;
 - при отсутствии секрета показывается placeholder `Enter new secret`.
+
+Для prompt-полей:
+
+- используются `text` / textarea controls;
+- UI не знает семантику prompt-а и не хранит prompt как source of truth;
+- длинные prompt templates редактируются и сохраняются как обычные runtime settings;
+- после сохранения source of truth остаётся в БД самого plugin-сервиса.
 
 ### Browser debug behavior
 
@@ -222,6 +230,9 @@ Request:
 }
 ```
 
+Prompt templates подчиняются тому же контракту. Если plugin публикует поле вроде
+`classificationPrompt`, MemoryService проксирует его как обычное `settings[classificationPrompt]`.
+
 Внутри MemoryService вызывает:
 
 ```http
@@ -262,6 +273,10 @@ MVP-реализация может:
 - `control_plugins`
 - `control_plugin_settings_snapshot`
 - `control_plugin_audit`
+
+Важно: snapshot в схеме `memory` не является master-хранилищем prompt-ов. Он нужен
+для UI/offline отображения последнего известного descriptor-а. Каноническое хранение
+prompt templates остаётся в БД самого plugin-сервиса.
 
 Назначение:
 

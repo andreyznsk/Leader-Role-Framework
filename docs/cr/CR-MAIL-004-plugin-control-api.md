@@ -24,6 +24,10 @@ MemoryService будет использовать этот контракт ка
 5. MailAgent применяет изменения в runtime.
 6. MailAgent пишет в логи, какие настройки применились.
 
+Отдельный случай этого контракта — runtime prompt editing. Классификационный prompt
+MailAgent не должен жить только в `PromptBuilder.java`; он должен редактироваться
+через тот же control API и храниться в БД MailAgent.
+
 ## Решение
 
 Добавить в `JavaMailAgent` новый REST API:
@@ -35,6 +39,21 @@ MemoryService будет использовать этот контракт ка
 ```
 
 Этот API нужен не пользователю напрямую, а `JavaMemoryService`.
+
+## Prompt persistence policy
+
+Prompt templates MailAgent хранятся по следующим правилам:
+
+- prompt template лежит в отдельной таблице схемы `mailagent`;
+- первая версия prompt-а создаётся Flyway migration-ом как seed data;
+- `PromptBuilder` не является каноническим хранилищем текста prompt-а, он только
+  собирает финальный prompt из runtime template + данных письма;
+- `GET /api/control/settings` возвращает текущий prompt из БД как editable field;
+- `PUT /api/control/settings` сохраняет обновлённый prompt в БД;
+- новый prompt начинает использоваться на следующем письме без рестарта процесса;
+- изменение prompt-а попадает в `mailagent.control_settings_audit`.
+
+MVP scope: first editable prompt is mail classification prompt from `PromptBuilder.java`.
 
 ## API
 
@@ -176,6 +195,15 @@ Response:
       "editable": true,
       "secret": false,
       "required": false
+    },
+    "classificationPrompt": {
+      "value": "Ты — ассистент Tech Lead...",
+      "type": "text",
+      "label": "Classification Prompt",
+      "description": "Runtime prompt template for email classification",
+      "editable": true,
+      "secret": false,
+      "required": true
     }
   }
 }
@@ -202,6 +230,7 @@ Request:
     "pollIntervalSeconds": "60",
     "foldersInclude": "Inbox",
     "foldersExclude": "Inbox/CI/CD\nJunk Email",
+    "classificationPrompt": "Ты — ассистент Tech Lead...",
     "markNoiseAsRead": "true",
     "moveProcessedMail": "true"
   }
@@ -351,18 +380,20 @@ CREATE TABLE mailagent.control_settings_audit (
 1. В `JavaMailAgent` есть `GET /api/control/settings`.
 2. Endpoint возвращает descriptor настроек в формате key-value map с metadata.
 3. В descriptor есть минимум настройки: `enabled`, `protocol`, `login`, `password`, `serverUrl`, `host`, `port`, `ssl`, `pollIntervalSeconds`, `foldersInclude`, `foldersExclude`, `markNoiseAsRead`, `moveProcessedMail`, `processedFolder`, `draftFolder`.
-4. В `JavaMailAgent` есть `PUT /api/control/settings`.
-5. `PUT /api/control/settings` применяет измененные значения в runtime config.
-6. `enabled=false` останавливает polling, но не JVM процесс.
-7. `enabled=true` включает polling, если конфигурация валидна.
-8. При изменении polling/mail настроек polling loop безопасно перезапускается.
-9. Секреты принимаются только на запись и не возвращаются в открытом виде.
-10. Plain password/token не попадает в application logs.
-11. После применения настроек пишется лог со списком примененных ключей.
-12. После применения настроек пишется audit-запись в БД или in-memory audit MVP.
-13. Есть `GET /api/control/status`.
-14. Есть `GET /api/control/audit`.
-15. Добавлен E2E сценарий для MailAgent control API.
+4. Descriptor дополнительно может содержать runtime prompt fields типа `text`, например `classificationPrompt`.
+5. В `JavaMailAgent` есть `PUT /api/control/settings`.
+6. `PUT /api/control/settings` применяет измененные значения в runtime config.
+7. Prompt fields сохраняются в БД MailAgent и используются без рестарта на следующем письме.
+8. `enabled=false` останавливает polling, но не JVM процесс.
+9. `enabled=true` включает polling, если конфигурация валидна.
+10. При изменении polling/mail настроек polling loop безопасно перезапускается.
+11. Секреты принимаются только на запись и не возвращаются в открытом виде.
+12. Plain password/token не попадает в application logs.
+13. После применения настроек пишется лог со списком примененных ключей.
+14. После применения настроек пишется audit-запись в БД или in-memory audit MVP.
+15. Есть `GET /api/control/status`.
+16. Есть `GET /api/control/audit`.
+17. Добавлен E2E сценарий для MailAgent control API.
 
 ## Как тестировать
 
