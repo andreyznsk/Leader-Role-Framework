@@ -19,22 +19,31 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final DailyPlanRepository planRepository;
     private final UsageEventService usageEventService;
+    private final TaskFileService taskFileService;
 
     public TaskService(TaskRepository taskRepository,
                        DailyPlanRepository planRepository,
-                       UsageEventService usageEventService) {
+                       UsageEventService usageEventService,
+                       TaskFileService taskFileService) {
         this.taskRepository = taskRepository;
         this.planRepository = planRepository;
         this.usageEventService = usageEventService;
+        this.taskFileService = taskFileService;
     }
 
     public Task createConfirmed(LocalDate date, String title, String priority,
                                 String description, String source, String emailId) {
+        return createConfirmed(date, title, priority, description, source, emailId, date, "TODO");
+    }
+
+    public Task createConfirmed(LocalDate date, String title, String priority,
+                                String description, String source, String emailId,
+                                LocalDate dueDate, String status) {
         Long planId = getOrCreatePlan(date).id();
         int sortOrder = taskRepository.findMaxSortOrderByPlanId(planId) + 1;
         Task task = new Task(null, planId, title, description,
-                "TODO", priority != null ? priority : "NORMAL",
-                date, source != null ? source : "MANUAL", emailId,
+                status != null ? status : "TODO", priority != null ? priority : "NORMAL",
+                dueDate != null ? dueDate : date, source != null ? source : "MANUAL", emailId,
                 sortOrder, Instant.now(), Instant.now());
         Task saved = taskRepository.save(task);
         recordTaskCreated(saved, usageSource(source), false);
@@ -98,6 +107,11 @@ public class TaskService {
 
     public Task reject(Long id) {
         return updateStatus(id, "DELETED");
+    }
+
+    public void deleteTask(Long id) {
+        updateStatus(id, "DELETED");
+        taskFileService.delete(id);
     }
 
     public Task edit(Long id, EditTaskRequest req) {

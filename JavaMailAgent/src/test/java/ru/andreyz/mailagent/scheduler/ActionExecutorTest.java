@@ -248,6 +248,7 @@ class ActionExecutorTest {
         );
         assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
+        verify(mailClient).markAsRead(emailId, "INBOX");
     }
 
     private Email email(String emailId) {

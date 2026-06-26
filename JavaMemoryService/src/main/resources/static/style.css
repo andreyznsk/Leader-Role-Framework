@@ -36,6 +36,10 @@ body {
   padding-top: 56px;
 }
 
+.los-page-content {
+  padding-top: 20px;
+}
+
 /* ─── NAVBAR ─────────────────────────────────────── */
 .los-navbar {
   position: fixed;
@@ -258,6 +262,30 @@ body {
 
 .los-plugin-field:last-child {
   border-bottom: 0;
+}
+
+.task-deadline {
+  min-width: 118px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text2);
+}
+
+.task-deadline-overdue {
+  color: var(--accent3);
+}
+
+.los-add-task-btn {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-width: 108px;
+  line-height: 1.05;
+  font-weight: 600;
 }
 
 .los-collapse-toggle {

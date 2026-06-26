@@ -183,7 +183,7 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | Метод | Путь | Описание |
 |-------|------|----------|
 | `GET` | `/api/context` | Контекст сессии: today/tomorrow, open incidents/risks, recent people notes |
-| `POST` | `/api/tasks` | Создать подтверждённую задачу |
+| `POST` | `/api/tasks` | Создать подтверждённую задачу; UI создаёт title, description, priority, status, dueDate, date |
 | `POST` | `/api/tasks/pending` | Создать задачу со статусом PENDING |
 | `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `DELETED` по умолчанием |
 | `PATCH` | `/api/tasks/{id}/status` | Изменить статус задачи |
@@ -234,7 +234,9 @@ MemoryService выступает единой точкой управления 
 из task, pending task, capture, capture processing и knowledge search flow. Агрегаты доступны через
 `GET /api/stats/usage?period=today|7d|30d|all`, UI — `/ui/stats`. Saved time считается
 по MVP-формуле из CR-MEM-008. Knowledge search и knowledge document management проходят через
-REST proxy (`/api/knowledge/**`) и не получают прямого JDBC-доступа к схеме `rag`.
+REST proxy (`/api/knowledge/**`) и не получают прямого JDBC-доступа к схеме `rag`. Поле
+`usage_events.correlation_id` хранится без жёсткого лимита `VARCHAR(128)`, чтобы не падать на длинных
+mail `Message-ID`.
 
 **MCP tools:** `getContext`, `getTasks`, `createTask`, `markTaskDone`, `moveTask`,
 `updateTaskStatus`, `getTaskDescription`, `setTaskDescription`, `createIncident`,

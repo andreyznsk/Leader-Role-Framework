@@ -164,6 +164,8 @@ Saved time MVP formula:
 - `CAPTURE_PROCESSED = 2 min`
 - `TASK_CREATED = 1 min`
 
+Для mail-derived задач `usage_events.correlation_id` должен допускать длинные `Message-ID`, поэтому хранится без ограничения `VARCHAR(128)`.
+
 ### 4.1 Схема (V1__init_schema.sql)
 
 ```sql
@@ -586,14 +588,14 @@ POST /api/plans
 
 # Задачи
 GET  /api/tasks?date=2026-06-08&status=TODO
-POST /api/tasks                          # создать подтверждённую задачу (агент после confirm)
+POST /api/tasks                          # создать подтверждённую задачу; поддерживает title, description, priority, status, dueDate, date, source
 PUT  /api/tasks/{id}
 PATCH /api/tasks/{id}/status             body: { "status": "TODO|IN_PROGRESS|BLOCKED|DONE" }
 POST /api/tasks/{id}/done
 POST /api/tasks/{id}/move                body: { "toDate": "2026-06-09" }
 POST /api/tasks/{id}/reorder             body: { "direction": "up"|"down" } | { "position": N }
-POST   /api/tasks/{id}/delete             # мягкое удаление (статус → DELETED)
-DELETE /api/tasks/{id}                   # мягкое удаление (статус → DELETED), REST-алиас
+POST   /api/tasks/{id}/delete            # мягкое удаление (статус → DELETED) + удалить workspace/tasks/TASK-{id}.md если файл существует
+DELETE /api/tasks/{id}                   # мягкое удаление (статус → DELETED) + удалить workspace/tasks/TASK-{id}.md, REST-алиас
 
 # Knowledge Gateway proxy (без прямого JDBC в schema rag)
 POST /api/knowledge/search
@@ -670,8 +672,7 @@ Base: `http://localhost:8082/ui`
 Секции страницы (порядок сверху вниз):
 1. **Сводка** — 4 карточки: задач сегодня / ожидают подтверждения / открытые инциденты / выполнено
 2. **Ожидают подтверждения** — показывается только если есть PENDING задачи
-3. **План на сегодня** — список задач с управлением (сортировка по `sort_order`)
-4. **Завтра** — список задач на следующий день (только просмотр + действия)
+3. **Текущие задачи** — список активных задач с фильтрами и сортировкой по полям
 
 Секция **"Ожидают подтверждения"** (показывается только если есть PENDING задачи):
 ```
@@ -688,22 +689,26 @@ Base: `http://localhost:8082/ui`
 └─────────────────────────────────────────────────┘
 ```
 
-Секция **"План на сегодня"** — управление задачами в строке:
+Секция **"Текущие задачи"**:
+
+- фильтры: `priority`, `status`, `dueDate`
+- сортировка кнопками `↑/↓` у полей `priority`, `status`, `dueDate`
+- задача открывается по клику на название
+- дедлайн показывается отдельной колонкой `DL`
+- кнопка `Завтра` сдвигает дедлайн на `+1 день` относительно текущего дедлайна
+- удаление происходит через modal-подтверждение и удаляет также markdown-файл описания
+
+Управление задачами в строке:
 
 | Элемент | Действие | HTTP |
 |---------|----------|------|
 | Чекбокс | `DONE` / снять | `POST /api/tasks/{id}/done` |
-| Стрелка ↑ | переместить вверх | `POST /api/tasks/{id}/reorder` `{"direction":"up"}` |
-| Стрелка ↓ | переместить вниз | `POST /api/tasks/{id}/reorder` `{"direction":"down"}` |
 | Иконка флага | циклически менять приоритет | `PUT /api/tasks/{id}` |
-| Иконка карандаша | открыть форму редактирования | `GET /ui/tasks/{id}/edit` |
-| Иконка корзины | удалить (без подтверждения) | `POST /api/tasks/{id}/delete` |
-| Drag handle `⠿` | drag-and-drop сортировка | `POST /api/tasks/{id}/reorder` `{"position":N}` |
+| Название задачи | открыть форму редактирования | `GET /ui/tasks/{id}/edit` |
+| Кнопка `Завтра` | сдвинуть дедлайн на +1 день | `PUT /api/tasks/{id}` |
+| Иконка удаления | открыть modal подтверждения и удалить задачу + md-файл | `DELETE /api/tasks/{id}` |
 
-Добавление задачи: кнопка "добавить" раскрывает inline-строку — поле `title` + select `priority` + `POST /api/tasks`.
-
-Секция **"Завтра"**:
-- Список задач на завтра (только просмотр + те же кнопки)
+Добавление задачи: зелёная кнопка `Добавить / задачу` расположена рядом с `Применить` и `Сбросить`, открывает modal-форму с полями `title`, `description`, `priority`, `status`, `dueDate`. После `POST /api/tasks` описание дополнительно пишется в `workspace/tasks/TASK-{id}.md` через `PUT /api/tasks/{id}/description`.
 
 **`/ui/tasks/{id}/edit`** — Форма редактирования задачи
 
@@ -719,7 +724,7 @@ Base: `http://localhost:8082/ui`
 Markdown-редактор — две вкладки: `markdown` (raw, monospace) и `preview` (HTML-рендер через JS, без библиотек).
 Под textarea — бейдж с путём к файлу: `📄 workspace/tasks/TASK-003.md`.
 
-Удаление на странице edit — двойное подтверждение: первый клик меняет текст на "точно удалить?" (3 сек), второй — `POST /api/tasks/{id}/delete` + удаление файла описания.
+Удаление на странице edit — двойное подтверждение: первый клик меняет текст на "точно удалить?" (3 сек), второй — `DELETE /api/tasks/{id}` + удаление файла описания.
 
 **`/ui/incidents`** — Активные инциденты
 - Список с severity badge (P1/P2/P3)
@@ -918,7 +923,7 @@ Leader-Role-Framework/
 
 **`TaskFileService`** — создаёт директорию при старте (`@PostConstruct`), читает/пишет файлы через `Files.readString` / `Files.writeString`. Если файл отсутствует при чтении — возвращает пустую строку (нормально для старых задач).
 
-При удалении задачи через `POST /api/tasks/{id}/delete` файл описания удаляется (`Files.deleteIfExists`).
+При удалении задачи через `POST /api/tasks/{id}/delete` или `DELETE /api/tasks/{id}` файл описания удаляется (`Files.deleteIfExists`).
 
 ---
 

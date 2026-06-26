@@ -92,7 +92,7 @@ public class ActionExecutor {
                     case REQUEST -> executeRequestRoute(route, (RequestActionPayload) routePayload);
                     case CAPTURE -> executeCaptureRoute(route, (CaptureActionPayload) routePayload);
                     case NOTICE -> executeNoticeRoute(route, email, (NoticeActionPayload) routePayload);
-                    case NOTE -> executeNoteRoute(route, (NoteActionPayload) routePayload);
+                    case NOTE -> executeNoteRoute(route, email, (NoteActionPayload) routePayload);
                     case NOISE, DRAFT -> executeMailSideEffectRoute(route, email, (MailSideEffectPayload) routePayload);
                 };
                 route = result.nextRoute();
@@ -195,7 +195,9 @@ public class ActionExecutor {
         };
     }
 
-    private StepResult executeNoteRoute(MailProcessingRoute route, NoteActionPayload payload) throws Exception {
+    private StepResult executeNoteRoute(MailProcessingRoute route,
+                                        Email email,
+                                        NoteActionPayload payload) throws Exception {
         return switch (route) {
             case MEMORY_NOTE -> {
                 memoryServiceClient.createNote(payload.text(), payload.tags(), payload.source());
@@ -206,6 +208,10 @@ public class ActionExecutor {
                 moveToProcessedIfEnabled(resolveInbox(payload.sourceId()),
                     resolveProcessed(payload.sourceId(), payload.processedFolder()),
                     payload.moveEnabled());
+                yield new StepResult(MailProcessingRoute.MARK_AS_READ, payload, null, null);
+            }
+            case MARK_AS_READ -> {
+                mailClient.markAsRead(email.id(), email.folder());
                 yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
             }
             default -> throw new IllegalStateException("Unsupported NOTE route: " + route);
