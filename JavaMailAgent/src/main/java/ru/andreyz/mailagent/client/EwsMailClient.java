@@ -82,7 +82,7 @@ public class EwsMailClient implements MailClient {
             }
             try {
                 URI ewsUrl = service.getUrl();
-                log.info("EWS lazy init folders: connecting to {}, autodiscover={}, version={}",
+                log.debug("EWS lazy init folders: connecting to {}, autodiscover={}, version={}",
                         ewsUrl, ewsProperties.isAutodiscover(), ewsProperties.getVersion());
 
                 Folder inbox = Folder.bind(service, WellKnownFolderName.Inbox, folderPropertySet());

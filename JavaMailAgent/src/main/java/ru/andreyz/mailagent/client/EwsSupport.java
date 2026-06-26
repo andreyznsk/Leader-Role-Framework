@@ -56,11 +56,11 @@ public final class EwsSupport {
 
         try {
             if (ewsProperties.isAutodiscover()) {
-                log.info("EWS autodiscover: {}", mailProperties.getUsername());
+                log.debug("EWS autodiscover: {}", mailProperties.getUsername());
                 service.autodiscoverUrl(mailProperties.getUsername(), url -> url != null && url.startsWith("https://"));
             } else if (ewsProperties.getUrl() != null && !ewsProperties.getUrl().isBlank()) {
                 String ewsUrl = normalizeEwsUrl(ewsProperties.getUrl());
-                log.info("EWS manual URL: {} (normalized from {})", ewsUrl, ewsProperties.getUrl());
+                log.debug("EWS manual URL: {} (normalized from {})", ewsUrl, ewsProperties.getUrl());
                 service.setUrl(URI.create(ewsUrl));
             }
         } catch (Exception e) {
