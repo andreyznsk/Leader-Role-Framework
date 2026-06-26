@@ -76,8 +76,8 @@ public class TodayViewController {
         model.addAttribute("priorityFilter", normalizeFilter(priority));
         model.addAttribute("statusFilter", normalizeFilter(status));
         model.addAttribute("dueDateFilter", dueDate);
-        model.addAttribute("sortBy", normalizeFilter(sortBy));
-        model.addAttribute("sortDir", normalizeSortDir(sortDir));
+        model.addAttribute("sortBy", normalizeFilter(sortBy) != null ? normalizeFilter(sortBy) : "status");
+        model.addAttribute("sortDir", normalizeFilter(sortBy) != null ? normalizeSortDir(sortDir) : "asc");
         model.addAttribute("priorityOptions", List.of("LOW", "NORMAL", "HIGH", "CRITICAL"));
         model.addAttribute("statusOptions", List.of("TODO", "IN_PROGRESS", "BLOCKED", "DONE"));
         planRepository.findByPlanDate(today).ifPresent(p -> model.addAttribute("todaySummary", p.summary()));
@@ -86,9 +86,16 @@ public class TodayViewController {
 
     private Comparator<Task> taskComparator(String sortBy, String sortDir) {
         Comparator<Task> fallback = Comparator.comparing(Task::sortOrder, Comparator.nullsLast(Integer::compareTo));
+        Comparator<Task> priorityDesc = Comparator.comparingInt(
+                (Task task) -> PRIORITY_ORDER.getOrDefault(task.priority(), Integer.MIN_VALUE)
+        ).reversed();
         String normalizedSortBy = normalizeFilter(sortBy);
         if (normalizedSortBy == null) {
-            return fallback;
+            return Comparator.comparing(
+                            (Task task) -> STATUS_ORDER.getOrDefault(task.status(), Integer.MAX_VALUE)
+                    )
+                    .thenComparing(priorityDesc)
+                    .thenComparing(fallback);
         }
 
         Comparator<Task> comparator = switch (normalizedSortBy) {
@@ -96,8 +103,8 @@ public class TodayViewController {
                     task -> PRIORITY_ORDER.getOrDefault(task.priority(), Integer.MAX_VALUE)
             );
             case "status" -> Comparator.comparing(
-                    task -> STATUS_ORDER.getOrDefault(task.status(), Integer.MAX_VALUE)
-            );
+                    (Task task) -> STATUS_ORDER.getOrDefault(task.status(), Integer.MAX_VALUE)
+            ).thenComparing(priorityDesc);
             case "dueDate" -> Comparator.comparing(
                     Task::dueDate,
                     Comparator.nullsLast(LocalDate::compareTo)

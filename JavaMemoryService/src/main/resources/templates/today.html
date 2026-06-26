@@ -193,9 +193,14 @@
                     </span>
 
                     <!-- Status badge -->
-                    <span class="badge me-2 flex-shrink-0"
-                          th:classappend="${task.status == 'DONE'} ? 'bg-success' : (${task.status == 'IN_PROGRESS'} ? 'bg-primary' : (${task.status == 'BLOCKED'} ? 'bg-danger' : 'bg-secondary'))"
-                          th:text="${task.status}"></span>
+                    <button type="button"
+                            class="btn btn-sm p-0 border-0 bg-transparent me-2 flex-shrink-0"
+                            th:attr="data-id=${task.id},data-status=${task.status},title='Сменить статус'"
+                            onclick="toggleStatus(this)">
+                        <span class="badge"
+                              th:classappend="${task.status == 'DONE'} ? 'bg-success' : (${task.status == 'IN_PROGRESS'} ? 'bg-primary' : (${task.status == 'BLOCKED'} ? 'bg-danger' : 'bg-secondary'))"
+                              th:text="${task.status}"></span>
+                    </button>
 
                     <!-- Actions -->
                     <div class="d-flex gap-1 ms-1">
@@ -310,7 +315,16 @@ function togglePriority(btn) {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({priority: btn.dataset.nextPriority})
-    }).then((result) => window.LeaderUiApi.handleSuccess('reload', result));
+    }).then(() => reloadTodayKeepingFilters());
+}
+
+function toggleStatus(btn) {
+    const nextStatus = nextTaskStatus(btn.dataset.status);
+    window.LeaderUiApi.request('/api/tasks/' + btn.dataset.id + '/status', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: nextStatus})
+    }).then(() => reloadTodayKeepingFilters());
 }
 
 function moveTaskToTomorrow(id, baseDate) {
@@ -319,7 +333,26 @@ function moveTaskToTomorrow(id, baseDate) {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({dueDate: nextDate})
-    }).then((result) => window.LeaderUiApi.handleSuccess('reload', result));
+    }).then(() => reloadTodayKeepingFilters());
+}
+
+function nextTaskStatus(status) {
+    switch (status) {
+        case 'TODO':
+            return 'IN_PROGRESS';
+        case 'IN_PROGRESS':
+            return 'BLOCKED';
+        case 'BLOCKED':
+            return 'TODO';
+        case 'DONE':
+        default:
+            return 'TODO';
+    }
+}
+
+function reloadTodayKeepingFilters() {
+    const currentUrl = new URL(window.location.href);
+    window.location.href = currentUrl.toString();
 }
 
 function shiftIsoDate(isoDate, days) {
