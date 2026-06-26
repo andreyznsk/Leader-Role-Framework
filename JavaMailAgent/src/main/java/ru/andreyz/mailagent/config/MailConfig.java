@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
@@ -143,10 +144,8 @@ public class MailConfig {
 
     @ConfigurationProperties(prefix = "mail.folders")
     public static class FolderProperties {
-        private List<String> include = List.of();
-        private List<String> exclude = List.of(
-            "Sent", "Drafts", "Trash", "Spam", "Archive", "Junk", "Deleted Items"
-        );
+        private List<String> include = new ArrayList<>();
+        private List<String> exclude = new ArrayList<>();
 
         public List<String> getInclude() { return include; }
         public void setInclude(List<String> v) { this.include = v; }
