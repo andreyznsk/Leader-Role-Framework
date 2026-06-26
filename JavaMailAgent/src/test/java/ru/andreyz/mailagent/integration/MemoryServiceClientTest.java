@@ -56,7 +56,7 @@ class MemoryServiceClientTest {
 
         MemoryServiceClient client = new MemoryServiceClient(new ObjectMapper(), props);
 
-        assertDoesNotThrow(() -> client.createNote("Read later", "mail,email", "email"));
+        assertDoesNotThrow(() -> client.createNote("Read later", "Some details", "mail,email", "email"));
     }
 
     @Test
@@ -157,7 +157,7 @@ class MemoryServiceClientTest {
             new ObjectMapper(), props, httpClient, duration -> {}
         );
 
-        client.createNote("Read later", "mail,email", "email");
+        client.createNote("Read later", "Some details", "mail,email", "email");
 
         ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
         verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));

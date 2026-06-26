@@ -200,8 +200,8 @@ public class ActionExecutor {
                                         NoteActionPayload payload) throws Exception {
         return switch (route) {
             case MEMORY_NOTE -> {
-                memoryServiceClient.createNote(payload.text(), payload.tags(), payload.source());
-                log.info("NOTE → memory-service notes: {}", payload.text());
+                memoryServiceClient.createNote(payload.title(), payload.text(), payload.tags(), payload.source());
+                log.info("NOTE → memory-service notes: {}", payload.title());
                 yield new StepResult(MailProcessingRoute.MOVE_TO_PROCESSED, payload, null, null);
             }
             case MOVE_TO_PROCESSED -> {
@@ -270,6 +270,7 @@ public class ActionExecutor {
                 true
             );
             case NOTE -> new NoteActionPayload(
+                response.noteTitle(),
                 response.noteText() != null && !response.noteText().isBlank()
                     ? response.noteText()
                     : (response.note() != null ? response.note() : ""),
@@ -385,6 +386,7 @@ public class ActionExecutor {
     ) {}
 
     public record NoteActionPayload(
+        String title,
         String text,
         String source,
         String tags,

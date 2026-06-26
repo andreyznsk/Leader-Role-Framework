@@ -99,7 +99,7 @@ agent:
 | `NOISE` | move в `processed/` -> `MARK_AS_READ` |
 | `CAPTURE` | POST `/api/capture` -> move в `processed/` |
 | `NOTICE` | записать NOTICE markdown -> move в `processed/` -> `MARK_AS_READ` |
-| `NOTE` | POST `/api/notes` -> move в `processed/` |
+| `NOTE` | POST `/api/notes` (поля: `title`, `text`, `tags`, `source`) -> move в `processed/` |
 
 **Трекинг обработанных писем:** таблица `mailagent.processed_emails` теперь хранит не только dedup, но и checkpoint state-machine:
 - `status`: `NEW | PROCESSING | ERROR | PROCESSED`
@@ -192,7 +192,8 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `POST` | `/api/knowledge/search` | Memory-owned прокси к JavaRagService `/api/search` + usage events |
 | `GET/PUT/POST` | `/api/knowledge/documents/**` | Browser-facing proxy управления RAG-документами |
 | `GET` | `/api/stats/usage?period=7d` | Usage Statistics: агрегаты по usage events |
-| `GET/POST` | `/api/notes` | Лента заметок |
+| `GET/POST` | `/api/notes` | Лента заметок (`POST` → `201 Created`; поля: `title` обязательный, `text` опциональный, `tags`, `source`) |
+| `DELETE` | `/api/notes/{id}` | Удалить заметку: `204 No Content` / `404 Not Found` (hard delete, CR-MEM-011) |
 | `GET/POST/PUT/DELETE` | `/api/incidents`, `/api/risks`, `/api/people` | CRUD/soft delete рабочих сущностей |
 | `GET` | `/ui/today` | Web UI: план дня |
 | `GET` | `/ui/notes` | Web UI: Operational Notes |

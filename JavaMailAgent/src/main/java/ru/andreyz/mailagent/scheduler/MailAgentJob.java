@@ -117,7 +117,10 @@ public class MailAgentJob {
                 continue;
             }
 
-            log.info("Folder [{}]: {} unread email(s)", folder, emails.size());
+            log.debug("Folder [{}]: {} unread email(s)", folder, emails.size());
+            if (!emails.isEmpty()) {
+                log.info("Folder [{}]: {} unread email(s)", folder, emails.size());
+            }
 
             for (Email email : emails) {
                 if (processingStateService.findByEmailId(email.id()).isPresent()) {

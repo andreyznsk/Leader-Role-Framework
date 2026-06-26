@@ -73,8 +73,7 @@ public class CaptureRouter {
     }
 
     private String routeNote(ClassifiedCapture c) {
-        String text = c.body() != null && !c.body().isBlank() ? c.body() : c.title();
-        noteService.create(text, c.tags(), "capture");
+        noteService.create(c.title(), c.body(), c.tags(), "capture");
         return "notes";
     }
 

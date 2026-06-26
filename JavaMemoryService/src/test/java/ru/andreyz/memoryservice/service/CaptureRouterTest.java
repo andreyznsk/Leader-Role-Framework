@@ -75,7 +75,7 @@ class CaptureRouterTest {
 
         String routedTo = router.route(c);
 
-        verify(noteService).create("raw note", null, "capture");
+        verify(noteService).create("Observation", "raw note", null, "capture");
         assertThat(routedTo).isEqualTo("notes");
     }
 

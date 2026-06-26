@@ -533,6 +533,10 @@ public record PendingTaskRequest(
 Использует `java.net.http.HttpClient` — встроен в Java 21, новых зависимостей нет.
 Конфигурация через `MailConfig.MemoryServiceProperties` (constructor injection).
 
+**Retry-логика:** при сбое HTTP-вызова делает до 3 повторных попыток с задержками 2/5/10 сек.
+Таймаут запроса — 30 сек. При исчерпании попыток бросает `IllegalStateException` (прерывает обработку письма).
+`RetrySleeper` — внутренний `@FunctionalInterface` для тестабильности без реального sleep.
+
 ```java
 @Component
 public class MemoryServiceClient {
@@ -604,31 +608,21 @@ public class MemoryServiceClient {
         }
     }
 
-    public void createNote(String text, String tags, String source) {
+    // title — обязательный заголовок заметки; если null/blank — auto-derived на стороне memory-service
+    public void createNote(String title, String text, String tags, String source) {
         if (!enabled) {
             log.debug("memory-service disabled, skipping note");
             return;
         }
         try {
-            String body = objectMapper.writeValueAsString(Map.of(
-                "text", text,
-                "tags", tags,
-                "source", source
-            ));
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/api/notes"))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .timeout(Duration.ofSeconds(5))
-                .build();
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() == 200 || response.statusCode() == 201) {
-                log.info("Note saved to memory-service");
-            } else {
-                log.warn("memory-service /api/notes returned {}: {}", response.statusCode(), response.body());
-            }
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("title", title);
+            payload.put("text", text);
+            payload.put("tags", tags);
+            payload.put("source", source);
+            postJson("/api/notes", payload, "Note saved to memory-service");
         } catch (Exception e) {
-            log.warn("Failed to save note to memory-service: {}", e.getMessage());
+            throw new IllegalStateException("Failed to save note to memory-service", e);
         }
     }
 
@@ -706,7 +700,10 @@ public class ActionExecutor {
                 String text = response.noteText() != null && !response.noteText().isBlank()
                     ? response.noteText()
                     : response.note();
-                memoryServiceClient.createNote(text, "mail,email", "email");
+                String title = response.noteTitle() != null && !response.noteTitle().isBlank()
+                    ? response.noteTitle()
+                    : null; // auto-derived из text на стороне NoteService
+                memoryServiceClient.createNote(title, text, "mail,email", "email");
                 Files.move(inbox, processed, StandardCopyOption.REPLACE_EXISTING);
                 log.info("NOTE → memory-service notes: {}", text);
             }
@@ -730,7 +727,8 @@ public record AgentResponse(
     String sender,       // email отправителя (только REQUEST)
     String draftPath,    // путь к черновику (только DRAFT)
     String captureText,  // краткое изложение письма (только CAPTURE)
-    String noteText      // текст заметки для /api/notes (только NOTE)
+    String noteText,     // тело заметки для /api/notes (только NOTE)
+    String noteTitle     // заголовок заметки для /api/notes, до 200 символов (только NOTE)
 ) {}
 ```
 
@@ -876,6 +874,7 @@ Flyway управляет схемой `mailagent`. Файлы — в `classpath
 |--------|------|------------|
 | V1 | `V1__create_processed_emails.sql` | Таблица + индексы |
 | V2 | `V2__add_output_path_to_processed_emails.sql` | `output_path` для NOTICE markdown |
+| V7 | `V7__note_title_in_prompt_template.sql` | Обновляет `classificationPrompt`: добавляет поля `noteTitle` и `noteText` в JSON-схему ответа для типа NOTE |
 
 ### Инфраструктура
 

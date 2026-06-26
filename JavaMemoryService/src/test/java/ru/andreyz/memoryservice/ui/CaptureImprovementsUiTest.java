@@ -30,12 +30,20 @@ class CaptureImprovementsUiTest {
 
     @Test
     void notesPageRendersCreateTaskAction() throws Exception {
-        noteService.create("Иван не знает процедуру rollback", "person,risk", "capture");
+        noteService.create("Rollback gap", "Иван не знает процедуру rollback", "person,risk", "capture");
 
         mockMvc.perform(get("/ui/notes"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(containsString("+ Добавить заметку")))
+                .andExpect(content().string(containsString("addNoteModal")))
+                .andExpect(content().string(containsString("Заголовок *")))
+                .andExpect(content().string(containsString("Описание")))
                 .andExpect(content().string(containsString("&rarr; В задачу")))
-                .andExpect(content().string(containsString("taskFromItemModal")));
+                .andExpect(content().string(containsString("taskFromItemModal")))
+                .andExpect(content().string(containsString("Rollback gap")))
+                .andExpect(content().string(containsString("note-body-")))
+                .andExpect(content().string(containsString("Удалить заметку")))
+                .andExpect(content().string(containsString("openDeleteNoteModal")));
     }
 
     @Test

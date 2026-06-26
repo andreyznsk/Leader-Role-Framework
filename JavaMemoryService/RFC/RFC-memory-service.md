@@ -284,9 +284,19 @@ src/main/resources/db/
 │   ├── V1__init_schema.sql
 │   ├── V2__add_capture_tables.sql
 │   ├── V3__add_task_sort_order.sql
-│   └── V4__add_notes_and_capture.sql
+│   ├── V4__add_notes_and_capture.sql
+│   └── V10__notes_title_and_optional_text.sql
 └── migration-h2/        # H2 патчи (local/test)
     └── V1_1__h2_compat.sql
+```
+
+`V10__notes_title_and_optional_text.sql` (CR-MEM-011):
+```sql
+ALTER TABLE notes ADD COLUMN title VARCHAR(200);
+UPDATE notes SET title = SUBSTRING(TRIM(text), 1, 200) WHERE title IS NULL;
+UPDATE notes SET title = 'Untitled note' WHERE title IS NULL OR title = '';
+ALTER TABLE notes ALTER COLUMN title SET NOT NULL;
+ALTER TABLE notes ALTER COLUMN text DROP NOT NULL;
 ```
 
 `V3__add_task_sort_order.sql`:
@@ -440,7 +450,8 @@ public record Capture(
 @Table("notes")
 public record Note(
     @Id Long id,
-    String text,
+    String title,    // обязательный; auto-derived из text если не передан
+    String text,     // опциональный (V10)
     String tags,
     String source,
     Instant createdAt
@@ -650,8 +661,10 @@ POST /api/capture/process-today          # batch classify + route
 POST /api/capture/process-now            # alias process-today
 
 # Notes / Questions
-GET  /api/notes?tags=risk,person&limit=50
-POST /api/notes
+GET    /api/notes?tags=risk,person&limit=50
+POST   /api/notes                    # 201 Created; body: { title, text?, tags, source }
+                                     # title обязательный; если не передан — auto-derived из text
+DELETE /api/notes/{id}               # 204 No Content / 404 Not Found (hard delete, CR-MEM-011)
 GET  /api/questions?status=OPEN
 POST /api/questions
 
@@ -743,10 +756,12 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 - Хронологические заметки под каждой карточкой
 - Форма добавить заметку
 
-**`/ui/notes`** — Лента заметок
+**`/ui/notes`** — Лента заметок (CR-MEM-011: полноценный CRUD-экран)
 - Список notes из PostgreSQL, сортировка от новых к старым
 - Фильтр по тегам через `GET /api/notes?tags=...`
-- Кнопка "в задачу" создаёт PENDING задачу через `POST /api/tasks/pending`
+- Кнопка `+ Добавить заметку` открывает Bootstrap modal с полями `title` (обязательный), `text` (опциональный), `tags`; `source` = `manual-ui`; отправляет `POST /api/notes`
+- Кнопка `Удалить` на каждой карточке с подтверждением; отправляет `DELETE /api/notes/{id}`
+- Кнопка `→ В задачу` создаёт PENDING задачу через `POST /api/tasks/pending`
 - Operational Notes: это не RAG knowledge и не source of truth для `NOTICE`
 
 **`/ui/captures`** — Capture Inbox
@@ -1249,7 +1264,7 @@ JavaMemoryService/
     │   │       ├── CaptureRequest.java
     │   │       ├── CaptureResponse.java
     │   │       ├── ClassifiedCapture.java
-    │   │       ├── CreateNoteRequest.java
+    │   │       ├── CreateNoteRequest.java           # { title, text?, tags, source }
     │   │       └── UpdateTaskStatusRequest.java
     │   └── resources/
     │       ├── application.yml

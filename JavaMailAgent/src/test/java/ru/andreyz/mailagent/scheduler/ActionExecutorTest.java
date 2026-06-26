@@ -88,7 +88,7 @@ class ActionExecutorTest {
         Files.writeString(inbox.resolve(emailId + ".json"), "{}");
 
         AgentResponse response = new AgentResponse(
-            AgentResponseType.NOISE, emailId, "CI notification", null, null, null, null, null, null, null
+            AgentResponseType.NOISE, emailId, "CI notification", null, null, null, null, null, null, null, null
         );
 
         executor.execute(email(emailId), response);
@@ -111,6 +111,7 @@ class ActionExecutorTest {
             "Review PR #42",
             "HIGH",
             "ivanov@test.com",
+            null,
             null,
             null,
             null
@@ -138,6 +139,7 @@ class ActionExecutorTest {
             "Review PR #42",
             "HIGH",
             "ivanov@test.com",
+            null,
             null,
             null,
             null
@@ -177,6 +179,7 @@ class ActionExecutorTest {
             "Useful FYI",
             null, null, null, null, null,
             "К сведению: переезд на новый кластер с 1 июля",
+            null,
             null
         );
 
@@ -196,7 +199,7 @@ class ActionExecutorTest {
 
         AgentResponse response = new AgentResponse(
                 AgentResponseType.NOTICE, emailId,
-                "Новая release-практика команды", null, null, null, null, null, null, null
+                "Новая release-практика команды", null, null, null, null, null, null, null, null
         );
 
         executor.execute(
@@ -236,12 +239,14 @@ class ActionExecutorTest {
             AgentResponseType.NOTE, emailId,
             "Стоит сохранить в заметки",
             null, null, null, null, null, null,
-            "Посмотреть практики blue-green rollout у соседней команды."
+            "Посмотреть практики blue-green rollout у соседней команды.",
+            "Blue-green rollout"
         );
 
         executor.execute(email(emailId), response);
 
         verify(memoryServiceClient).createNote(
+            "Blue-green rollout",
             "Посмотреть практики blue-green rollout у соседней команды.",
             "mail,email",
             "email"

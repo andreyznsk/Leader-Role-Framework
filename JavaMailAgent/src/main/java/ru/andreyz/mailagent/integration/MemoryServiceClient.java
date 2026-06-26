@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -81,17 +82,18 @@ public class MemoryServiceClient {
         }
     }
 
-    public void createNote(String text, String tags, String source) {
+    public void createNote(String title, String text, String tags, String source) {
         if (!enabled) {
             log.debug("memory-service disabled, skipping note");
             return;
         }
         try {
-            postJson("/api/notes", Map.of(
-                "text", text,
-                "tags", tags,
-                "source", source
-            ), "Note saved to memory-service");
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("title", title);
+            payload.put("text", text);
+            payload.put("tags", tags);
+            payload.put("source", source);
+            postJson("/api/notes", payload, "Note saved to memory-service");
         } catch (Exception e) {
             throw new IllegalStateException("Failed to save note to memory-service", e);
         }

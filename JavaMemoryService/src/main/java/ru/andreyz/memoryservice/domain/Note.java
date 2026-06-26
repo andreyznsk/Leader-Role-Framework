@@ -8,6 +8,7 @@ import java.time.Instant;
 @Table("notes")
 public record Note(
         @Id Long id,
+        String title,
         String text,
         String tags,
         String source,
