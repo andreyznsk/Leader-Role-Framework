@@ -119,6 +119,7 @@ public class FileIndexer {
                     .orElse(IndexedDocument.failed(filePath, docType, hash, errMsg));
             repository.save(doc);
             log.error("❌ Indexing error: {} — {}", filePath, errMsg);
+            log.error("", e);
             return new IndexResult(0, "failed: " + errMsg, filePath);
         }
     }
