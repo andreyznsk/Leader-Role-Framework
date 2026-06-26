@@ -27,6 +27,7 @@ public class MailConfig {
         private String password;
         private int pollIntervalSeconds = 60;
         private int fetchLimit = 20;
+        private Integer processingParallelism;
 
         public String getProtocol() { return protocol; }
         public void setProtocol(String v) { this.protocol = v; }
@@ -38,6 +39,8 @@ public class MailConfig {
         public void setPollIntervalSeconds(int v) { this.pollIntervalSeconds = v; }
         public int getFetchLimit() { return fetchLimit; }
         public void setFetchLimit(int v) { this.fetchLimit = v; }
+        public Integer getProcessingParallelism() { return processingParallelism; }
+        public void setProcessingParallelism(Integer v) { this.processingParallelism = v; }
     }
 
     @ConfigurationProperties(prefix = "path")

@@ -11,22 +11,27 @@ import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
-import ru.andreyz.mailagent.model.ProcessedEmail;
-import ru.andreyz.mailagent.model.EmailProcessingStatus;
 import ru.andreyz.mailagent.service.MailProcessingStateService;
 import ru.andreyz.mailagent.service.MailRuntimeConfig;
 import ru.andreyz.mailagent.service.MailRuntimeConfigService;
+import ru.andreyz.mailagent.model.ProcessedEmail;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 @Component
 public class MailAgentJob {
 
     private static final Logger log = LoggerFactory.getLogger(MailAgentJob.class);
+    private static final AgentResponseType[] RESPONSE_TYPES = AgentResponseType.values();
 
     private final MailClient mailClient;
     private final PromptBuilder promptBuilder;
@@ -67,7 +72,7 @@ public class MailAgentJob {
             return;
         }
         int total = 0, errors = 0;
-        int[] counts = {0, 0, 0, 0, 0, 0}; // REQUEST, DRAFT, NOISE, CAPTURE, NOTICE, NOTE
+        int[] counts = emptyCounts();
 
         List<ProcessedEmail> errorQueue = processingStateService.findErrorQueue();
         if (!errorQueue.isEmpty()) {
@@ -102,6 +107,7 @@ public class MailAgentJob {
 
         log.info("Poll started — scanning {} folder(s): {}", folders.size(), folders);
 
+        List<Email> emailsToProcess = new ArrayList<>();
         for (String folder : folders) {
             List<Email> emails;
             try {
@@ -118,21 +124,24 @@ public class MailAgentJob {
                     log.debug("Email {} already has processing state, skipping", email.id());
                     continue;
                 }
-                total++;
-                try {
-                    AgentResponse resp = processEmail(email);
-                    countByType(resp.type().name(), counts);
-                    actionExecutor.execute(email, resp);
-                } catch (Exception e) {
-                    errors++;
-                    log.warn("Email {} failed: {}, will retry next poll", email.id(), e.getMessage());
-                    finishPoll(total, errors, counts);
-                    return;
-                }
+                emailsToProcess.add(email);
             }
         }
 
+        total += emailsToProcess.size();
+        ProcessingBatchResult batchResult = processBatch(emailsToProcess);
+        errors += batchResult.errors();
+        mergeCounts(counts, batchResult.counts());
+
         finishPoll(total, errors, counts);
+    }
+
+    int resolveProcessingParallelism() {
+        Integer configured = mailProperties.getProcessingParallelism();
+        if (configured != null && configured > 0) {
+            return configured;
+        }
+        return Math.max(1, Runtime.getRuntime().availableProcessors());
     }
 
     private AgentResponse processEmail(Email email) throws Exception {
@@ -147,23 +156,88 @@ public class MailAgentJob {
         return resp;
     }
 
+    private ProcessingBatchResult processBatch(List<Email> emails) {
+        if (emails.isEmpty()) {
+            return new ProcessingBatchResult(0, emptyCounts());
+        }
+
+        int parallelism = Math.min(emails.size(), resolveProcessingParallelism());
+        log.info("Collected {} email(s) for processing with {} worker(s)", emails.size(), parallelism);
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(parallelism)) {
+            List<Future<ProcessingOutcome>> futures = emails.stream()
+                .map(email -> executor.submit(() -> processSingleEmail(email)))
+                .toList();
+
+            int errors = 0;
+            int[] counts = emptyCounts();
+            for (Future<ProcessingOutcome> future : futures) {
+                try {
+                    ProcessingOutcome outcome = future.get();
+                    if (outcome.errorMessage() != null) {
+                        errors++;
+                        log.warn("Email {} failed: {}, will retry next poll", outcome.emailId(), outcome.errorMessage());
+                        continue;
+                    }
+                    countByType(outcome.responseType(), counts);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    errors++;
+                    log.warn("Mail processing interrupted: {}", e.getMessage());
+                } catch (ExecutionException e) {
+                    errors++;
+                    Throwable cause = e.getCause() != null ? e.getCause() : e;
+                    log.warn("Unexpected mail processing failure: {}", cause.getMessage());
+                    log.debug("", cause);
+                }
+            }
+            return new ProcessingBatchResult(errors, counts);
+        }
+    }
+
+    private ProcessingOutcome processSingleEmail(Email email) {
+        try {
+            AgentResponse resp = processEmail(email);
+            actionExecutor.execute(email, resp);
+            return new ProcessingOutcome(email.id(), resp.type().name(), null);
+        } catch (Exception e) {
+            return new ProcessingOutcome(email.id(), null, e.getMessage());
+        }
+    }
+
     private void countByType(String responseType, int[] counts) {
         AgentResponseType type = AgentResponseType.valueOf(responseType);
-        switch (type) {
-            case REQUEST -> counts[0]++;
-            case DRAFT -> counts[1]++;
-            case NOISE -> counts[2]++;
-            case CAPTURE -> counts[3]++;
-            case NOTICE -> counts[4]++;
-            case NOTE -> counts[5]++;
+        counts[type.ordinal()]++;
+    }
+
+    private void mergeCounts(int[] target, int[] source) {
+        for (int i = 0; i < target.length; i++) {
+            target[i] += source[i];
         }
     }
 
     private void finishPoll(int total, int errors, int[] counts) {
         String result = "%d processed (%d REQUEST, %d DRAFT, %d NOISE, %d CAPTURE, %d NOTICE, %d NOTE, %d errors)"
-            .formatted(Math.max(0, total - errors), counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], errors);
+            .formatted(
+                Math.max(0, total - errors),
+                countFor(AgentResponseType.REQUEST, counts),
+                countFor(AgentResponseType.DRAFT, counts),
+                countFor(AgentResponseType.NOISE, counts),
+                countFor(AgentResponseType.CAPTURE, counts),
+                countFor(AgentResponseType.NOTICE, counts),
+                countFor(AgentResponseType.NOTE, counts),
+                errors
+            );
         log.info("Poll finished: {}", result);
         runtimeConfigService.registerPollResult(result);
+    }
+
+    private int[] emptyCounts() {
+        return new int[RESPONSE_TYPES.length];
+    }
+
+    private int countFor(AgentResponseType type, int[] counts) {
+        return counts[type.ordinal()];
     }
 
     private AgentResponse parseAgentResponse(String raw) throws IOException {
@@ -203,5 +277,11 @@ public class MailAgentJob {
                 .replace('\\', '/')
                 .replaceAll("/+", "/")
                 .toLowerCase(Locale.ROOT);
+    }
+
+    private record ProcessingOutcome(String emailId, String responseType, String errorMessage) {
+    }
+
+    private record ProcessingBatchResult(int errors, int[] counts) {
     }
 }

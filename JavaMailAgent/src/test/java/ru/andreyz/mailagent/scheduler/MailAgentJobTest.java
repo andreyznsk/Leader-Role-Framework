@@ -16,6 +16,7 @@ import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 class MailAgentJobTest {
@@ -87,6 +88,63 @@ class MailAgentJobTest {
         verify(agentClient, never()).complete(anyString());
     }
 
+    @Test
+    void pollCollectsSequentiallyAndProcessesCollectedEmails() throws Exception {
+        Email first = email("msg-101", "INBOX");
+        Email second = email("msg-102", "Team");
+        when(processingStateService.findErrorQueue()).thenReturn(List.of());
+        when(processingStateService.findByEmailId(anyString())).thenReturn(java.util.Optional.empty());
+        when(mailClient.listFolders(any())).thenReturn(List.of("INBOX", "Team"));
+        when(mailClient.listUnread("INBOX", 20)).thenReturn(List.of(first));
+        when(mailClient.listUnread("Team", 20)).thenReturn(List.of(second));
+        when(promptBuilder.build(any(Email.class))).thenReturn("prompt");
+        when(agentClient.complete("prompt")).thenReturn("""
+            {"type":"NOISE","emailId":"msg","sender":"sender@example.com","note":"ignored"}
+            """);
+
+        job.poll();
+
+        verify(mailClient).listUnread("INBOX", 20);
+        verify(mailClient).listUnread("Team", 20);
+        verify(actionExecutor).execute(eq(first), any());
+        verify(actionExecutor).execute(eq(second), any());
+    }
+
+    @Test
+    void resolveProcessingParallelismUsesConfiguredValueWhenPresent() {
+        MailConfig.MailProperties configured = new MailConfig.MailProperties();
+        configured.setFetchLimit(20);
+        configured.setProcessingParallelism(7);
+
+        MailAgentJob configuredJob = new MailAgentJob(
+            mailClient,
+            promptBuilder,
+            agentClient,
+            actionExecutor,
+            configured,
+            new MailConfig.PathProperties(),
+            processingStateService,
+            new ObjectMapper().findAndRegisterModules(),
+            new MailRuntimeConfigService(
+                configured,
+                new MailConfig.PathProperties(),
+                new MailConfig.ImapProperties(),
+                new MailConfig.EwsProperties(),
+                new MailConfig.FolderProperties(),
+                mock(MailControlAuditStore.class),
+                promptTemplateService()
+            )
+        );
+
+        assertThat(configuredJob.resolveProcessingParallelism()).isEqualTo(7);
+    }
+
+    @Test
+    void resolveProcessingParallelismFallsBackToAvailableProcessorsWhenUnset() {
+        assertThat(job.resolveProcessingParallelism())
+            .isEqualTo(Math.max(1, Runtime.getRuntime().availableProcessors()));
+    }
+
     private ProcessedEmail failedEmail(String emailId) {
         Email email = new Email(
             emailId,
@@ -100,5 +158,22 @@ class MailAgentJobTest {
             .withCheckpoint("REQUEST", ru.andreyz.mailagent.model.MailProcessingRoute.MEMORY_PENDING_TASK,
                 "{\"taskLine\":\"- [ ] test\"}", null, null, LocalDateTime.now())
             .withError("memory down", LocalDateTime.now());
+    }
+
+    private Email email(String emailId, String folder) {
+        return new Email(
+            emailId,
+            "Subject " + emailId,
+            "sender@example.com",
+            "Body",
+            LocalDateTime.of(2026, 6, 25, 10, 0),
+            folder
+        );
+    }
+
+    private MailPromptTemplateService promptTemplateService() {
+        MailPromptTemplateService promptTemplateService = mock(MailPromptTemplateService.class);
+        when(promptTemplateService.loadClassificationPrompt()).thenReturn("Prompt");
+        return promptTemplateService;
     }
 }
