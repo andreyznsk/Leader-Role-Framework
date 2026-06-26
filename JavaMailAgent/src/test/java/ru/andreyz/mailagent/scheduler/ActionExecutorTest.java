@@ -15,6 +15,7 @@ import ru.andreyz.mailagent.model.MailProcessingRoute;
 import ru.andreyz.mailagent.model.ProcessedEmail;
 import ru.andreyz.mailagent.service.MailControlAuditStore;
 import ru.andreyz.mailagent.service.MailProcessingStateService;
+import ru.andreyz.mailagent.service.MailPromptTemplateService;
 import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 import ru.andreyz.mailagent.repository.ProcessedEmailRepository;
 
@@ -58,7 +59,10 @@ class ActionExecutorTest {
         MailConfig.EwsProperties ews = new MailConfig.EwsProperties();
         MailConfig.FolderProperties folders = new MailConfig.FolderProperties();
         MailControlAuditStore auditStore = mock(MailControlAuditStore.class);
-        runtimeConfigService = new MailRuntimeConfigService(mail, paths, imap, ews, folders, auditStore);
+        MailPromptTemplateService promptTemplateService = mock(MailPromptTemplateService.class);
+        when(promptTemplateService.loadClassificationPrompt()).thenReturn("Prompt");
+        when(promptTemplateService.saveClassificationPrompt(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        runtimeConfigService = new MailRuntimeConfigService(mail, paths, imap, ews, folders, auditStore, promptTemplateService);
         processedEmailRepository = mock(ProcessedEmailRepository.class);
         when(processedEmailRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(processedEmailRepository.findByEmailId(any())).thenReturn(Optional.empty());

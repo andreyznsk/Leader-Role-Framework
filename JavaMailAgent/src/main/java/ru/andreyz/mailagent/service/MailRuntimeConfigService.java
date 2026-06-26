@@ -33,6 +33,7 @@ public class MailRuntimeConfigService {
 
     private final AtomicReference<MailRuntimeConfig> current;
     private final MailControlAuditStore auditStore;
+    private final MailPromptTemplateService promptTemplateService;
 
     private volatile LocalDateTime lastPollAt;
     private volatile String lastPollResult = "No polls yet";
@@ -42,9 +43,12 @@ public class MailRuntimeConfigService {
                                     MailConfig.ImapProperties imapProperties,
                                     MailConfig.EwsProperties ewsProperties,
                                     MailConfig.FolderProperties folderProperties,
-                                    MailControlAuditStore auditStore) {
+                                    MailControlAuditStore auditStore,
+                                    MailPromptTemplateService promptTemplateService) {
         this.auditStore = auditStore;
+        this.promptTemplateService = promptTemplateService;
         String initialProtocol = normalizeProtocol(mailProperties.getProtocol());
+        String classificationPrompt = promptTemplateService.loadClassificationPrompt();
         this.current = new AtomicReference<>(new MailRuntimeConfig(
                 true,
                 initialProtocol,
@@ -62,6 +66,7 @@ public class MailRuntimeConfigService {
                 true,
                 pathProperties.getProcessed(),
                 pathProperties.getDrafts(),
+                classificationPrompt,
                 1L,
                 LocalDateTime.now()
         ));
@@ -101,6 +106,8 @@ public class MailRuntimeConfigService {
                 null, true, false, false, null));
         settings.put("draftFolder", descriptor(config.draftFolder(), "string", "Draft folder",
                 null, true, false, false, null));
+        settings.put("classificationPrompt", descriptor(config.classificationPrompt(), "text", "Classification Prompt",
+                "Runtime prompt template for email classification. Stored in MailAgent database and applied on next email.", true, false, true, null));
         return new ControlSettingsResponse(PLUGIN_CODE, PLUGIN_NAME, config.version(), settings);
     }
 
@@ -125,6 +132,7 @@ public class MailRuntimeConfigService {
         boolean moveProcessedMail = parseBoolean(incoming, "moveProcessedMail", previous.moveProcessedMail());
         String processedFolder = parseString(incoming, "processedFolder", previous.processedFolder());
         String draftFolder = parseString(incoming, "draftFolder", previous.draftFolder());
+        String classificationPrompt = parseText(incoming, "classificationPrompt", previous.classificationPrompt(), true);
 
         MailRuntimeConfig updated = new MailRuntimeConfig(
                 enabled,
@@ -143,9 +151,13 @@ public class MailRuntimeConfigService {
                 moveProcessedMail,
                 processedFolder,
                 draftFolder,
+                classificationPrompt,
                 previous.version() + 1,
                 appliedAt
         );
+        if (!Objects.equals(previous.classificationPrompt(), classificationPrompt)) {
+            promptTemplateService.saveClassificationPrompt(classificationPrompt);
+        }
         current.set(updated);
 
         List<String> changedKeys = changedKeys(previous, updated);
@@ -154,7 +166,7 @@ public class MailRuntimeConfigService {
         Map<String, String> ignored = incoming.containsKey("password")
                 ? Map.of("password", "secret value accepted but not returned")
                 : Map.of();
-        String message = "MailAgent settings applied. Polling will restart with new config.";
+        String message = "MailAgent settings applied. New values will be used by subsequent operations.";
 
         log.info("Received settings update: keys={}", changedKeys);
         for (String key : changedKeys) {
@@ -165,7 +177,7 @@ public class MailRuntimeConfigService {
             }
         }
         if (!changedKeys.isEmpty()) {
-            log.info("Restarting polling loop due to config update version={}", updated.version());
+            log.info("Applied runtime config version={}", updated.version());
         }
 
         auditStore.save(updated.version(), changedKeys, requestAudit, applied, "APPLIED", message);
@@ -228,6 +240,7 @@ public class MailRuntimeConfigService {
         maybeAdd(changed, "moveProcessedMail", previous.moveProcessedMail(), updated.moveProcessedMail());
         maybeAdd(changed, "processedFolder", previous.processedFolder(), updated.processedFolder());
         maybeAdd(changed, "draftFolder", previous.draftFolder(), updated.draftFolder());
+        maybeAdd(changed, "classificationPrompt", previous.classificationPrompt(), updated.classificationPrompt());
         return changed;
     }
 
@@ -254,6 +267,7 @@ public class MailRuntimeConfigService {
         applied.put("moveProcessedMail", bool(config.moveProcessedMail()));
         applied.put("processedFolder", config.processedFolder());
         applied.put("draftFolder", config.draftFolder());
+        applied.put("classificationPrompt", config.classificationPrompt());
         return applied;
     }
 
@@ -339,6 +353,24 @@ public class MailRuntimeConfigService {
             return fallback;
         }
         return value;
+    }
+
+    private String parseText(Map<String, String> incoming, String key, String fallback, boolean required) {
+        if (!incoming.containsKey(key)) {
+            return fallback;
+        }
+        String value = incoming.get(key);
+        if (value == null) {
+            if (required) {
+                throw new IllegalArgumentException("Setting " + key + " must not be empty");
+            }
+            return "";
+        }
+        String normalized = value.replace("\r\n", "\n");
+        if (required && normalized.isBlank()) {
+            throw new IllegalArgumentException("Setting " + key + " must not be empty");
+        }
+        return normalized;
     }
 
     private List<String> parseLines(Map<String, String> incoming, String key, List<String> fallback, boolean required) {

@@ -119,7 +119,36 @@
                   th:action="'/ui/settings/plugins/' + ${panel.plugin().code()}"
                   th:attr="data-plugin-code=${panel.plugin().code()},data-api-url=${'/api/settings/control/plugins/' + panel.plugin().code() + '/settings'},data-detect-url=${panel.plugin().code() == 'mail' ? '/api/settings/control/plugins/mail/detect-endpoint' : null},data-test-url=${panel.plugin().code() == 'mail' ? '/api/settings/control/plugins/mail/test-connection' : null},data-api-custom-handler='true'"
                   class="row g-3">
-                <div th:each="entry : ${panel.descriptor().settings()}" class="col-12">
+                <th:block th:if="${panel.plugin().code() == 'mail' and panel.descriptor().settings().containsKey('classificationPrompt')}"
+                          th:with="field=${panel.descriptor().settings().get('classificationPrompt')}">
+                    <div class="col-12">
+                        <div class="border rounded-2 p-3">
+                            <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                                <div>
+                                    <div class="form-label mb-1">
+                                        <span th:text="${field.label()}">Classification Prompt</span>
+                                        <span th:if="${field.required()}" class="text-danger">*</span>
+                                    </div>
+                                    <div class="small text-muted">Stored in Mail Agent database and applied to the next email classification without restart.</div>
+                                </div>
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis">Prompt Editor</span>
+                            </div>
+                            <textarea class="form-control font-monospace"
+                                      th:id="${'field-' + panel.plugin().code() + '-classificationPrompt'}"
+                                      th:name="${'settings[classificationPrompt]'}"
+                                      th:attr="data-plugin-field='classificationPrompt',data-field-type=${field.type()},data-protocol-scope=${null},spellcheck='false'"
+                                      rows="22"
+                                      th:text="${field.value()}"
+                                      th:disabled="${!field.editable()}"></textarea>
+                            <div th:if="${field.description() != null && !#strings.isEmpty(field.description())}"
+                                 class="form-text mt-2"
+                                 th:text="${field.description()}">Runtime prompt template for email classification.</div>
+                        </div>
+                    </div>
+                </th:block>
+
+                <th:block th:each="entry : ${panel.descriptor().settings()}">
+                <div th:unless="${entry.key == 'classificationPrompt'}" class="col-12">
                     <div class="los-plugin-field" th:with="field=${entry.value}, key=${entry.key}">
                         <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                             <label class="form-label mb-0" th:for="${'field-' + panel.plugin().code() + '-' + key}">
@@ -196,6 +225,7 @@
                              th:text="${field.description()}">Description</div>
                     </div>
                 </div>
+                </th:block>
                 <div class="col-12 d-flex justify-content-between align-items-center gap-3 flex-wrap">
                     <div class="text-muted small">
                         Version <span th:text="${panel.descriptor().version()}">1</span>

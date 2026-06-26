@@ -47,7 +47,8 @@ class MailAgentControlServiceTest {
                 new MailConfig.ImapProperties(),
                 new MailConfig.EwsProperties(),
                 new MailConfig.FolderProperties(),
-                mock(MailControlAuditStore.class)
+                mock(MailControlAuditStore.class),
+                promptTemplateService()
         );
         MailConnectionTestService connectionTestService = mock(MailConnectionTestService.class);
         when(connectionTestService.testConnection(null))
@@ -58,5 +59,13 @@ class MailAgentControlServiceTest {
         assertEquals(true, result.success());
         assertEquals("ok", result.message());
         assertEquals("maildev", result.target());
+    }
+
+    private MailPromptTemplateService promptTemplateService() {
+        MailPromptTemplateService service = mock(MailPromptTemplateService.class);
+        when(service.loadClassificationPrompt()).thenReturn("Prompt");
+        when(service.saveClassificationPrompt(org.mockito.ArgumentMatchers.anyString()))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+        return service;
     }
 }

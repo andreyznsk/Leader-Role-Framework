@@ -10,6 +10,7 @@ import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.ProcessedEmail;
 import ru.andreyz.mailagent.service.MailControlAuditStore;
 import ru.andreyz.mailagent.service.MailProcessingStateService;
+import ru.andreyz.mailagent.service.MailPromptTemplateService;
 import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 
 import java.time.LocalDateTime;
@@ -41,8 +42,10 @@ class MailAgentJobTest {
         MailConfig.EwsProperties ews = new MailConfig.EwsProperties();
         MailConfig.FolderProperties folders = new MailConfig.FolderProperties();
         MailControlAuditStore auditStore = mock(MailControlAuditStore.class);
+        MailPromptTemplateService promptTemplateService = mock(MailPromptTemplateService.class);
+        when(promptTemplateService.loadClassificationPrompt()).thenReturn("Prompt");
         MailRuntimeConfigService runtimeConfigService = new MailRuntimeConfigService(
-            mailProperties, pathProperties, imap, ews, folders, auditStore
+            mailProperties, pathProperties, imap, ews, folders, auditStore, promptTemplateService
         );
 
         job = new MailAgentJob(

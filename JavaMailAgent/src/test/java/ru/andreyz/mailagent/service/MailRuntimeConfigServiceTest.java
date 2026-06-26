@@ -14,15 +14,18 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 class MailRuntimeConfigServiceTest {
 
     private MailRuntimeConfigService service;
     private MailControlAuditStore auditStore;
+    private MailPromptTemplateService promptTemplateService;
 
     @BeforeEach
     void setUp() {
@@ -41,7 +44,10 @@ class MailRuntimeConfigServiceTest {
         MailConfig.FolderProperties folders = new MailConfig.FolderProperties();
 
         auditStore = mock(MailControlAuditStore.class);
-        service = new MailRuntimeConfigService(mail, paths, imap, ews, folders, auditStore);
+        promptTemplateService = mock(MailPromptTemplateService.class);
+        when(promptTemplateService.loadClassificationPrompt()).thenReturn("Prompt {{subject}}");
+        when(promptTemplateService.saveClassificationPrompt(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
+        service = new MailRuntimeConfigService(mail, paths, imap, ews, folders, auditStore, promptTemplateService);
     }
 
     @Test
@@ -53,6 +59,7 @@ class MailRuntimeConfigServiceTest {
         assertEquals("*****", response.settings().get("password").value());
         assertEquals(List.of("maildev", "imap", "ews"), response.settings().get("protocol").options());
         assertEquals(List.of("BASIC", "NTLM", "OAUTH2"), response.settings().get("authType").options());
+        assertEquals("text", response.settings().get("classificationPrompt").type());
     }
 
     @Test
@@ -63,7 +70,8 @@ class MailRuntimeConfigServiceTest {
                 "password", "new-secret",
                 "serverUrl", "https://exchange.example.com/EWS/Exchange.asmx",
                 "authType", "NTLM",
-                "foldersExclude", "Inbox/CI/CD\nJunk Email"
+                "foldersExclude", "Inbox/CI/CD\nJunk Email",
+                "classificationPrompt", "Updated prompt"
         ));
 
         assertEquals("APPLIED", response.status());
@@ -77,7 +85,9 @@ class MailRuntimeConfigServiceTest {
         assertFalse(status.enabled());
         assertEquals("ews", status.protocol());
         assertEquals(MailAuthType.NTLM, service.snapshot().authType());
+        assertEquals("Updated prompt", service.snapshot().classificationPrompt());
 
         verify(auditStore).save(eq(2L), any(), any(), any(), eq("APPLIED"), any());
+        verify(promptTemplateService).saveClassificationPrompt("Updated prompt");
     }
 }

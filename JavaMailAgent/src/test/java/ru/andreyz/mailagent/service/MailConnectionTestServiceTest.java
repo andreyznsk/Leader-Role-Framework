@@ -14,6 +14,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class MailConnectionTestServiceTest {
 
@@ -35,8 +36,10 @@ class MailConnectionTestServiceTest {
         ews.setUrl("https://exchange.example.com/EWS/Exchange.asmx");
         ews.setAuthType("NTLM");
         MailConfig.FolderProperties folders = new MailConfig.FolderProperties();
+        MailPromptTemplateService promptTemplateService = mock(MailPromptTemplateService.class);
+        when(promptTemplateService.loadClassificationPrompt()).thenReturn("Prompt");
 
-        runtimeConfigService = new MailRuntimeConfigService(mail, paths, imap, ews, folders, mock(MailControlAuditStore.class));
+        runtimeConfigService = new MailRuntimeConfigService(mail, paths, imap, ews, folders, mock(MailControlAuditStore.class), promptTemplateService);
         ewsConnectionTester = new CapturingEwsConnectionTester();
         endpointDetector = new StubEwsEndpointDetector();
         service = new MailConnectionTestService(
@@ -64,7 +67,8 @@ class MailConnectionTestServiceTest {
                 imap,
                 ews,
                 new MailConfig.FolderProperties(),
-                mock(MailControlAuditStore.class)
+                mock(MailControlAuditStore.class),
+                promptTemplateService()
         );
         MailConnectionTestService blankUrlService = new MailConnectionTestService(
                 blankUrlRuntime,
@@ -134,6 +138,12 @@ class MailConnectionTestServiceTest {
             return MailConnectionTestResult.connected("ews", "Exchange2010_SP2", ewsProperties.getAuthType(),
                     1, false, true, "Connected", ewsProperties.getUrl());
         }
+    }
+
+    private MailPromptTemplateService promptTemplateService() {
+        MailPromptTemplateService service = mock(MailPromptTemplateService.class);
+        when(service.loadClassificationPrompt()).thenReturn("Prompt");
+        return service;
     }
 
     private static class StubEwsEndpointDetector extends EwsEndpointDetector {

@@ -22,6 +22,7 @@ public record MailRuntimeConfig(
         boolean moveProcessedMail,
         String processedFolder,
         String draftFolder,
+        String classificationPrompt,
         long version,
         LocalDateTime appliedAt
 ) {
