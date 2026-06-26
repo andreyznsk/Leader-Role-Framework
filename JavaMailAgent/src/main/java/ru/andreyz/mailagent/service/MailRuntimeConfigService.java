@@ -60,7 +60,7 @@ public class MailRuntimeConfigService {
                 imapProperties.getPort(),
                 imapProperties.isSsl(),
                 Math.max(1, mailProperties.getPollIntervalSeconds()),
-                List.of("Inbox"),
+                sanitizeList(folderProperties.getInclude()),
                 sanitizeList(folderProperties.getExclude()),
                 true,
                 true,

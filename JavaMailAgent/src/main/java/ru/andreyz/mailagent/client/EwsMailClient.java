@@ -4,6 +4,7 @@ import microsoft.exchange.webservices.data.core.ExchangeService;
 import microsoft.exchange.webservices.data.core.PropertySet;
 import microsoft.exchange.webservices.data.core.enumeration.property.BasePropertySet;
 import microsoft.exchange.webservices.data.core.enumeration.property.BodyType;
+import microsoft.exchange.webservices.data.core.enumeration.search.LogicalOperator;
 import microsoft.exchange.webservices.data.core.enumeration.property.WellKnownFolderName;
 import microsoft.exchange.webservices.data.core.enumeration.search.FolderTraversal;
 import microsoft.exchange.webservices.data.core.enumeration.service.ConflictResolutionMode;
@@ -17,6 +18,7 @@ import microsoft.exchange.webservices.data.property.complex.EmailAddress;
 import microsoft.exchange.webservices.data.property.complex.FolderId;
 import microsoft.exchange.webservices.data.property.complex.ItemId;
 import microsoft.exchange.webservices.data.property.complex.MessageBody;
+import microsoft.exchange.webservices.data.property.complex.ConversationId;
 import microsoft.exchange.webservices.data.search.FindFoldersResults;
 import microsoft.exchange.webservices.data.search.FindItemsResults;
 import microsoft.exchange.webservices.data.search.FolderView;
@@ -29,12 +31,16 @@ import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -45,6 +51,7 @@ public class EwsMailClient implements MailClient {
 
     private static final Logger log = LoggerFactory.getLogger(EwsMailClient.class);
     private static final String INBOX = "Inbox";
+    private static final String AGGREGATED_PREFIX = "ews-conv:";
 
     private final MailConfig.MailProperties mailProperties;
     private final MailConfig.EwsProperties ewsProperties;
@@ -137,13 +144,13 @@ public class EwsMailClient implements MailClient {
             SearchFilter unreadOnly = new SearchFilter.IsEqualTo(EmailMessageSchema.IsRead, false);
             FindItemsResults<Item> items = service.findItems(folderId, unreadOnly, view);
 
-            List<Email> result = new ArrayList<>();
+            List<EmailMessage> messages = new ArrayList<>();
             for (Item item : items.getItems()) {
                 if (item instanceof EmailMessage message) {
-                    result.add(toEmail(message, folder));
+                    messages.add(message);
                 }
             }
-            return result;
+            return aggregateByConversation(messages, folder);
         } catch (Exception e) {
             throw new MailException("Failed to list unread EWS emails from " + folder + ": " + e.getMessage(), e);
         }
@@ -152,6 +159,10 @@ public class EwsMailClient implements MailClient {
     @Override
     public void markAsRead(String emailId, String folder) throws MailException {
         try {
+            if (isAggregatedConversationId(emailId)) {
+                markConversationAsRead(emailId, folder);
+                return;
+            }
             EmailMessage message = EmailMessage.bind(service, new ItemId(emailId),
                     new PropertySet(EmailMessageSchema.IsRead));
             message.setIsRead(true);
@@ -273,6 +284,133 @@ public class EwsMailClient implements MailClient {
         return new Email(id, subject, from, defaultString(body, ""), receivedAt, folder);
     }
 
+    private List<Email> aggregateByConversation(List<EmailMessage> messages, String folder) throws Exception {
+        Map<String, List<EmailMessage>> grouped = new LinkedHashMap<>();
+        for (EmailMessage message : messages) {
+            String key = conversationKey(message);
+            grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(message);
+        }
+
+        List<Email> result = new ArrayList<>();
+        for (List<EmailMessage> conversationMessages : grouped.values()) {
+            if (conversationMessages.size() == 1) {
+                result.add(toEmail(conversationMessages.getFirst(), folder));
+            } else {
+                result.add(toConversationEmail(conversationMessages, folder));
+            }
+        }
+        result.sort(Comparator.comparing(Email::receivedAt).reversed());
+        return result;
+    }
+
+    private Email toConversationEmail(List<EmailMessage> messages, String folder) throws Exception {
+        List<Email> parts = new ArrayList<>();
+        for (EmailMessage message : messages) {
+            parts.add(toEmail(message, folder));
+        }
+        parts.sort(Comparator.comparing(Email::receivedAt));
+
+        Email newest = parts.getLast();
+        String conversationId = conversationKey(messages.getFirst());
+        String body = buildConversationBody(parts);
+        String aggregateId = aggregatedConversationId(conversationId, newest.id());
+
+        log.debug("EWS aggregated {} unread items into one conversation email: folder={}, conversationId={}, aggregateId={}",
+                parts.size(), folder, conversationId, aggregateId);
+
+        return new Email(
+                aggregateId,
+                newest.subject(),
+                newest.from(),
+                body,
+                newest.receivedAt(),
+                folder
+        );
+    }
+
+    private String buildConversationBody(List<Email> parts) {
+        StringBuilder body = new StringBuilder();
+        for (int index = 0; index < parts.size(); index++) {
+            Email part = parts.get(index);
+            if (index > 0) {
+                body.append("\n\n");
+            }
+            body.append("----- message ")
+                    .append(index + 1)
+                    .append(" / ")
+                    .append(parts.size())
+                    .append(" -----\n");
+            body.append("From: ").append(defaultString(part.from(), "unknown")).append('\n');
+            body.append("Subject: ").append(defaultString(part.subject(), "(no subject)")).append('\n');
+            body.append("Received: ").append(part.receivedAt()).append("\n\n");
+            body.append(defaultString(part.body(), ""));
+        }
+        return body.toString();
+    }
+
+    private String conversationKey(EmailMessage message) throws Exception {
+        ConversationId conversationId = message.getConversationId();
+        if (conversationId != null && conversationId.getUniqueId() != null && !conversationId.getUniqueId().isBlank()) {
+            return conversationId.getUniqueId();
+        }
+        return message.getId().getUniqueId();
+    }
+
+    private boolean isAggregatedConversationId(String emailId) {
+        return emailId != null && emailId.startsWith(AGGREGATED_PREFIX);
+    }
+
+    private String aggregatedConversationId(String conversationId, String newestItemId) {
+        return AGGREGATED_PREFIX + encodeIdPart(conversationId) + ":" + encodeIdPart(newestItemId);
+    }
+
+    private void markConversationAsRead(String aggregateId, String folder) throws Exception {
+        String conversationId = extractConversationId(aggregateId);
+        FolderId folderId;
+        synchronized (folderIdsByPath) {
+            folderId = folderIdsByPath.get(folder);
+        }
+        if (folderId == null) {
+            throw new MailException("Unknown EWS folder: " + folder);
+        }
+
+        SearchFilter unreadOnly = new SearchFilter.IsEqualTo(EmailMessageSchema.IsRead, false);
+        SearchFilter sameConversation = new SearchFilter.IsEqualTo(ItemSchema.ConversationId, new ConversationId(conversationId));
+        SearchFilter.SearchFilterCollection filter = new SearchFilter.SearchFilterCollection(
+                LogicalOperator.And,
+                unreadOnly,
+                sameConversation
+        );
+
+        ItemView view = new ItemView(100);
+        view.setPropertySet(new PropertySet(BasePropertySet.IdOnly, EmailMessageSchema.IsRead, ItemSchema.ConversationId));
+
+        FindItemsResults<Item> items = service.findItems(folderId, filter, view);
+        for (Item item : items.getItems()) {
+            if (item instanceof EmailMessage message) {
+                message.setIsRead(true);
+                message.update(ConflictResolutionMode.AutoResolve);
+            }
+        }
+    }
+
+    private String extractConversationId(String aggregateId) {
+        String payload = aggregateId.substring(AGGREGATED_PREFIX.length());
+        int separator = payload.indexOf(':');
+        if (separator < 0) {
+            throw new IllegalArgumentException("Invalid aggregated EWS email id: " + aggregateId);
+        }
+        return decodeIdPart(payload.substring(0, separator));
+    }
+
+    private String encodeIdPart(String value) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String decodeIdPart(String value) {
+        return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
+    }
+
     /**
      * Safely extracts the body text. The body may not be loaded via FindItem,
      * so we load it lazily using a separate bind request if needed.
@@ -330,6 +468,7 @@ public class EwsMailClient implements MailClient {
         PropertySet propertySet = new PropertySet(BasePropertySet.IdOnly,
                 ItemSchema.Subject,
                 ItemSchema.DateTimeReceived,
+                ItemSchema.ConversationId,
                 EmailMessageSchema.From,
                 EmailMessageSchema.IsRead);
         return propertySet;

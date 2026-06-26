@@ -140,10 +140,13 @@ public class MailConfig {
 
     @ConfigurationProperties(prefix = "mail.folders")
     public static class FolderProperties {
+        private List<String> include = List.of();
         private List<String> exclude = List.of(
             "Sent", "Drafts", "Trash", "Spam", "Archive", "Junk", "Deleted Items"
         );
 
+        public List<String> getInclude() { return include; }
+        public void setInclude(List<String> v) { this.include = v; }
         public List<String> getExclude() { return exclude; }
         public void setExclude(List<String> v) { this.exclude = v; }
     }
