@@ -89,6 +89,58 @@ echo "Found in search: $FOUND_COUNT"
 ```
 **Expected:** `$FOUND_COUNT >= 1`, `score > 0.3`
 
+Step 8 — Проверить поиск через Memory Service Knowledge Gateway
+
+После того как RAG уже нашёл документ, проверить новый endpoint Memory Service.
+
+SEARCH_MEMORY=$(curl -s -X POST $MS_URL/api/knowledge/search \
+-H "Content-Type: application/json" \
+-d "{
+\"query\":\"$RUN_ID\",
+\"keywords\":[\"release\",\"pipeline\",\"Jenkins\",\"Helm\"],
+\"topK\":5,
+\"includeOperationalContext\":true
+}")
+
+echo "$SEARCH_MEMORY" | jq
+
+Проверка:
+
+FOUND_MEMORY=$(echo "$SEARCH_MEMORY" | grep -c "$RUN_ID")
+echo "Found via Memory Gateway: $FOUND_MEMORY"
+
+Expected:
+
+HTTP 200
+results не пустой
+operationalContext присутствует
+FOUND_MEMORY >= 1
+Step 9 — Проверить MCP Tool searchKnowledge
+
+Проверить, что агент получает тот же результат через MCP.
+
+Пример вызова MCP Tool:
+
+Tool: searchKnowledge
+
+Query:
+$RUN_ID
+
+или через MCP smoke-test:
+
+./test-runner/mcp-call.sh \
+searchKnowledge \
+"{\"query\":\"$RUN_ID\",\"topK\":5}"
+
+(использовать фактический способ вызова MCP в проекте)
+
+Expected:
+
+Tool вызван успешно
+Ответ содержит $RUN_ID
+Ответ содержит данные из проиндексированного документа
+Источник = RAG_DOCUMENT
+
 ## Cleanup
 ```bash
 rm -f "rag-inbox/captures/$(basename "$KNOWLEDGE_FILE")" 2>/dev/null || true

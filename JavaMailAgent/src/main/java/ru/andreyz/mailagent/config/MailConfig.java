@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
@@ -14,6 +15,7 @@ import java.util.List;
     MailConfig.MaildevProperties.class,
     MailConfig.ImapProperties.class,
     MailConfig.EwsProperties.class,
+    MailConfig.TestConnectionProperties.class,
     MailConfig.AgentProperties.class,
     MailConfig.FolderProperties.class
 })
@@ -26,6 +28,7 @@ public class MailConfig {
         private String password;
         private int pollIntervalSeconds = 60;
         private int fetchLimit = 20;
+        private Integer processingParallelism;
 
         public String getProtocol() { return protocol; }
         public void setProtocol(String v) { this.protocol = v; }
@@ -37,6 +40,8 @@ public class MailConfig {
         public void setPollIntervalSeconds(int v) { this.pollIntervalSeconds = v; }
         public int getFetchLimit() { return fetchLimit; }
         public void setFetchLimit(int v) { this.fetchLimit = v; }
+        public Integer getProcessingParallelism() { return processingParallelism; }
+        public void setProcessingParallelism(Integer v) { this.processingParallelism = v; }
     }
 
     @ConfigurationProperties(prefix = "path")
@@ -45,6 +50,7 @@ public class MailConfig {
         private String processed = "processed";
         private String drafts = "drafts";
         private String plan = "plans/today.md";
+        private String ragInbox = "rag-inbox";
 
         public String getInbox() { return inbox; }
         public void setInbox(String v) { this.inbox = v; }
@@ -54,6 +60,8 @@ public class MailConfig {
         public void setDrafts(String v) { this.drafts = v; }
         public String getPlan() { return plan; }
         public void setPlan(String v) { this.plan = v; }
+        public String getRagInbox() { return ragInbox; }
+        public void setRagInbox(String v) { this.ragInbox = v; }
     }
 
     @ConfigurationProperties(prefix = "memory.service")
@@ -97,6 +105,7 @@ public class MailConfig {
         private String url;
         private boolean autodiscover = false;
         private String domain;
+        private String authType = "NTLM";
         private String version = "Exchange2010_SP2";
         private int timeoutSeconds = 30;
 
@@ -106,10 +115,23 @@ public class MailConfig {
         public void setAutodiscover(boolean v) { this.autodiscover = v; }
         public String getDomain() { return domain; }
         public void setDomain(String v) { this.domain = v; }
+        public String getAuthType() { return authType; }
+        public void setAuthType(String v) { this.authType = v; }
         public String getVersion() { return version; }
         public void setVersion(String v) { this.version = v; }
         public int getTimeoutSeconds() { return timeoutSeconds; }
         public void setTimeoutSeconds(int v) { this.timeoutSeconds = v; }
+    }
+
+    @ConfigurationProperties(prefix = "mail.test-connection")
+    public static class TestConnectionProperties {
+        private int timeoutSeconds = 15;
+        private int maxFoldersToScan = 500;
+
+        public int getTimeoutSeconds() { return timeoutSeconds; }
+        public void setTimeoutSeconds(int v) { this.timeoutSeconds = v; }
+        public int getMaxFoldersToScan() { return maxFoldersToScan; }
+        public void setMaxFoldersToScan(int v) { this.maxFoldersToScan = v; }
     }
 
     @ConfigurationProperties(prefix = "agent")
@@ -122,10 +144,11 @@ public class MailConfig {
 
     @ConfigurationProperties(prefix = "mail.folders")
     public static class FolderProperties {
-        private List<String> exclude = List.of(
-            "Sent", "Drafts", "Trash", "Spam", "Archive", "Junk", "Deleted Items"
-        );
+        private List<String> include = new ArrayList<>();
+        private List<String> exclude = new ArrayList<>();
 
+        public List<String> getInclude() { return include; }
+        public void setInclude(List<String> v) { this.include = v; }
         public List<String> getExclude() { return exclude; }
         public void setExclude(List<String> v) { this.exclude = v; }
     }

@@ -5,8 +5,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.domain.Risk;
 import ru.andreyz.memoryservice.domain.Task;
+import ru.andreyz.memoryservice.domain.UsageEventType;
 import ru.andreyz.memoryservice.dto.ContextDto;
 import ru.andreyz.memoryservice.dto.ClassifiedCapture;
+import ru.andreyz.memoryservice.dto.UsageEventCommand;
 
 import java.io.IOException;
 import java.util.List;
@@ -21,15 +23,18 @@ public class CaptureProcessingService {
     private final CaptureClassifierAgent classifierAgent;
     private final CaptureRouter captureRouter;
     private final ContextService contextService;
+    private final UsageEventService usageEventService;
 
     public CaptureProcessingService(CaptureService captureService,
                                      CaptureClassifierAgent classifierAgent,
                                      CaptureRouter captureRouter,
-                                     ContextService contextService) {
+                                     ContextService contextService,
+                                     UsageEventService usageEventService) {
         this.captureService = captureService;
         this.classifierAgent = classifierAgent;
         this.captureRouter = captureRouter;
         this.contextService = contextService;
+        this.usageEventService = usageEventService;
     }
 
     public ProcessResult processToday() {
@@ -39,7 +44,7 @@ public class CaptureProcessingService {
             return new ProcessResult(0, 0);
         }
 
-        log.info("Processing {} capture files via claude --print", pending.size());
+        log.info("Processing {} capture files via agent", pending.size());
 
         List<ClassifiedCapture> classified;
         try {
@@ -60,6 +65,17 @@ public class CaptureProcessingService {
                     captureService.moveToProcessed(c.file());
                 }
                 routed++;
+                usageEventService.record(new UsageEventCommand(
+                        UsageEventType.CAPTURE_PROCESSED,
+                        "capture-bot",
+                        "SUCCESS",
+                        c.file(),
+                        "capture",
+                        c.captureId() != null ? String.valueOf(c.captureId()) : null,
+                        null,
+                        null,
+                        java.util.Map.of("classification", c.type(), "routedTo", routedTo)
+                ));
                 log.info("Capture {} → {} ({})", captureRef(c), c.type(), routedTo);
             } catch (IOException e) {
                 log.warn("Failed to move capture file {} after route: {}", c.file(), e.getMessage(), e);

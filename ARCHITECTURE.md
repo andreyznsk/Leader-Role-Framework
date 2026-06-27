@@ -1,6 +1,6 @@
 # LeaderOS — Architecture - Мастер-Спека
 
-**Последнее обновление:** 2026-06-12
+**Последнее обновление:** 2026-06-26
 **Статус:** Living document — обновлять при любом изменении контрактов между сервисами
 **git:** https://github.com/andreyznsk/Leader-Role-Framework.git
 ---
@@ -83,6 +83,7 @@ agent:
 |---------|----------|--------|--------|
 | local | Maildev HTTP API | `MaildevClient` | ✅ реализован |
 | dev | IMAP | `ImapMailClient` | 🔜 planned |
+| ews | Exchange EWS | `EwsMailClient` | ✅ реализован |
 | prod | EWS (Exchange on-premise) | `EwsMailClient` | ✅ реализован |
 
 **Prod Exchange scan:** `EwsMailClient` рекурсивно сканирует `Inbox` и все подпапки.
@@ -93,19 +94,56 @@ agent:
 
 | Тип | Действие |
 |-----|----------|
-| `REQUEST` | Добавить в `plans/today.md` + POST `/api/tasks/pending` в JavaMemoryService |
-| `DRAFT` | Сохранить черновик в `drafts/` |
-| `NOISE` | Пометить прочитанным на сервере, переместить в `processed/` |
-| `CAPTURE` | POST `/api/capture` в JavaMemoryService, переместить файл в `processed/` |
+| `REQUEST` | `PLAN_APPEND` -> POST `/api/tasks/pending` -> move в `processed/` |
+| `DRAFT` | move в `processed/` |
+| `NOISE` | move в `processed/` -> `MARK_AS_READ` |
+| `CAPTURE` | POST `/api/capture` -> move в `processed/` |
+| `NOTICE` | записать NOTICE markdown -> move в `processed/` -> `MARK_AS_READ` |
+| `NOTE` | POST `/api/notes` (поля: `title`, `text`, `tags`, `source`) -> move в `processed/` |
 
-**Трекинг обработанных писем:** таблица `mailagent.processed_emails`
-- `REQUEST` и `DRAFT` — письмо остаётся непрочитанным на сервере
-- `NOISE` — помечается прочитанным на сервере
+**Трекинг обработанных писем:** таблица `mailagent.processed_emails` теперь хранит не только dedup, но и checkpoint state-machine:
+- `status`: `NEW | PROCESSING | ERROR | PROCESSED`
+- `failed_route`: checkpoint следующего side-effect (`PLAN_APPEND`, `MEMORY_PENDING_TASK`, `MEMORY_CAPTURE`, `MEMORY_NOTE`, `NOTICE_WRITE`, `MOVE_TO_PROCESSED`, `MARK_AS_READ`)
+- `route_payload_json`: сериализованный payload для retry без повторного чтения письма с сервера и без повторного вызова LLM
+
+**Retry flow:** каждый poll сначала обрабатывает очередь `status=ERROR` по `last_attempt_at, created_at`. Пока очередь ошибок не пуста, новые письма не имеют приоритета. При падении любого route batch останавливается, запись письма остаётся в `ERROR`, а следующий запуск продолжает цепочку с сохранённого checkpoint.
+
+**Scheduler:** polling запускается через `@Scheduled(fixedDelayString = "#{${mail.poll-interval-seconds:60} * 1000}")`. Параметр `mail.poll-interval-seconds` читается из application properties при старте приложения.
 
 **Исходящие вызовы:**
 - `POST http://localhost:8082/api/tasks/pending` — создать PENDING задачу
+- `POST http://localhost:8082/api/capture` — создать raw capture
+- `POST http://localhost:8082/api/notes` — создать operational note
 
 **UI:** `http://localhost:8080/ui/status` — статус агента, счётчики, последние логи
+
+**Plugin Control API (CR-MAIL-004, ✅ Implemented):**
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `GET` | `/api/control/settings` | Настройки плагина как `ControlSettingsDescriptor` (key → value/type/label/editable/secret/options) |
+| `PUT` | `/api/control/settings` | Применить изменения. Body: `{"settings":{...}}`. Ответ: `{status,keys,configVersion,message}` |
+| `GET` | `/api/control/status` | Статус: `{pluginCode,pluginName,enabled,schedulerEnabled,configVersion,...}` |
+| `GET` | `/api/control/audit` | История изменений настроек |
+| `POST` | `/api/control/plugin-state` | `{enabled:true/false}` — включить/выключить polling внутри JVM (без остановки процесса) |
+| `POST` | `/api/control/detect-endpoint` | Быстрая проверка EWS endpoint без авторизации. Ответ: `success/status`, `endpointReachable`, `httpsOk`, `ewsDetected`, `httpStatus`, `recommendedAuthType`. |
+| `POST` | `/api/control/test-connection` | Тест подключения к почтовому серверу. Может принять runtime override (`protocol`, `ewsUrl`, `username`, `password`, `authType`, `folderExclude`). Ответ: `success/status`, `exchangeVersion`, `authType`, `foldersFound`, `errorType`, `details`. |
+
+**Важно:** `enabled=false` останавливает polling/классификацию внутри JVM. Процесс mail-agent продолжает работать.
+
+**RuntimeMailClient:** выбирает реализацию на каждый вызов по `runtimeConfigService.snapshot().protocol()`:
+- `maildev` → `MaildevClient` (статические свойства из конфига)
+- `ews` → `EwsMailClient` (runtime `serverUrl` из базы)
+- `imap` → `MailException` (not implemented)
+
+**EWS authentication settings:** Mail Agent control descriptor теперь отдаёт `authType = BASIC | NTLM | OAUTH2`, при `protocol = ews` дефолт в UI и runtime settings — `NTLM`.
+Для MVP backend реально выполняет `BASIC` и `NTLM`. `OAUTH2` пока только отражён в UI и возвращает `NOT_SUPPORTED`.
+
+**Новые таблицы БД:**
+
+| Таблица | Описание |
+|---------|----------|
+| `mailagent.control_settings_audit` | История изменений настроек (action, keys, status, message, createdAt) |
 
 ---
 
@@ -115,9 +153,10 @@ agent:
 **RFC:** `JavaMemoryService/RFC/RFC-memory-service.md`
 **Статус:** In Progress
 
-**Роль:** Операционная память техлида. Хранит быстро меняющиеся данные —
-задачи, планы, инциденты, риски, людей, заметки и raw captures.
-Даёт REST, Thymeleaf UI и MCP tools для Claude-агента.
+**Роль:** Операционная память техлида и UI/gateway для базы знаний.
+Хранит быстро меняющиеся данные — задачи, планы, инциденты, риски, людей,
+заметки и raw captures. RAG-документами не владеет, но отдаёт browser-facing
+UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP tools для Claude-агента.
 
 **База данных:** PostgreSQL, схема `memory`, владелец `memory_user`
 
@@ -131,21 +170,56 @@ agent:
 Каждый сервис управляет только своей схемой через Flyway.
 Инициализация: `infra/postgres/init.sql` — схемы, пользователи, права.
 
+**Новые таблицы (CR-MEM-009):**
+
+| Таблица | Описание |
+|---------|----------|
+| `memory.control_plugins` | Реестр зарегистрированных плагинов (code, name, baseUrl, status, lastSyncAt) |
+| `memory.control_plugin_settings_snapshot` | Последний известный snapshot настроек плагина (для offline-рендеринга) |
+| `memory.control_plugin_audit` | История изменений настроек через control plane proxy |
+
 **Ключевые endpoint-ы:**
 
 | Метод | Путь | Описание |
 |-------|------|----------|
 | `GET` | `/api/context` | Контекст сессии: today/tomorrow, open incidents/risks, recent people notes |
-| `POST` | `/api/tasks` | Создать подтверждённую задачу |
+| `POST` | `/api/tasks` | Создать подтверждённую задачу; UI создаёт title, description, priority, status, dueDate, date |
 | `POST` | `/api/tasks/pending` | Создать задачу со статусом PENDING |
-| `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `DELETED` по умолчанию |
+| `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `DELETED` по умолчанием |
 | `PATCH` | `/api/tasks/{id}/status` | Изменить статус задачи |
 | `POST` | `/api/capture` | Сохранить raw capture в БД и `capture-inbox/` |
 | `POST` | `/api/capture/process-now` | Ручной запуск классификации capture-файлов |
-| `GET/POST` | `/api/notes` | Лента заметок |
+| `POST` | `/api/knowledge/search` | Memory-owned прокси к JavaRagService `/api/search` + usage events |
+| `GET/PUT/POST` | `/api/knowledge/documents/**` | Browser-facing proxy управления RAG-документами |
+| `GET` | `/api/stats/usage?period=7d` | Usage Statistics: агрегаты по usage events |
+| `GET/POST` | `/api/notes` | Лента заметок (`POST` → `201 Created`; поля: `title` обязательный, `text` опциональный, `tags`, `source`) |
+| `DELETE` | `/api/notes/{id}` | Удалить заметку: `204 No Content` / `404 Not Found` (hard delete, CR-MEM-011) |
 | `GET/POST/PUT/DELETE` | `/api/incidents`, `/api/risks`, `/api/people` | CRUD/soft delete рабочих сущностей |
 | `GET` | `/ui/today` | Web UI: план дня |
-| `GET` | `/ui/notes` | Web UI: лента заметок |
+| `GET` | `/ui/notes` | Web UI: Operational Notes |
+| `GET` | `/ui/captures` | Web UI: Capture Inbox |
+| `GET` | `/ui/knowledge` | Web UI: Knowledge Gateway для RAG lifecycle |
+| `GET` | `/ui/stats` | Web UI: статистика использования и saved time |
+| `GET` | `/ui/settings` | Web UI: Control Plane — настройки плагинов (descriptor-driven UI) |
+
+**Control Plane Proxy (CR-MEM-009, CR-MEM-010, ✅ Implemented):**
+
+MemoryService выступает единой точкой управления для всех plugin-сервисов.
+`ControlPluginRegistry` регистрирует плагины: `mail → http://localhost:8080`, `rag → http://localhost:8081`.
+`ControlPluginService` проксирует запросы к `/api/control/*` каждого плагина.
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `GET` | `/api/settings/control/plugins` | Список зарегистрированных плагинов |
+| `GET` | `/api/settings/control/plugins/{code}/settings` | Получить настройки плагина через proxy (503 если недоступен) |
+| `PUT` | `/api/settings/control/plugins/{code}/settings` | Обновить настройки плагина через proxy |
+| `GET` | `/api/settings/control/plugins/{code}/audit` | История изменений плагина через proxy |
+| `POST` | `/api/settings/control/plugins/mail/detect-endpoint` | Endpoint-only диагностика EWS без username/password. |
+| `POST` | `/api/settings/control/plugins/mail/test-connection` | Единый endpoint для кнопки `Test Connection` в UI MemoryService. Проксирует вызов в MailAgent, не запускает polling и не меняет состояние писем. |
+
+**UI Settings:** `/ui/settings` — Thymeleaf-страница `settings.html`. Рендерит форму настроек на сервере через `ControlSettingsDescriptor`. Данные полностью server-side (Thymeleaf), без client-side API fetch при загрузке. Форма сохраняется через browser fetch → `PUT /api/settings/control/plugins/{code}/settings`.
+
+**Live Prompt Editing Policy:** prompt templates plugin-сервисов редактируются через тот же control plane UI `/ui/settings`, что и остальные runtime settings. Каждый plugin хранит свои prompts в собственной БД, в отдельной таблице своей схемы. Начальные prompt values seed-ятся Flyway migration-ами. После этого пользователь может менять prompt в реальном времени через descriptor-driven form (`type=text`), plugin сохраняет обновлённый prompt в свою БД и использует его на следующем вызове без рестарта процесса. Snapshot в MemoryService не является source of truth для prompts, он нужен только для proxy UI и audit/history.
 
 **Статусы задачи:** `PENDING → TODO → IN_PROGRESS → DONE` / `DELETED`
 
@@ -156,6 +230,14 @@ agent:
 `PERSON_NOTE → person_notes`, `KNOWLEDGE → JavaRagService/rag-inbox/captures`,
 `JOURNAL → workspace/08_daily_journal`.
 После успешной обработки файл переносится в `capture-inbox/processed/YYYY-MM-DD/`.
+
+**Usage Statistics:** Memory Service владеет таблицей `memory.usage_events` и пишет события
+из task, pending task, capture, capture processing и knowledge search flow. Агрегаты доступны через
+`GET /api/stats/usage?period=today|7d|30d|all`, UI — `/ui/stats`. Saved time считается
+по MVP-формуле из CR-MEM-008. Knowledge search и knowledge document management проходят через
+REST proxy (`/api/knowledge/**`) и не получают прямого JDBC-доступа к схеме `rag`. Поле
+`usage_events.correlation_id` хранится без жёсткого лимита `VARCHAR(128)`, чтобы не падать на длинных
+mail `Message-ID`.
 
 **MCP tools:** `getContext`, `getTasks`, `createTask`, `markTaskDone`, `moveTask`,
 `updateTaskStatus`, `getTaskDescription`, `setTaskDescription`, `createIncident`,
@@ -202,6 +284,19 @@ agent:
 **Scheduler:** `scheduleWithFixedDelay` каждые ~60 сек, сканирует `rag-inbox/`, идемпотентен по hash
 
 **Входящие вызовы от:** Claude-агент (через MCP или REST API)
+
+**Plugin Control API (CR-RAG-001, ✅ Implemented):**
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `GET` | `/api/control/settings` | Настройки как `ControlSettingsDescriptor` |
+| `PUT` | `/api/control/settings` | Применить изменения. Body: `{"settings":{...}}` |
+| `GET` | `/api/control/status` | Статус сервиса: `{pluginCode,pluginName,enabled,schedulerEnabled,...}` |
+| `GET` | `/api/control/audit` | История изменений настроек |
+
+**Настройки плагина:** `enabled`, `schedulerEnabled`, `scanIntervalSeconds`, `ragInboxPath`, `embeddingModel`, `topK`, `opensearchUrl`, `validationEnabled`
+
+**`pluginCode = "rag"`, `pluginName = "RAG Service"`**
 
 ---
 
@@ -331,7 +426,20 @@ JavaMemoryService ──capture KNOWLEDGE файл──→  JavaRagService/rag-
 JavaMemoryService ──AgentClient──→  common
 JavaRagService ──depends on──→  common (future LLM features)
 LLM provider ──читает──→  JavaRagService (через MCP или HTTP /api/search)
+
+// Plugin Control Protocol (CR-MAIL-004, CR-RAG-001, CR-MEM-009):
+JavaMemoryService ──GET/PUT /api/control/settings──→  JavaMailAgent   (proxy via ControlPluginService)
+JavaMemoryService ──GET/PUT /api/control/settings──→  JavaRagService  (proxy via ControlPluginService)
+JavaMemoryService ──POST /api/control/test-connection──→  JavaMailAgent
+Browser/Agent ──/ui/settings──→  JavaMemoryService ──proxies──→  Plugins
 ```
+
+**Plugin Control Protocol** — единый контракт для управления plugin-сервисами из MemoryService:
+- Каждый plugin-сервис экспонирует `GET/PUT /api/control/settings`, `GET /api/control/status`, `GET /api/control/audit`
+- JavaMailAgent дополнительно: `POST /api/control/test-connection`, `POST /api/control/plugin-state`
+- JavaMemoryService проксирует все запросы через `ControlPluginService`
+- `ControlSettingsDescriptor` — ключ-значение дескриптор настройки: `{value, type, label, description, editable, secret, required, options[]}`
+- Типы настроек: `string`, `number`, `boolean`, `select`, `text`, `list`, `secret`
 
 ---
 
@@ -391,8 +499,14 @@ LLM provider ──читает──→  JavaRagService (через MCP или 
 
 ```
 Leader-Role-Framework/
-└── cr/
-    └── CR-ARCH-001-master-update.md
+├── cr/
+│   └── CR-ARCH-001-master-update.md
+└── docs/
+    └── cr/
+        ├── CR-MAIL-004-plugin-control-api.md      (Implemented, 2026-06-23)
+        ├── CR-MEM-009-plugin-settings-store.md    (Implemented, 2026-06-23)
+        ├── CR-MEM-010-universal-plugin-control-ui.md (Implemented, 2026-06-23)
+        └── CR-RAG-001-plugin-control-api.md       (Implemented, 2026-06-23)
 
 JavaMemoryService/
 └── cr/
@@ -604,6 +718,7 @@ docker compose up -d
 | `04_draft_no_task_created.md` | HIGH | DRAFT → черновик в drafts/, задача НЕ создана |
 | `05_mixed_batch_three_types.md` | HIGH | 3 письма → правильные типы и read-статусы |
 | `06_full_daily_cycle.md` | HIGH | письмо → PENDING → TODO → IN_PROGRESS → DONE |
+| `10_control_plane_settings.md` | HIGH | Plugin Control API: settings fetch/update/testConnection 200/500, audit, UI smoke |
 
 ---
 

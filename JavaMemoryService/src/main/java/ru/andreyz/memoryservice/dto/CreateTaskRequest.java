@@ -6,6 +6,8 @@ public record CreateTaskRequest(
         String title,
         String description,
         String priority,
+        String status,
+        LocalDate dueDate,
         LocalDate date,
         String source
 ) {}

@@ -10,6 +10,7 @@ public record Capture(
         @Id Long id,
         String rawText,
         String source,
+        String sourceId,
         String status,
         String classified,
         String routedTo,

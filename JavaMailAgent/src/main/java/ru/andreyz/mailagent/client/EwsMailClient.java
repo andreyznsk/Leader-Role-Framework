@@ -1,14 +1,12 @@
 package ru.andreyz.mailagent.client;
 
-import jakarta.annotation.PostConstruct;
 import microsoft.exchange.webservices.data.core.ExchangeService;
 import microsoft.exchange.webservices.data.core.PropertySet;
-import microsoft.exchange.webservices.data.core.enumeration.misc.ExchangeVersion;
 import microsoft.exchange.webservices.data.core.enumeration.property.BasePropertySet;
 import microsoft.exchange.webservices.data.core.enumeration.property.BodyType;
+import microsoft.exchange.webservices.data.core.enumeration.search.LogicalOperator;
 import microsoft.exchange.webservices.data.core.enumeration.property.WellKnownFolderName;
 import microsoft.exchange.webservices.data.core.enumeration.search.FolderTraversal;
-import microsoft.exchange.webservices.data.core.enumeration.search.SortDirection;
 import microsoft.exchange.webservices.data.core.enumeration.service.ConflictResolutionMode;
 import microsoft.exchange.webservices.data.core.service.folder.Folder;
 import microsoft.exchange.webservices.data.core.service.item.EmailMessage;
@@ -16,11 +14,11 @@ import microsoft.exchange.webservices.data.core.service.item.Item;
 import microsoft.exchange.webservices.data.core.service.schema.EmailMessageSchema;
 import microsoft.exchange.webservices.data.core.service.schema.FolderSchema;
 import microsoft.exchange.webservices.data.core.service.schema.ItemSchema;
-import microsoft.exchange.webservices.data.credential.WebCredentials;
 import microsoft.exchange.webservices.data.property.complex.EmailAddress;
 import microsoft.exchange.webservices.data.property.complex.FolderId;
 import microsoft.exchange.webservices.data.property.complex.ItemId;
 import microsoft.exchange.webservices.data.property.complex.MessageBody;
+import microsoft.exchange.webservices.data.property.complex.ConversationId;
 import microsoft.exchange.webservices.data.search.FindFoldersResults;
 import microsoft.exchange.webservices.data.search.FindItemsResults;
 import microsoft.exchange.webservices.data.search.FolderView;
@@ -28,96 +26,131 @@ import microsoft.exchange.webservices.data.search.ItemView;
 import microsoft.exchange.webservices.data.search.filter.SearchFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.lang.Nullable;
 
-@Component
-@ConditionalOnProperty(name = "mail.protocol", havingValue = "ews")
 public class EwsMailClient implements MailClient {
 
     private static final Logger log = LoggerFactory.getLogger(EwsMailClient.class);
     private static final String INBOX = "Inbox";
+    private static final String AGGREGATED_PREFIX = "ews-conv:";
 
     private final MailConfig.MailProperties mailProperties;
     private final MailConfig.EwsProperties ewsProperties;
     private final ExchangeService service;
+    private final List<String> excludeFolders;
     private final Map<String, FolderId> folderIdsByPath = new HashMap<>();
+    private volatile boolean foldersInitialized;
 
     public EwsMailClient(MailConfig.MailProperties mailProperties,
                          MailConfig.EwsProperties ewsProperties) {
-        this.mailProperties = mailProperties;
-        this.ewsProperties = ewsProperties;
-        this.service = createService(mailProperties, ewsProperties);
+        this(mailProperties, ewsProperties, List.of());
     }
 
-    @PostConstruct
-    public void checkConnection() {
-        try {
-            Folder inbox = Folder.bind(service, WellKnownFolderName.Inbox, folderPropertySet());
-            log.info("EWS connection OK - {}, Inbox unread: {}",
-                    connectionTarget(), inbox.getUnreadCount());
-        } catch (Exception e) {
-            log.error("EWS connection FAILED - {}: {}", connectionTarget(), e.getMessage());
+    public EwsMailClient(MailConfig.MailProperties mailProperties,
+                         MailConfig.EwsProperties ewsProperties,
+                         List<String> excludeFolders) {
+        this.mailProperties = mailProperties;
+        this.ewsProperties = ewsProperties;
+        this.excludeFolders = excludeFolders != null ? excludeFolders : List.of();
+        this.service = EwsSupport.createService(mailProperties, ewsProperties);
+    }
+
+    /**
+     * Lazily initialises the folder-id map so that both {@link #listFolders}
+     * and {@link #listUnread} work regardless of whether a new instance was
+     * created by {@code RuntimeMailClient.delegateChecked()}.
+     */
+    private void ensureFoldersInitialized() throws MailException {
+        if (foldersInitialized) {
+            return;
+        }
+        synchronized (folderIdsByPath) {
+            if (foldersInitialized) {
+                return;
+            }
+            try {
+                URI ewsUrl = service.getUrl();
+                log.debug("EWS lazy init folders: connecting to {}, autodiscover={}, version={}",
+                        ewsUrl, ewsProperties.isAutodiscover(), ewsProperties.getVersion());
+
+                Folder inbox = Folder.bind(service, WellKnownFolderName.Inbox, folderPropertySet());
+                folderIdsByPath.put(INBOX, inbox.getId());
+                collectChildFolders(inbox, INBOX, excludeFolders, null);
+                foldersInitialized = true;
+                log.debug("EWS folder cache initialized with {} folders", folderIdsByPath.size());
+            } catch (MailException e) {
+                throw e;
+            } catch (Exception e) {
+                URI ewsUrl = service.getUrl();
+                log.error("EWS lazy init failed at {}. Target: {}. Auth: {}. Error: {}",
+                        ewsUrl, ewsProperties.getUrl(), ewsProperties.getAuthType(), e.getMessage(), e);
+                throw new MailException("Failed to initialize EWS folders at %s: %s"
+                        .formatted(ewsUrl != null ? ewsUrl : "unknown", e.getMessage()), e);
+            }
         }
     }
 
     @Override
     public List<String> listFolders(List<String> excludeFolders) throws MailException {
-        try {
-            folderIdsByPath.clear();
-
-            Folder inbox = Folder.bind(service, WellKnownFolderName.Inbox, folderPropertySet());
-            folderIdsByPath.put(INBOX, inbox.getId());
-
+        ensureFoldersInitialized();
+        synchronized (folderIdsByPath) {
             List<String> folders = new ArrayList<>();
-            if (!isExcluded(INBOX, excludeFolders)) {
-                folders.add(INBOX);
+            for (String path : folderIdsByPath.keySet()) {
+                String leaf = leafName(path);
+                if (!isExcluded(path, excludeFolders) && !isExcluded(leaf, excludeFolders)) {
+                    folders.add(path);
+                }
             }
-
-            collectChildFolders(inbox, INBOX, excludeFolders, folders);
-            log.debug("EWS folders selected for scan: {}", folders);
+            log.debug("EWS folders selected for scan (from cache): {}", folders);
             return folders;
-        } catch (Exception e) {
-            throw new MailException("Failed to list EWS folders: " + e.getMessage(), e);
         }
     }
 
     @Override
     public List<Email> listUnread(String folder, int limit) throws MailException {
-        FolderId folderId = folderIdsByPath.get(folder);
+        ensureFoldersInitialized();
+        FolderId folderId;
+        synchronized (folderIdsByPath) {
+            folderId = folderIdsByPath.get(folder);
+        }
         if (folderId == null) {
+            log.warn("EWS listUnread: folder '{}' not found in cache; keys={}", folder, folderIdsByPath.keySet());
             throw new MailException("Unknown EWS folder: " + folder);
         }
 
         try {
             ItemView view = new ItemView(limit);
             view.setPropertySet(emailListPropertySet());
-            view.getOrderBy().add(ItemSchema.DateTimeReceived, SortDirection.Ascending);
 
             SearchFilter unreadOnly = new SearchFilter.IsEqualTo(EmailMessageSchema.IsRead, false);
             FindItemsResults<Item> items = service.findItems(folderId, unreadOnly, view);
 
-            List<Email> result = new ArrayList<>();
+            List<EmailMessage> messages = new ArrayList<>();
             for (Item item : items.getItems()) {
                 if (item instanceof EmailMessage message) {
-                    result.add(toEmail(message, folder));
+                    messages.add(message);
                 }
             }
-            return result;
+            return aggregateByConversation(messages, folder);
         } catch (Exception e) {
             throw new MailException("Failed to list unread EWS emails from " + folder + ": " + e.getMessage(), e);
         }
@@ -126,12 +159,46 @@ public class EwsMailClient implements MailClient {
     @Override
     public void markAsRead(String emailId, String folder) throws MailException {
         try {
+            if (isAggregatedConversationId(emailId)) {
+                markConversationAsRead(emailId, folder);
+                return;
+            }
             EmailMessage message = EmailMessage.bind(service, new ItemId(emailId),
                     new PropertySet(EmailMessageSchema.IsRead));
             message.setIsRead(true);
             message.update(ConflictResolutionMode.AutoResolve);
         } catch (Exception e) {
             throw new MailException("Failed to mark EWS email " + emailId + " as read", e);
+        }
+    }
+
+    @Override
+    public MailConnectionTestResult testConnection() {
+        URI ewsUrl = service.getUrl();
+        try {
+            log.info("EWS testConnection: checking {}", ewsUrl);
+            Folder inbox = Folder.bind(service, WellKnownFolderName.Inbox, folderPropertySet());
+            log.info("EWS testConnection OK: {} unread={}", ewsUrl, inbox.getUnreadCount());
+            return MailConnectionTestResult.connected(
+                    "ews",
+                    ewsProperties.getVersion(),
+                    ewsProperties.getAuthType(),
+                    null,
+                    false,
+                    inbox != null,
+                    "Inbox unread: " + inbox.getUnreadCount(),
+                    EwsSupport.connectionTarget(mailProperties, ewsProperties)
+            );
+        } catch (Exception e) {
+            log.warn("EWS testConnection FAILED at {}: {}", ewsUrl, e.getMessage());
+            return MailConnectionTestResult.failed(
+                    "ews",
+                    ewsProperties.getAuthType(),
+                    null,
+                    "Connection failed",
+                    e.getMessage(),
+                    EwsSupport.connectionTarget(mailProperties, ewsProperties)
+            );
         }
     }
 
@@ -143,7 +210,7 @@ public class EwsMailClient implements MailClient {
     private void collectChildFolders(Folder parent,
                                      String parentPath,
                                      List<String> excludeFolders,
-                                     List<String> selectedFolders) throws Exception {
+                                     @Nullable List<String> selectedFolders) throws Exception {
         FolderView view = new FolderView(100);
         view.setTraversal(FolderTraversal.Shallow);
         view.setPropertySet(folderPropertySet());
@@ -157,9 +224,11 @@ public class EwsMailClient implements MailClient {
                 String path = parentPath + "/" + child.getDisplayName();
                 folderIdsByPath.put(path, child.getId());
 
-                if (!isExcluded(path, excludeFolders)) {
+                if (selectedFolders != null && !isExcluded(path, excludeFolders)) {
                     selectedFolders.add(path);
                     collectChildFolders(child, path, excludeFolders, selectedFolders);
+                } else if (selectedFolders == null) {
+                    collectChildFolders(child, path, excludeFolders, null);
                 } else {
                     log.debug("EWS folder excluded from scan: {}", path);
                 }
@@ -210,9 +279,160 @@ public class EwsMailClient implements MailClient {
         String id = message.getId().getUniqueId();
         String subject = defaultString(message.getSubject(), "(no subject)");
         String from = fromAddress(message);
-        String body = MessageBody.getStringFromMessageBody(message.getBody());
+        String body = extractBody(message);
         LocalDateTime receivedAt = toLocalDateTime(message.getDateTimeReceived());
         return new Email(id, subject, from, defaultString(body, ""), receivedAt, folder);
+    }
+
+    private List<Email> aggregateByConversation(List<EmailMessage> messages, String folder) throws Exception {
+        Map<String, List<EmailMessage>> grouped = new LinkedHashMap<>();
+        for (EmailMessage message : messages) {
+            String key = conversationKey(message);
+            grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(message);
+        }
+
+        List<Email> result = new ArrayList<>();
+        for (List<EmailMessage> conversationMessages : grouped.values()) {
+            if (conversationMessages.size() == 1) {
+                result.add(toEmail(conversationMessages.getFirst(), folder));
+            } else {
+                result.add(toConversationEmail(conversationMessages, folder));
+            }
+        }
+        result.sort(Comparator.comparing(Email::receivedAt).reversed());
+        return result;
+    }
+
+    private Email toConversationEmail(List<EmailMessage> messages, String folder) throws Exception {
+        List<Email> parts = new ArrayList<>();
+        for (EmailMessage message : messages) {
+            parts.add(toEmail(message, folder));
+        }
+        parts.sort(Comparator.comparing(Email::receivedAt));
+
+        Email newest = parts.getLast();
+        String conversationId = conversationKey(messages.getFirst());
+        String body = buildConversationBody(parts);
+        String aggregateId = aggregatedConversationId(conversationId, newest.id());
+
+        log.debug("EWS aggregated {} unread items into one conversation email: folder={}, conversationId={}, aggregateId={}",
+                parts.size(), folder, conversationId, aggregateId);
+
+        return new Email(
+                aggregateId,
+                newest.subject(),
+                newest.from(),
+                body,
+                newest.receivedAt(),
+                folder
+        );
+    }
+
+    private String buildConversationBody(List<Email> parts) {
+        StringBuilder body = new StringBuilder();
+        for (int index = 0; index < parts.size(); index++) {
+            Email part = parts.get(index);
+            if (index > 0) {
+                body.append("\n\n");
+            }
+            body.append("----- message ")
+                    .append(index + 1)
+                    .append(" / ")
+                    .append(parts.size())
+                    .append(" -----\n");
+            body.append("From: ").append(defaultString(part.from(), "unknown")).append('\n');
+            body.append("Subject: ").append(defaultString(part.subject(), "(no subject)")).append('\n');
+            body.append("Received: ").append(part.receivedAt()).append("\n\n");
+            body.append(defaultString(part.body(), ""));
+        }
+        return body.toString();
+    }
+
+    private String conversationKey(EmailMessage message) throws Exception {
+        ConversationId conversationId = message.getConversationId();
+        if (conversationId != null && conversationId.getUniqueId() != null && !conversationId.getUniqueId().isBlank()) {
+            return conversationId.getUniqueId();
+        }
+        return message.getId().getUniqueId();
+    }
+
+    private boolean isAggregatedConversationId(String emailId) {
+        return emailId != null && emailId.startsWith(AGGREGATED_PREFIX);
+    }
+
+    private String aggregatedConversationId(String conversationId, String newestItemId) {
+        return AGGREGATED_PREFIX + encodeIdPart(conversationId) + ":" + encodeIdPart(newestItemId);
+    }
+
+    private void markConversationAsRead(String aggregateId, String folder) throws Exception {
+        String conversationId = extractConversationId(aggregateId);
+        FolderId folderId;
+        synchronized (folderIdsByPath) {
+            folderId = folderIdsByPath.get(folder);
+        }
+        if (folderId == null) {
+            throw new MailException("Unknown EWS folder: " + folder);
+        }
+
+        SearchFilter unreadOnly = new SearchFilter.IsEqualTo(EmailMessageSchema.IsRead, false);
+        SearchFilter sameConversation = new SearchFilter.IsEqualTo(ItemSchema.ConversationId, new ConversationId(conversationId));
+        SearchFilter.SearchFilterCollection filter = new SearchFilter.SearchFilterCollection(
+                LogicalOperator.And,
+                unreadOnly,
+                sameConversation
+        );
+
+        ItemView view = new ItemView(100);
+        view.setPropertySet(new PropertySet(BasePropertySet.IdOnly, EmailMessageSchema.IsRead, ItemSchema.ConversationId));
+
+        FindItemsResults<Item> items = service.findItems(folderId, filter, view);
+        for (Item item : items.getItems()) {
+            if (item instanceof EmailMessage message) {
+                message.setIsRead(true);
+                message.update(ConflictResolutionMode.AutoResolve);
+            }
+        }
+    }
+
+    private String extractConversationId(String aggregateId) {
+        String payload = aggregateId.substring(AGGREGATED_PREFIX.length());
+        int separator = payload.indexOf(':');
+        if (separator < 0) {
+            throw new IllegalArgumentException("Invalid aggregated EWS email id: " + aggregateId);
+        }
+        return decodeIdPart(payload.substring(0, separator));
+    }
+
+    private String encodeIdPart(String value) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String decodeIdPart(String value) {
+        return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Safely extracts the body text. The body may not be loaded via FindItem,
+     * so we load it lazily using a separate bind request if needed.
+     */
+    private String extractBody(EmailMessage message) throws Exception {
+        try {
+            microsoft.exchange.webservices.data.property.complex.MessageBody mb = message.getBody();
+            if (mb != null) {
+                return MessageBody.getStringFromMessageBody(mb);
+            }
+        } catch (Exception ignored) {
+            // body not loaded via FindItem — fall through to lazy load
+        }
+        try {
+            PropertySet bodyOnly = new PropertySet(ItemSchema.Body);
+            bodyOnly.setRequestedBodyType(BodyType.Text);
+            EmailMessage loaded = EmailMessage.bind(service, message.getId(), bodyOnly);
+            return MessageBody.getStringFromMessageBody(loaded.getBody());
+        } catch (Exception e) {
+            log.debug("Could not load body for email {}: {}", message.getId(), e.getMessage());
+            return "";
+        }
     }
 
     private String fromAddress(EmailMessage message) throws Exception {
@@ -247,54 +467,11 @@ public class EwsMailClient implements MailClient {
     private PropertySet emailListPropertySet() {
         PropertySet propertySet = new PropertySet(BasePropertySet.IdOnly,
                 ItemSchema.Subject,
-                ItemSchema.Body,
                 ItemSchema.DateTimeReceived,
+                ItemSchema.ConversationId,
                 EmailMessageSchema.From,
                 EmailMessageSchema.IsRead);
-        propertySet.setRequestedBodyType(BodyType.Text);
         return propertySet;
     }
 
-    private static ExchangeService createService(MailConfig.MailProperties mailProperties,
-                                                 MailConfig.EwsProperties ewsProperties) {
-        ExchangeService service = new ExchangeService(exchangeVersion(ewsProperties.getVersion()));
-        service.setCredentials(webCredentials(mailProperties, ewsProperties));
-        service.setTimeout(Math.max(1, ewsProperties.getTimeoutSeconds()) * 1000);
-        service.setPreAuthenticate(true);
-
-        try {
-            if (ewsProperties.isAutodiscover()) {
-                service.autodiscoverUrl(mailProperties.getUsername(), url -> url != null && url.startsWith("https://"));
-            } else if (ewsProperties.getUrl() != null && !ewsProperties.getUrl().isBlank()) {
-                service.setUrl(URI.create(ewsProperties.getUrl()));
-            }
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to configure EWS endpoint", e);
-        }
-
-        return service;
-    }
-
-    private static WebCredentials webCredentials(MailConfig.MailProperties mailProperties,
-                                                 MailConfig.EwsProperties ewsProperties) {
-        String domain = ewsProperties.getDomain();
-        if (domain != null && !domain.isBlank()) {
-            return new WebCredentials(mailProperties.getUsername(), mailProperties.getPassword(), domain);
-        }
-        return new WebCredentials(mailProperties.getUsername(), mailProperties.getPassword());
-    }
-
-    private static ExchangeVersion exchangeVersion(String value) {
-        if (value == null || value.isBlank()) {
-            return ExchangeVersion.Exchange2010_SP2;
-        }
-        return ExchangeVersion.valueOf(value);
-    }
-
-    private String connectionTarget() {
-        if (ewsProperties.isAutodiscover()) {
-            return "autodiscover:" + mailProperties.getUsername();
-        }
-        return ewsProperties.getUrl();
-    }
 }

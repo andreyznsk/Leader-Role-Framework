@@ -1,7 +1,7 @@
 # RFC: common — Общий модуль LeaderOS
 
 **Статус:** Draft
-**Дата:** 2026-06-12
+**Дата:** 2026-06-20
 **Автор:** Андрей Зайцев
 **Модуль:** `common`
 **Запускать Claude Code из:** `Leader-Role-Framework/`
@@ -239,6 +239,7 @@ public class MockAgentClient implements AgentClient {
 > `agent.mock.response`, возвращается фиксированная строка. Если значение пустое,
 > mock классифицирует поддерживаемые prompt-ы по keyword-based правилам,
 > перенесённым из бывших `MockClaudeRunner` и `MockCaptureClassifierAgent`.
+> Mail classification mock должен покрывать `REQUEST`, `DRAFT`, `NOISE`, `CAPTURE`, `NOTICE`.
 
 ---
 
@@ -378,7 +379,7 @@ public class AgentClientConfig {
     public AgentClient claudeAgentClient(
             @Value("${agent.timeout-minutes:5}") int timeoutMinutes) {
         log.info("AgentClient provider: claude --print");
-        return new ClaudeProcessAgentClient(timeoutMinutes);
+        return new CodeProcessAgentClient(timeoutMinutes);
     }
 
     // ── mock ────────────────────────────────────────────────────────────────
@@ -397,13 +398,13 @@ public class AgentClientConfig {
     @ConditionalOnProperty(name = "agent.provider", havingValue = "ollama")
     public ChatClient ollamaChatClient(ChatClient.Builder builder) {
         return builder
-            .defaultAdvisors(SimpleLoggerAdvisor.builder().order(4).build())
-            .defaultOptions(OllamaOptions.builder()
-                .temperature(0.0)
-                .topP(1.0)
-                .topK(20)
-                .build())
-            .build();
+                .defaultAdvisors(SimpleLoggerAdvisor.builder().order(4).build())
+                .defaultOptions(OllamaOptions.builder()
+                        .temperature(0.0)
+                        .topP(1.0)
+                        .topK(20)
+                        .build())
+                .build();
     }
 
     @Bean
@@ -419,8 +420,8 @@ public class AgentClientConfig {
     @ConditionalOnProperty(name = "agent.provider", havingValue = "gigachat")
     public ChatClient gigaChatClient(ChatClient.Builder builder) {
         return builder
-            .defaultAdvisors(SimpleLoggerAdvisor.builder().order(4).build())
-            .build();
+                .defaultAdvisors(SimpleLoggerAdvisor.builder().order(4).build())
+                .build();
     }
 
     @Bean

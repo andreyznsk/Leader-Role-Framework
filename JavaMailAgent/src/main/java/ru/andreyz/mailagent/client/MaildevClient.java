@@ -1,13 +1,12 @@
 package ru.andreyz.mailagent.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.model.MailConnectionErrorType;
+import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -19,8 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@Component
-@ConditionalOnProperty(name = "mail.protocol", havingValue = "maildev")
 public class MaildevClient implements MailClient {
 
     private static final Logger log = LoggerFactory.getLogger(MaildevClient.class);
@@ -34,25 +31,6 @@ public class MaildevClient implements MailClient {
     public MaildevClient(ObjectMapper objectMapper, MailConfig.MaildevProperties props) {
         this.objectMapper = objectMapper;
         this.apiUrl = props.getApiUrl();
-    }
-
-    @PostConstruct
-    public void checkConnection() {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(apiUrl + "/email"))
-                .timeout(Duration.ofSeconds(3))
-                .GET()
-                .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() == 200) {
-                log.info("✅ Maildev connection OK — {}", apiUrl);
-            } else {
-                log.error("❌ Maildev returned HTTP {}", response.statusCode());
-            }
-        } catch (Exception e) {
-            log.error("❌ Maildev connection FAILED — {}: {}", apiUrl, e.getMessage());
-        }
     }
 
     @Override
@@ -97,6 +75,26 @@ public class MaildevClient implements MailClient {
             httpClient.send(request, HttpResponse.BodyHandlers.discarding());
         } catch (Exception e) {
             throw new MailException("Failed to mark email " + emailId + " as read", e);
+        }
+    }
+
+    @Override
+    public MailConnectionTestResult testConnection() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(apiUrl + "/email"))
+                .timeout(Duration.ofSeconds(3))
+                .GET()
+                .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                return MailConnectionTestResult.connected("maildev", null, null, null, false, false, "HTTP 200", apiUrl);
+            }
+            return MailConnectionTestResult.failed("maildev", null, MailConnectionErrorType.UNKNOWN,
+                    "HTTP " + response.statusCode(), "Maildev returned HTTP " + response.statusCode(), apiUrl);
+        } catch (Exception e) {
+            return MailConnectionTestResult.failed("maildev", null, MailConnectionErrorType.UNKNOWN,
+                    "Connection failed", e.getMessage(), apiUrl);
         }
     }
 

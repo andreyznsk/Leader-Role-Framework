@@ -11,8 +11,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
+import org.springframework.util.StringUtils;
 import ru.andreyz.common.agent.AgentClient;
-import ru.andreyz.common.agent.ClaudeProcessAgentClient;
+import ru.andreyz.common.agent.CodeProcessAgentClient;
 import ru.andreyz.common.agent.GigaChatAgentClient;
 import ru.andreyz.common.agent.MockAgentClient;
 import ru.andreyz.common.agent.OllamaAgentClient;
@@ -24,10 +26,19 @@ public class AgentClientConfig {
 
     @Bean
     @ConditionalOnMissingBean(AgentClient.class)
-    @ConditionalOnProperty(name = "agent.provider", havingValue = "claude", matchIfMissing = true)
-    public AgentClient claudeAgentClient(@Value("${agent.timeout-minutes:5}") int timeoutMinutes) {
-        log.info("AgentClient provider: claude --print");
-        return new ClaudeProcessAgentClient(timeoutMinutes);
+    @ConditionalOnProperty(name = "agent.provider", havingValue = "agent", matchIfMissing = true)
+    public AgentClient agentAgentClient(@Value("${agent.command:}") String agentCommand,
+                                        @Value("${agent.timeout-minutes:5}") int timeoutMinutes,
+                                        Environment environment) {
+        boolean providerExplicitlyConfigured = environment.containsProperty("agent.provider");
+        if (!StringUtils.hasText(agentCommand)) {
+            if (providerExplicitlyConfigured) {
+                throw new IllegalStateException("agent.command must be set when agent.provider=agent");
+            }
+            agentCommand = "agent --print";
+        }
+        log.info("AgentClient provider: {}", agentCommand);
+        return new CodeProcessAgentClient(agentCommand, timeoutMinutes);
     }
 
     @Bean

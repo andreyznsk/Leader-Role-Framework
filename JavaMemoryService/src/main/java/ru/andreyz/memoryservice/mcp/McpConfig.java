@@ -14,9 +14,10 @@ public class McpConfig {
             TaskTools taskTools,
             IncidentTools incidentTools,
             RiskTools riskTools,
-            PeopleTools peopleTools) {
+            PeopleTools peopleTools,
+            KnowledgeTools knowledgeTools) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(contextTools, taskTools, incidentTools, riskTools, peopleTools)
+                .toolObjects(contextTools, taskTools, incidentTools, riskTools, peopleTools, knowledgeTools)
                 .build();
     }
 }

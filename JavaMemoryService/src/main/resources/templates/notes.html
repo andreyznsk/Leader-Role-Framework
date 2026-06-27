@@ -1,19 +1,28 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
-<head th:replace="~{fragments/layout :: head('Заметки')}"></head>
+<head th:replace="~{fragments/layout :: head('Operational Notes')}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 
 <div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">Заметки</h4>
-        <form method="get" action="/ui/notes" class="d-flex gap-2">
-            <input type="text" name="tags" class="form-control form-control-sm"
-                   placeholder="tags" th:value="${tags}"/>
-            <input type="number" name="limit" class="form-control form-control-sm" min="1" max="200"
-                   style="width: 90px" th:value="${limit}"/>
-            <button class="btn btn-sm btn-outline-primary">Фильтр</button>
-        </form>
+    <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
+        <div>
+            <h4 class="mb-0">Operational Notes</h4>
+            <div class="text-muted small">Рабочие заметки Memory Service, не RAG-документы</div>
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <form method="get" action="/ui/notes" class="d-flex gap-2">
+                <input type="text" name="tags" class="form-control form-control-sm"
+                       placeholder="tags" th:value="${tags}"/>
+                <input type="number" name="limit" class="form-control form-control-sm" min="1" max="200"
+                       style="width: 90px" th:value="${limit}"/>
+                <button class="btn btn-sm btn-outline-primary">Фильтр</button>
+            </form>
+            <button type="button" class="btn btn-sm btn-success"
+                    data-bs-toggle="modal" data-bs-target="#addNoteModal">
+                + Добавить заметку
+            </button>
+        </div>
     </div>
 
     <div class="card">
@@ -25,17 +34,72 @@
                     <span class="small text-muted"
                           th:text="${#temporals.format(note.createdAt, 'dd.MM.yyyy HH:mm')}"></span>
                 </div>
-                <div class="mb-2" th:text="${note.text}"></div>
-                <div class="d-flex justify-content-between align-items-center gap-2">
+                <div class="fw-semibold mb-2" th:text="${note.title}">Note title</div>
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                     <div th:if="${note.tags}" class="small text-muted" th:text="${note.tags}"></div>
-                    <button type="button" class="btn btn-sm btn-outline-primary ms-auto"
-                            data-bs-toggle="modal"
-                            data-bs-target="#taskFromItemModal"
-                            th:attr="data-task-title=${#strings.abbreviate(note.text, 200)},data-task-description=|Задача из заметки #${note.id}|">
-                        &rarr; В задачу
-                    </button>
+                    <div class="d-flex gap-2 ms-auto flex-wrap">
+                        <button th:if="${note.text != null and !note.text.isBlank()}"
+                                type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                data-bs-toggle="collapse"
+                                th:attr="data-bs-target='#note-body-' + ${note.id},aria-controls='note-body-' + ${note.id}"
+                                aria-expanded="false">
+                            Описание
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#taskFromItemModal"
+                                th:data-task-title="${note.title}"
+                                th:data-task-description="${note.text != null and !note.text.isBlank() ? note.text : 'Задача из заметки #' + note.id}">
+                            &rarr; В задачу
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                title="Удалить"
+                                th:attr="data-note-id=${note.id},data-note-label=${#strings.abbreviate(note.title, 80)}"
+                                onclick="openDeleteNoteModal(this.dataset.noteId, this.dataset.noteLabel)">
+                            Удалить
+                        </button>
+                    </div>
+                </div>
+                <div th:if="${note.text != null and !note.text.isBlank()}"
+                     th:id="'note-body-' + ${note.id}"
+                     class="collapse mt-3">
+                    <div class="small text-muted" style="white-space: pre-wrap" th:text="${note.text}"></div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addNoteModal" tabindex="-1" aria-labelledby="addNoteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addNoteModalLabel">Новая заметка</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addNoteForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="newNoteTitle">Заголовок *</label>
+                        <input id="newNoteTitle" name="title" type="text" class="form-control" maxlength="200" required/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="newNoteText">Описание</label>
+                        <textarea id="newNoteText" name="text" class="form-control" rows="5"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="newNoteTags">Tags</label>
+                        <input id="newNoteTags" name="tags" type="text" class="form-control"
+                               placeholder="team,process"/>
+                    </div>
+                    <div id="addNoteError" class="text-danger small d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-success">Добавить заметку</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -82,9 +146,66 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<div class="modal fade" id="deleteNoteModal" tabindex="-1" aria-labelledby="deleteNoteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteNoteModalLabel">Удалить заметку</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Заметка будет удалена из operational notes.</p>
+                <div id="deleteNoteLabel" class="small text-muted"></div>
+                <div id="deleteNoteError" class="text-danger small d-none mt-3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteNoteButton">Удалить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (function () {
+    const addNoteModalEl = document.getElementById('addNoteModal');
+    const addNoteModal = bootstrap.Modal.getOrCreateInstance(addNoteModalEl);
+    const addNoteForm = document.getElementById('addNoteForm');
+    const addNoteTitle = document.getElementById('newNoteTitle');
+    const addNoteText = document.getElementById('newNoteText');
+    const addNoteTags = document.getElementById('newNoteTags');
+    const addNoteError = document.getElementById('addNoteError');
+
+    addNoteModalEl.addEventListener('show.bs.modal', () => {
+        addNoteError.classList.add('d-none');
+        addNoteError.textContent = '';
+    });
+
+    addNoteForm.addEventListener('submit', event => {
+        event.preventDefault();
+        addNoteError.classList.add('d-none');
+        addNoteError.textContent = '';
+
+        const payload = {
+            title: addNoteTitle.value,
+            text: addNoteText.value || null,
+            tags: addNoteTags.value || null,
+            source: 'manual-ui'
+        };
+
+        window.LeaderUiApi.request('/api/notes', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        }).then(result => {
+            addNoteModal.hide();
+            window.LeaderUiApi.handleSuccess('reload', result);
+        }).catch(err => {
+            addNoteError.textContent = 'Не удалось создать заметку: ' + err.message;
+            addNoteError.classList.remove('d-none');
+        });
+    });
+
     const modal = document.getElementById('taskFromItemModal');
     const form = document.getElementById('taskFromItemForm');
     const title = document.getElementById('taskTitle');
@@ -110,16 +231,47 @@
             priority: form.querySelector('input[name="priority"]:checked').value,
             dueDate: dueDate.value || null
         };
-        fetch('/api/tasks/pending', {
+        window.LeaderUiApi.request('/api/tasks/pending', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
-        }).then(response => {
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            window.location.href = '/ui/today';
+        }).then((result) => {
+            window.LeaderUiApi.handleSuccess('redirect:/ui/today', result);
         }).catch(err => {
             error.textContent = 'Не удалось создать задачу: ' + err.message;
             error.classList.remove('d-none');
+        });
+    });
+
+    const deleteNoteModalEl = document.getElementById('deleteNoteModal');
+    const deleteNoteModal = bootstrap.Modal.getOrCreateInstance(deleteNoteModalEl);
+    const deleteNoteLabel = document.getElementById('deleteNoteLabel');
+    const deleteNoteError = document.getElementById('deleteNoteError');
+    const confirmDeleteNoteButton = document.getElementById('confirmDeleteNoteButton');
+    let noteIdToDelete = null;
+
+    window.openDeleteNoteModal = function (id, label) {
+        noteIdToDelete = id;
+        deleteNoteLabel.textContent = label || '';
+        deleteNoteError.textContent = '';
+        deleteNoteError.classList.add('d-none');
+        deleteNoteModal.show();
+    };
+
+    confirmDeleteNoteButton.addEventListener('click', () => {
+        if (!noteIdToDelete) {
+            return;
+        }
+        deleteNoteError.textContent = '';
+        deleteNoteError.classList.add('d-none');
+        window.LeaderUiApi.request('/api/notes/' + noteIdToDelete, {
+            method: 'DELETE'
+        }).then(result => {
+            deleteNoteModal.hide();
+            window.LeaderUiApi.handleSuccess('reload', result);
+        }).catch(err => {
+            deleteNoteError.textContent = 'Не удалось удалить заметку: ' + err.message;
+            deleteNoteError.classList.remove('d-none');
         });
     });
 })();

@@ -5,7 +5,11 @@ public enum DocField {
     SERVICE("service"),
     UPDATED("updated"),
     REVIEW_BY("review_by"),
-    SOURCE("source");
+    SOURCE("source"),
+    MESSAGE_ID("message_id"),
+    SENDER("sender"),
+    SUBJECT("subject"),
+    RECEIVED_AT("received_at");
 
     private final String key;
 

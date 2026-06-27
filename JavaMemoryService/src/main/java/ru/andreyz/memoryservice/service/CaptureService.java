@@ -5,7 +5,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.domain.Capture;
+import ru.andreyz.memoryservice.domain.UsageEventType;
 import ru.andreyz.memoryservice.dto.CaptureRequest;
+import ru.andreyz.memoryservice.dto.UsageEventCommand;
 import ru.andreyz.memoryservice.repository.CaptureRepository;
 
 import java.io.IOException;
@@ -30,11 +32,14 @@ public class CaptureService {
     private static final DateTimeFormatter FRONT_MATTER_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final CaptureRepository captureRepository;
+    private final UsageEventService usageEventService;
     private final Path inboxDir;
 
     public CaptureService(CaptureRepository captureRepository,
+                          UsageEventService usageEventService,
                           @Value("${app.capture.inbox-dir:capture-inbox}") String inboxDir) {
         this.captureRepository = captureRepository;
+        this.usageEventService = usageEventService;
         this.inboxDir = Path.of(inboxDir);
     }
 
@@ -45,18 +50,26 @@ public class CaptureService {
     public CaptureSaveResult saveWithFile(CaptureRequest req) {
         Instant now = Instant.now();
         String source = req.source() != null ? req.source() : "manual";
+        if (req.sourceId() != null && !req.sourceId().isBlank()) {
+            var existing = captureRepository.findBySourceAndSourceId(source, req.sourceId());
+            if (existing.isPresent()) {
+                return new CaptureSaveResult(existing.get(), null);
+            }
+        }
 
         // Email captures are already classified by MailAgent — skip re-classification queue
         if ("email".equals(source)) {
-            Capture capture = new Capture(null, req.text(), source, "PROCESSED",
+            Capture capture = new Capture(null, req.text(), source, req.sourceId(), "PROCESSED",
                     "email", "capture", now, now);
             Capture saved = captureRepository.save(capture);
+            recordCaptureCreated(saved);
             return new CaptureSaveResult(saved, null);
         }
 
-        Capture capture = new Capture(null, req.text(), source, "PENDING",
+        Capture capture = new Capture(null, req.text(), source, req.sourceId(), "PENDING",
                 null, null, now, null);
         Capture saved = captureRepository.save(capture);
+        recordCaptureCreated(saved);
         Path file = writeToInbox(saved);
         return new CaptureSaveResult(saved, file);
     }
@@ -76,7 +89,7 @@ public class CaptureService {
     public Capture markProcessed(Long id, String classified, String routedTo) {
         Capture c = captureRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Capture not found: " + id));
-        Capture updated = new Capture(c.id(), c.rawText(), c.source(), "PROCESSED",
+        Capture updated = new Capture(c.id(), c.rawText(), c.source(), c.sourceId(), "PROCESSED",
                 classified, routedTo, c.capturedAt(), Instant.now());
         return captureRepository.save(updated);
     }
@@ -186,4 +199,18 @@ public class CaptureService {
 
     public record CaptureSaveResult(Capture capture, Path file) {}
     public record CaptureFile(String file, String text) {}
+
+    private void recordCaptureCreated(Capture capture) {
+        usageEventService.record(new UsageEventCommand(
+                UsageEventType.CAPTURE_CREATED,
+                capture.source() != null && !capture.source().isBlank() ? capture.source() : "manual-ui",
+                "SUCCESS",
+                null,
+                "capture",
+                String.valueOf(capture.id()),
+                null,
+                null,
+                java.util.Map.of("status", capture.status())
+        ));
+    }
 }

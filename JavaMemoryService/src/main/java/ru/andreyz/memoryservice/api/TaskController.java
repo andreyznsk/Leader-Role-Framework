@@ -41,7 +41,7 @@ public class TaskController {
         Task task = taskService.createConfirmed(
                 req.date() != null ? req.date() : LocalDate.now(),
                 req.title(), req.priority(), req.description(),
-                req.source(), null);
+                req.source(), null, req.dueDate(), req.status());
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
@@ -53,6 +53,11 @@ public class TaskController {
     @PostMapping("/{id}/done")
     public ResponseEntity<Task> markDone(@PathVariable Long id) {
         return ResponseEntity.ok(taskService.markDone(id));
+    }
+
+    @PostMapping("/{id}/toggle-done")
+    public ResponseEntity<Task> toggleDone(@PathVariable Long id) {
+        return ResponseEntity.ok(taskService.toggleDone(id));
     }
 
     @PostMapping("/{id}/move")
@@ -97,13 +102,13 @@ public class TaskController {
 
     @PostMapping("/{id}/delete")
     public ResponseEntity<Void> deleteTaskPost(@PathVariable Long id) {
-        taskService.updateStatus(id, "DELETED");
+        taskService.deleteTask(id);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
-        taskService.updateStatus(id, "DELETED");
+        taskService.deleteTask(id);
         return ResponseEntity.noContent().build();
     }
 }

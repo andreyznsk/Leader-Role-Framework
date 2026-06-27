@@ -1,0 +1,1 @@
+- [E2E Test Patterns](project_test_patterns.md) — профили local/ollama, пути rag-inbox, дефекты сценариев, время обработки

@@ -2,7 +2,7 @@
 
 **Статус:** Living document
 **Автор:** Андрей Зайцев
-**Дата:** 2026-06-12
+**Дата:** 2026-06-20
 **Порт:** 8082
 
 ---
@@ -20,6 +20,10 @@
 - Принимает предложения задач от java-mail-agent (статус PENDING) и ждёт подтверждения через UI
 - Принимает raw capture-заметки в `capture-inbox/`, пакетно классифицирует их через `AgentClient` из `common`
   и маршрутизирует в задачи, риски, заметки, вопросы, RAG inbox или daily journal
+- Владеет usage statistics: пишет `usage_events` для AI-agent flows, task/capture сценариев,
+  отдаёт агрегаты через `/api/stats/usage` и UI `/ui/stats`
+- Даёт две UI-зоны: `Operational Memory` и `Knowledge Gateway`, не дублируя RAG-документы в своей БД
+- Выступает единым control plane UI для runtime-редактирования plugin prompts через `/ui/settings`
 
 ---
 
@@ -123,6 +127,45 @@ SPRING_PROFILES_ACTIVE=prod java -jar JavaMemoryService/target/memory-service.ja
 
 ## 4. База данных
 
+### 4.0 Prompt editing ideology
+
+`JavaMemoryService` не хранит prompt templates внешних plugin-сервисов как master-data,
+но даёт единый UI для их редактирования.
+
+Архитектурное правило:
+
+- prompt каждого plugin-а хранится в собственной БД plugin-а, в отдельной таблице;
+- стартовое значение prompt создаётся Flyway migration-ом как seed data;
+- `/ui/settings` показывает prompt как обычное descriptor field (`type=text`);
+- сохранение идёт через control plane proxy в `PUT /api/control/settings` plugin-а;
+- plugin сам сохраняет новый prompt в свою БД и использует его для следующих вызовов без рестарта;
+- audit изменений prompt-а хранится в plugin audit и в proxy history.
+
+Это позволяет править prompts в реальном времени без редактирования `.java` файлов и без redeploy.
+
+### 4.0 Usage Statistics
+
+Memory Service owns usage statistics. It records `usage_events` for AI-agent flows,
+knowledge search, task creation, capture processing and task completion.
+
+Core endpoints:
+- `GET /api/stats/usage?period=today|7d|30d|all` — aggregated counters and saved time
+- `GET /ui/stats` — Thymeleaf UI with period switcher, cards, sources, formula and latest events
+- `POST /api/stats/events` — local-profile debug endpoint for e2e/manual event injection
+- `POST /api/knowledge/search` — Memory-owned proxy to JavaRagService `/api/search` with
+  `KNOWLEDGE_SEARCH`, `RAG_SEARCH` and `RAG_RESULT_USED` usage events
+- `GET /api/knowledge/documents`, `GET/PUT /api/knowledge/documents/{id}`, `POST /api/knowledge/documents/{id}/reindex`
+  — browser-facing proxy управления RAG-документами
+
+Saved time MVP formula:
+- `ASK_ANSWERED = 15 min`
+- `RAG_RESULT_USED = 10 min`
+- `MAIL_TASK_CREATED = 3 min`
+- `CAPTURE_PROCESSED = 2 min`
+- `TASK_CREATED = 1 min`
+
+Для mail-derived задач `usage_events.correlation_id` должен допускать длинные `Message-ID`, поэтому хранится без ограничения `VARCHAR(128)`.
+
 ### 4.1 Схема (V1__init_schema.sql)
 
 ```sql
@@ -211,7 +254,7 @@ CREATE TABLE email_state (
     subject        VARCHAR(1000),
     sender         VARCHAR(500),
     received_at    TIMESTAMP,
-    classification VARCHAR(20),   -- DRAFT | REQUEST | NOISE
+    classification VARCHAR(20),   -- DRAFT | REQUEST | NOISE | CAPTURE | NOTICE
     status         VARCHAR(20)  NOT NULL DEFAULT 'NEW',  -- NEW | PROCESSED | IGNORED
     summary        TEXT,
     created_at     TIMESTAMP    NOT NULL DEFAULT NOW()
@@ -241,9 +284,19 @@ src/main/resources/db/
 │   ├── V1__init_schema.sql
 │   ├── V2__add_capture_tables.sql
 │   ├── V3__add_task_sort_order.sql
-│   └── V4__add_notes_and_capture.sql
+│   ├── V4__add_notes_and_capture.sql
+│   └── V10__notes_title_and_optional_text.sql
 └── migration-h2/        # H2 патчи (local/test)
     └── V1_1__h2_compat.sql
+```
+
+`V10__notes_title_and_optional_text.sql` (CR-MEM-011):
+```sql
+ALTER TABLE notes ADD COLUMN title VARCHAR(200);
+UPDATE notes SET title = SUBSTRING(TRIM(text), 1, 200) WHERE title IS NULL;
+UPDATE notes SET title = 'Untitled note' WHERE title IS NULL OR title = '';
+ALTER TABLE notes ALTER COLUMN title SET NOT NULL;
+ALTER TABLE notes ALTER COLUMN text DROP NOT NULL;
 ```
 
 `V3__add_task_sort_order.sql`:
@@ -397,7 +450,8 @@ public record Capture(
 @Table("notes")
 public record Note(
     @Id Long id,
-    String text,
+    String title,    // обязательный; auto-derived из text если не передан
+    String text,     // опциональный (V10)
     String tags,
     String source,
     Instant createdAt
@@ -545,14 +599,22 @@ POST /api/plans
 
 # Задачи
 GET  /api/tasks?date=2026-06-08&status=TODO
-POST /api/tasks                          # создать подтверждённую задачу (агент после confirm)
+POST /api/tasks                          # создать подтверждённую задачу; поддерживает title, description, priority, status, dueDate, date, source
 PUT  /api/tasks/{id}
 PATCH /api/tasks/{id}/status             body: { "status": "TODO|IN_PROGRESS|BLOCKED|DONE" }
 POST /api/tasks/{id}/done
 POST /api/tasks/{id}/move                body: { "toDate": "2026-06-09" }
 POST /api/tasks/{id}/reorder             body: { "direction": "up"|"down" } | { "position": N }
-POST   /api/tasks/{id}/delete             # мягкое удаление (статус → DELETED)
-DELETE /api/tasks/{id}                   # мягкое удаление (статус → DELETED), REST-алиас
+POST   /api/tasks/{id}/delete            # мягкое удаление (статус → DELETED) + удалить workspace/tasks/TASK-{id}.md если файл существует
+DELETE /api/tasks/{id}                   # мягкое удаление (статус → DELETED) + удалить workspace/tasks/TASK-{id}.md, REST-алиас
+
+# Knowledge Gateway proxy (без прямого JDBC в schema rag)
+POST /api/knowledge/search
+GET  /api/knowledge/documents
+GET  /api/knowledge/documents/{id}
+PUT  /api/knowledge/documents/{id}
+POST /api/knowledge/documents/{id}/reindex
+GET  /api/notices                       # legacy alias/filter type=NOTICE
 
 # Описания задач (файловая шина workspace/tasks/)
 GET  /api/tasks/{id}/description         # 200 text/plain | 204 если файл отсутствует
@@ -599,8 +661,10 @@ POST /api/capture/process-today          # batch classify + route
 POST /api/capture/process-now            # alias process-today
 
 # Notes / Questions
-GET  /api/notes?tags=risk,person&limit=50
-POST /api/notes
+GET    /api/notes?tags=risk,person&limit=50
+POST   /api/notes                    # 201 Created; body: { title, text?, tags, source }
+                                     # title обязательный; если не передан — auto-derived из text
+DELETE /api/notes/{id}               # 204 No Content / 404 Not Found (hard delete, CR-MEM-011)
 GET  /api/questions?status=OPEN
 POST /api/questions
 
@@ -621,8 +685,7 @@ Base: `http://localhost:8082/ui`
 Секции страницы (порядок сверху вниз):
 1. **Сводка** — 4 карточки: задач сегодня / ожидают подтверждения / открытые инциденты / выполнено
 2. **Ожидают подтверждения** — показывается только если есть PENDING задачи
-3. **План на сегодня** — список задач с управлением (сортировка по `sort_order`)
-4. **Завтра** — список задач на следующий день (только просмотр + действия)
+3. **Текущие задачи** — список активных задач с фильтрами и сортировкой по полям
 
 Секция **"Ожидают подтверждения"** (показывается только если есть PENDING задачи):
 ```
@@ -639,22 +702,26 @@ Base: `http://localhost:8082/ui`
 └─────────────────────────────────────────────────┘
 ```
 
-Секция **"План на сегодня"** — управление задачами в строке:
+Секция **"Текущие задачи"**:
+
+- фильтры: `priority`, `status`, `dueDate`
+- сортировка кнопками `↑/↓` у полей `priority`, `status`, `dueDate`
+- задача открывается по клику на название
+- дедлайн показывается отдельной колонкой `DL`
+- кнопка `Завтра` сдвигает дедлайн на `+1 день` относительно текущего дедлайна
+- удаление происходит через modal-подтверждение и удаляет также markdown-файл описания
+
+Управление задачами в строке:
 
 | Элемент | Действие | HTTP |
 |---------|----------|------|
 | Чекбокс | `DONE` / снять | `POST /api/tasks/{id}/done` |
-| Стрелка ↑ | переместить вверх | `POST /api/tasks/{id}/reorder` `{"direction":"up"}` |
-| Стрелка ↓ | переместить вниз | `POST /api/tasks/{id}/reorder` `{"direction":"down"}` |
 | Иконка флага | циклически менять приоритет | `PUT /api/tasks/{id}` |
-| Иконка карандаша | открыть форму редактирования | `GET /ui/tasks/{id}/edit` |
-| Иконка корзины | удалить (без подтверждения) | `POST /api/tasks/{id}/delete` |
-| Drag handle `⠿` | drag-and-drop сортировка | `POST /api/tasks/{id}/reorder` `{"position":N}` |
+| Название задачи | открыть форму редактирования | `GET /ui/tasks/{id}/edit` |
+| Кнопка `Завтра` | сдвинуть дедлайн на +1 день | `PUT /api/tasks/{id}` |
+| Иконка удаления | открыть modal подтверждения и удалить задачу + md-файл | `DELETE /api/tasks/{id}` |
 
-Добавление задачи: кнопка "добавить" раскрывает inline-строку — поле `title` + select `priority` + `POST /api/tasks`.
-
-Секция **"Завтра"**:
-- Список задач на завтра (только просмотр + те же кнопки)
+Добавление задачи: зелёная кнопка `Добавить / задачу` расположена рядом с `Применить` и `Сбросить`, открывает modal-форму с полями `title`, `description`, `priority`, `status`, `dueDate`. После `POST /api/tasks` описание дополнительно пишется в `workspace/tasks/TASK-{id}.md` через `PUT /api/tasks/{id}/description`.
 
 **`/ui/tasks/{id}/edit`** — Форма редактирования задачи
 
@@ -670,7 +737,7 @@ Base: `http://localhost:8082/ui`
 Markdown-редактор — две вкладки: `markdown` (raw, monospace) и `preview` (HTML-рендер через JS, без библиотек).
 Под textarea — бейдж с путём к файлу: `📄 workspace/tasks/TASK-003.md`.
 
-Удаление на странице edit — двойное подтверждение: первый клик меняет текст на "точно удалить?" (3 сек), второй — `POST /api/tasks/{id}/delete` + удаление файла описания.
+Удаление на странице edit — двойное подтверждение: первый клик меняет текст на "точно удалить?" (3 сек), второй — `DELETE /api/tasks/{id}` + удаление файла описания.
 
 **`/ui/incidents`** — Активные инциденты
 - Список с severity badge (P1/P2/P3)
@@ -689,10 +756,26 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 - Хронологические заметки под каждой карточкой
 - Форма добавить заметку
 
-**`/ui/notes`** — Лента заметок
+**`/ui/notes`** — Лента заметок (CR-MEM-011: полноценный CRUD-экран)
 - Список notes из PostgreSQL, сортировка от новых к старым
 - Фильтр по тегам через `GET /api/notes?tags=...`
-- Кнопка "в задачу" создаёт PENDING задачу через `POST /api/tasks/pending`
+- Кнопка `+ Добавить заметку` открывает Bootstrap modal с полями `title` (обязательный), `text` (опциональный), `tags`; `source` = `manual-ui`; отправляет `POST /api/notes`
+- Кнопка `Удалить` на каждой карточке с подтверждением; отправляет `DELETE /api/notes/{id}`
+- Кнопка `→ В задачу` создаёт PENDING задачу через `POST /api/tasks/pending`
+- Operational Notes: это не RAG knowledge и не source of truth для `NOTICE`
+
+**`/ui/captures`** — Capture Inbox
+- raw captures и их routing state
+- кнопка `Process Now` вызывает `POST /api/capture/process-now`
+
+**`/ui/knowledge`** — RAG Knowledge / Knowledge Gateway
+- список документов из JavaRagService REST API
+- фильтры по типам (`NOTICE`, `ADR`, `PROCESS`, `SERVICE_CARD`, `GLOSSARY`)
+- edit/reindex без JDBC-доступа к схеме `rag`
+
+**`/ui/notice`**
+- не самостоятельный экран
+- redirect на `/ui/knowledge?type=NOTICE`
 
 **Capture UI / ручной запуск**
 - Capture сохраняется через REST `POST /api/capture`
@@ -855,7 +938,7 @@ Leader-Role-Framework/
 
 **`TaskFileService`** — создаёт директорию при старте (`@PostConstruct`), читает/пишет файлы через `Files.readString` / `Files.writeString`. Если файл отсутствует при чтении — возвращает пустую строку (нормально для старых задач).
 
-При удалении задачи через `POST /api/tasks/{id}/delete` файл описания удаляется (`Files.deleteIfExists`).
+При удалении задачи через `POST /api/tasks/{id}/delete` или `DELETE /api/tasks/{id}` файл описания удаляется (`Files.deleteIfExists`).
 
 ---
 
@@ -968,6 +1051,7 @@ Content-Type: application/json
 Далее пользователь видит её в UI `/ui/today` в секции "Ожидают подтверждения" и нажимает [Принять] / [Изменить] / [Отклонить].
 
 **Агент через MCP не участвует в этом потоке** — PENDING задачи подтверждаются только через UI.
+`NOTICE` письма в этот поток не попадают: они сразу становятся RAG-документами в Knowledge Gateway.
 
 ---
 
@@ -1180,7 +1264,7 @@ JavaMemoryService/
     │   │       ├── CaptureRequest.java
     │   │       ├── CaptureResponse.java
     │   │       ├── ClassifiedCapture.java
-    │   │       ├── CreateNoteRequest.java
+    │   │       ├── CreateNoteRequest.java           # { title, text?, tags, source }
     │   │       └── UpdateTaskStatusRequest.java
     │   └── resources/
     │       ├── application.yml

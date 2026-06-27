@@ -12,5 +12,7 @@ public record AgentResponse(
     String priority,
     String sender,
     String draftPath,
-    String captureText
+    String captureText,
+    String noteText,
+    String noteTitle
 ) {}

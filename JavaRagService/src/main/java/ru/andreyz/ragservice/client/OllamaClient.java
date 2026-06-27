@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import ru.andreyz.ragservice.control.RagRuntimeConfigService;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -19,17 +20,17 @@ public class OllamaClient {
     private static final Logger log = LoggerFactory.getLogger(OllamaClient.class);
 
     private final String ollamaUrl;
-    private final String model;
+    private final RagRuntimeConfigService runtimeConfigService;
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
 
     public OllamaClient(
             @Value("${ollama.url}") String ollamaUrl,
-            @Value("${ollama.model}") String model,
-            ObjectMapper mapper) {
+            ObjectMapper mapper,
+            RagRuntimeConfigService runtimeConfigService) {
         this.ollamaUrl = ollamaUrl;
-        this.model = model;
         this.mapper = mapper;
+        this.runtimeConfigService = runtimeConfigService;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(30))
                 .build();
@@ -37,6 +38,7 @@ public class OllamaClient {
 
     public float[] embed(String text) {
         try {
+            String model = runtimeConfigService.snapshot().embeddingModel();
             String body = mapper.writeValueAsString(new EmbedRequest(model, text));
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ollamaUrl + "/api/embeddings"))

@@ -91,6 +91,7 @@ LeaderOS — система из трёх Java-сервисов, оркестр�
 - NOISE → пометить прочитанным, переместить в processed/
 - Дедупликация через таблицу processed_emails
 - Web UI: http://localhost:8080/ui/status
+- Control Plane test endpoint: `POST /api/settings/control/plugins/mail/test-connection`
 
 ### JavaMemoryService
 - Ежедневный план задач с приоритетами и статусами
@@ -99,8 +100,9 @@ LeaderOS — система из трёх Java-сервисов, оркестр�
 - Управление инцидентами (P1/P2/P3) и рисками
 - Карточки людей и хронологические заметки
 - Capture Bot: приём сырых заметок → классификация в 18:00
+- Usage Statistics UI: /ui/stats — показывает вопросы агенту, RAG search, задачи, captures и оценку сэкономленного времени.
 - MCP Server: 14 инструментов для Claude агента
-- Web UI: /ui/today, /ui/notes, /ui/incidents, /ui/risks, /ui/people
+- Web UI: /ui/today, /ui/notes (Operational Notes), /ui/captures, /ui/knowledge, /ui/incidents, /ui/risks, /ui/people, /ui/stats
 
 ### JavaRagService
 - Семантический поиск по Markdown-документации
@@ -166,7 +168,87 @@ JavaRagService: 44 PASS / 0 FAIL (2026-06-12)
 
 local → Maildev (Docker), разработка
 dev   → IMAP, тестовый сервер
+ews   → Exchange EWS, отдельный профиль подключения
 prod  → Exchange EWS, рабочий ПК
+
+### EWS profile
+
+For a dedicated Exchange setup use:
+
+```bash
+SPRING_PROFILES_ACTIVE=ews java -jar JavaMailAgent/target/mail-agent.jar
+```
+
+Config file:
+- `JavaMailAgent/src/main/resources/application-ews.yml`
+- example overrides: `JavaMailAgent/application-ews.properties.example`
+
+Required settings for EWS:
+- `mail.protocol=ews`
+- `mail.username`
+- `mail.password`
+- `ews.url`
+
+Recommended settings:
+- `ews.auth-type=NTLM`
+- `ews.autodiscover=false`
+- `ews.timeout-seconds=30`
+- `mail.test-connection.timeout-seconds=15`
+- `mail.test-connection.max-folders-to-scan=500`
+
+Optional settings:
+- `ews.domain` for `DOMAIN\\user` auth
+- `ews.version` if your Exchange requires a specific EWS version hint
+- `mail.folders.exclude` to skip CI/CD and service folders
+
+### EWS diagnostics
+
+Mail Agent settings in `http://localhost:8082/ui/settings` now expose:
+- `Authentication Type` (`BASIC`, `NTLM`, `OAUTH2`)
+- `Detect Endpoint`
+- `Test Connection`
+
+For `Protocol = EWS`, UI defaults `Authentication Type` to `NTLM`.
+
+Endpoint detection:
+
+```http
+POST /api/settings/control/plugins/mail/detect-endpoint
+Content-Type: application/json
+```
+
+Example payload:
+
+```json
+{
+  "protocol": "ews",
+  "ewsUrl": "https://outlook.domain.ru/EWS/Exchange.asmx"
+}
+```
+
+This checks HTTPS reachability and whether the URL looks like a real EWS/WCF service. It does not require credentials and recommends `NTLM` for EWS.
+
+Browser-facing endpoint:
+
+```http
+POST /api/settings/control/plugins/mail/test-connection
+Content-Type: application/json
+```
+
+Example payload:
+
+```json
+{
+  "protocol": "ews",
+  "ewsUrl": "https://outlook.domain.ru/EWS/Exchange.asmx",
+  "username": "user@domain.ru",
+  "password": "",
+  "authType": "NTLM",
+  "folderExclude": ["Inbox/CI/CD"]
+}
+```
+
+The authenticated test validates connectivity only. It does not start polling, write `processed_emails`, or flip read/unread state. Empty `password` means reuse the already stored secret. `OAUTH2` is visible in UI as planned and currently returns a not-supported result from backend.
 
 
 ## Структура проекта
@@ -207,4 +289,3 @@ techlead-workspace/
     ├── 07_risks/                ← Operational risks
     └── 08_daily_journal/        ← Дневник
 ```
-

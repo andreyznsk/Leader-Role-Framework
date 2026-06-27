@@ -14,6 +14,9 @@ mail:
   password: ${MAIL_PASSWORD}
   poll-interval-seconds: ${MAIL_POLL_INTERVAL_SECONDS:60}
   fetch-limit: ${MAIL_FETCH_LIMIT:20}
+  test-connection:
+    timeout-seconds: ${MAIL_TEST_CONNECTION_TIMEOUT_SECONDS:15}
+    max-folders-to-scan: ${MAIL_TEST_CONNECTION_MAX_FOLDERS:500}
   folders:
     exclude:
       - Sent
@@ -36,6 +39,7 @@ ews:
   autodiscover: ${EWS_AUTODISCOVER:false}
   # Optional for DOMAIN\user auth. Leave empty for UPN auth user@company.com.
   domain: ${EWS_DOMAIN:}
+  auth-type: ${EWS_AUTH_TYPE:NTLM}
   # EWS Java API 2.0 supports Exchange2007_SP1, Exchange2010, Exchange2010_SP1, Exchange2010_SP2.
   version: ${EWS_VERSION:Exchange2010_SP2}
   timeout-seconds: ${EWS_TIMEOUT_SECONDS:30}

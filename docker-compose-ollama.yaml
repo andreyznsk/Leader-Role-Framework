@@ -1,0 +1,80 @@
+# LeaderOS — Ollama Docker Compose
+# Последнее обновление: 2026-06-14
+#
+# Запускает Ollama и скачивает две модели:
+#   - mxbai-embed-large : эмбеддинги (JavaRagService)
+#   - qwen3:8b          : агентский режим (JavaMailAgent, JavaMemoryService)
+#
+# Использование:
+#   Автономно:
+#     docker compose -f docker-compose-ollama.yaml up -d
+#
+#   Совместно с основной инфраструктурой:
+#     docker compose -f docker-compose.yaml -f docker-compose-ollama.yaml up -d
+#
+# Spring-профили Java-сервисов:
+#   JavaRagService    → --spring.profiles.active=ollama
+#   JavaMailAgent     → --spring.profiles.active=ollama
+#   JavaMemoryService → --spring.profiles.active=ollama
+
+services:
+
+  # ─────────────────────────────────────────────
+  # Ollama — LLM-сервер
+  # API:  (host), port 11434 inside container
+  # Порт 11434 на хосте занят локальной Ollama, поэтому используем 11435
+  # ─────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: leaderos-ollama
+    restart: unless-stopped
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+    # ── GPU (NVIDIA) — раскомментируй если есть видеокарта ──
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ─────────────────────────────────────────────
+  # ollama-init — однократно скачивает модели и завершается
+  # Запускается после того, как ollama прошёл healthcheck
+  # ─────────────────────────────────────────────
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: leaderos-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      # Указываем CLI работать против нашего Ollama-сервиса
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "==> Pulling embedding model: mxbai-embed-large"
+        ollama pull mxbai-embed-large
+        echo "==> Pulling agent model: qwen3:8b"
+        ollama pull qwen3:8b
+        echo "==> Models ready"
+        ollama list
+    restart: "no"
+
+# ─────────────────────────────────────────────
+# Именованные volumes
+# ─────────────────────────────────────────────
+volumes:
+  ollama_data:
+    name: leaderos-ollama-data

@@ -5,5 +5,6 @@ public enum DocType {
     PROCESS,
     GLOSSARY,
     ADR,
-    KNOWLEDGE
+    KNOWLEDGE,
+    NOTICE
 }

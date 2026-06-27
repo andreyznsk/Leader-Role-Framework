@@ -101,6 +101,13 @@
         "."
       ],
       "description": "Локальная файловая система — workspace/, plans/, capture-inbox/, rag-inbox/."
+    },
+
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest", "--headed", "--browser", "chromium"],
+      "description": "Playwright — управление браузером: навигация, клики, скриншоты, чтение DOM. Для проверки UI после запуска проекта."
     }
   }
 }

@@ -2,48 +2,27 @@ package ru.andreyz.mailagent.scheduler;
 
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 
 @Component
 public class PromptBuilder {
 
+    private final MailRuntimeConfigService runtimeConfigService;
+
+    public PromptBuilder(MailRuntimeConfigService runtimeConfigService) {
+        this.runtimeConfigService = runtimeConfigService;
+    }
+
     public String build(Email email) {
-        return """
-            Ты — ассистент Tech Lead. Проанализируй входящее письмо и верни JSON.
+        String template = runtimeConfigService.snapshot().classificationPrompt();
+        return template
+            .replace("{{from}}", safe(email.from()))
+            .replace("{{subject}}", safe(email.subject()))
+            .replace("{{body}}", safe(email.body()))
+            .replace("{{emailId}}", safe(email.id()));
+    }
 
-            Письмо:
-            От: %s
-            Тема: %s
-            Текст:
-            %s
-
-            Верни JSON строго в следующем формате (только JSON, без пояснений):
-            {
-              "type": "<REQUEST|DRAFT|NOISE|CAPTURE>",
-              "emailId": "%s",
-              "note": "<краткое объяснение решения>",
-              "taskLine": "<строка для plans/today.md, только для REQUEST, иначе null>",
-              "taskTitle": "<заголовок задачи, только для REQUEST, иначе null>",
-              "priority": "<LOW|NORMAL|HIGH|CRITICAL, только для REQUEST, иначе null>",
-              "sender": "<email отправителя, только для REQUEST, иначе null>",
-              "draftPath": "<путь к черновику drafts/..., только для DRAFT, иначе null>",
-              "captureText": "<суть письма 1-2 предложения, только для CAPTURE, иначе null>"
-            }
-
-            Типы:
-            - REQUEST: письмо требует действия от Tech Lead
-            - DRAFT: требует ответного письма, нужен черновик
-            - NOISE: CI/CD уведомление, реклама, автоматика — не требует действия
-            - CAPTURE: письмо содержит полезную информацию или знание, но не требует срочного действия.
-              Примеры: FYI, архитектурные решения, аналитика, плановые работы, новости команды.
-              captureText = краткое изложение сути в 1-2 предложения.
-
-            Приоритет (только для REQUEST):
-            - CRITICAL: "срочно", "asap", "до сегодня"
-            - HIGH: "до завтра", "важно", P1/P2 инцидент
-            - NORMAL: конкретный дедлайн на этой неделе
-            - LOW: без дедлайна или "когда будет время"
-
-            taskLine формат: "- [ ] [PRIORITY] Описание — от sender@example.com"
-            """.formatted(email.from(), email.subject(), email.body(), email.id());
+    private String safe(String value) {
+        return value == null ? "" : value;
     }
 }

@@ -32,7 +32,12 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
+  font-size: 19px;
   padding-top: 56px;
+}
+
+.los-page-content {
+  padding-top: 20px;
 }
 
 /* ─── NAVBAR ─────────────────────────────────────── */
@@ -71,7 +76,7 @@ body {
 
 .los-title {
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: 0.02em;
@@ -87,8 +92,17 @@ body {
   flex-wrap: wrap;
 }
 
+.los-group {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 0 8px 0 12px;
+}
+
 .los-links a {
-  font-size: 13px;
+  font-size: 16px;
   color: var(--text2);
   text-decoration: none;
   padding: 5px 10px;
@@ -130,7 +144,7 @@ body {
 
 .table thead th {
   color: var(--text2);
-  font-size: 11px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: .08em;
   font-family: var(--mono);
@@ -155,7 +169,7 @@ body {
 }
 
 .form-control::placeholder { color: var(--text3); }
-.form-label { color: var(--text2); font-size: 13px; }
+.form-label { color: var(--text2); font-size: 16px; }
 
 /* ─── MODAL ───────────────────────────────────────── */
 .modal-content {
@@ -190,7 +204,7 @@ body {
 
 .los-pending-title {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--accent3);
   text-transform: uppercase;
   letter-spacing: .1em;
@@ -215,8 +229,83 @@ body {
 }
 
 .los-stat-label {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text2);
+}
+
+.los-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.los-kv:last-child {
+  border-bottom: 0;
+}
+
+.los-kv span {
+  color: var(--text2);
+}
+
+.los-kv strong {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+}
+
+.los-plugin-field {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.los-plugin-field:last-child {
+  border-bottom: 0;
+}
+
+.task-deadline {
+  min-width: 118px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text2);
+}
+
+.task-deadline-overdue {
+  color: var(--accent3);
+}
+
+.los-add-task-btn {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-width: 108px;
+  line-height: 1.05;
+  font-weight: 600;
+}
+
+.los-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.los-collapse-icon {
+  display: inline-block;
+  transition: transform .15s ease;
+}
+
+.los-collapse-toggle[aria-expanded="false"] .los-collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.los-audit-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
 }
 
 /* ─── PRESENTATION ────────────────────────────────── */
@@ -245,4 +334,58 @@ body {
   --bs-btn-hover-border-color: var(--text3);
   --bs-btn-active-color: var(--text);
   --bs-btn-active-bg: var(--bg3);
+}
+
+.los-notice-item {
+  background: transparent;
+  transition: background .15s ease, border-color .15s ease;
+}
+
+.los-notice-item:hover,
+.los-notice-item.active {
+  background: rgba(74, 158, 255, .08);
+}
+
+.los-notice-editor {
+  min-height: 560px;
+  font-family: var(--mono);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* ─── TASK TITLE CLICKABLE (CR-MEM-009) ──────────── */
+.task-title-clickable {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+.task-title-clickable:hover {
+  text-decoration: underline;
+  color: var(--accent);
+}
+
+/* ─── TASK EDITOR LINKS PREVIEW (CR-MEM-009) ─────── */
+.task-editor-links {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: var(--bg3);
+  font-size: 14px;
+}
+.task-editor-links-label {
+  color: var(--text2);
+  font-size: 13px;
+  font-family: var(--mono);
+  margin-bottom: 4px;
+}
+.task-editor-links ul {
+  margin: 0;
+  padding-left: 16px;
+}
+.task-editor-links a {
+  color: var(--accent2);
+  word-break: break-all;
+}
+.task-editor-links a:hover {
+  color: var(--accent);
 }

@@ -47,7 +47,8 @@
                         <h5 class="modal-title">Закрыть инцидент: <span th:text="${inc.title}"></span></h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <form method="post" th:action="@{/ui/incidents/{id}/resolve(id=${inc.id})}">
+                    <form method="post" th:action="@{/ui/incidents/{id}/resolve(id=${inc.id})}"
+                          th:attr="data-api-url=@{/api/incidents/{id}/resolve(id=${inc.id})},data-api-method='POST',data-api-success='reload'">
                         <div class="modal-body">
                             <div class="mb-3">
                                 <label class="form-label">Root cause</label>
@@ -76,7 +77,8 @@
                 <h5 class="modal-title">Новый инцидент</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post" action="/ui/incidents/add">
+            <form method="post" action="/ui/incidents/add"
+                  data-api-url="/api/incidents" data-api-method="POST" data-api-success="reload">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Название</label>

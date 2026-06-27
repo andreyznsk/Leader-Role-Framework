@@ -61,7 +61,7 @@ check_port "PostgreSQL"          "localhost" "5432"
 check_http "OpenSearch"          "http://172.80.2.1:9200"
 check_http "Maildev UI"          "http://172.80.2.1:18080"
 check_port "Maildev SMTP"        "localhost" "1025"
-check_port "Ollama"              "localhost" "11434"
+check_port "Ollama (Docker)"     "localhost" "11435"
 
 echo ""
 echo "── Java Services ────────────────────────────"

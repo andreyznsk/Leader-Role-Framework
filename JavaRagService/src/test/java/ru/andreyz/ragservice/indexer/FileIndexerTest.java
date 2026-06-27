@@ -10,6 +10,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import ru.andreyz.ragservice.client.OllamaClient;
 import ru.andreyz.ragservice.client.OpenSearchClient;
+import ru.andreyz.ragservice.control.RagControlAuditStore;
+import ru.andreyz.ragservice.control.RagRuntimeConfigService;
 import ru.andreyz.ragservice.db.IndexedDocument;
 import ru.andreyz.ragservice.db.IndexedDocumentRepository;
 import ru.andreyz.ragservice.indexer.FileIndexer.IndexResult;
@@ -42,7 +44,15 @@ class FileIndexerTest {
 
     @BeforeEach
     void setUp() {
-        indexer = new FileIndexer(new ChunkSplitter(), ollama, openSearch, repository, new DocumentValidator());
+        RagChunkProperties chunkProperties = new RagChunkProperties();
+        indexer = new FileIndexer(
+                new ChunkSplitter(chunkProperties),
+                ollama,
+                openSearch,
+                repository,
+                new DocumentValidator(),
+                runtimeConfigService(true, tempDir.toString(), true, 10)
+        );
         lenient().when(ollama.embed(anyString())).thenReturn(new float[1024]);
         lenient().when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -68,6 +78,7 @@ class FileIndexerTest {
 
         verify(repository).save(argThat(doc ->
                 doc.filePath().equals(file.toString()) &&
+                "ADR".equals(doc.docType()) &&
                 doc.status().equals("indexed") &&
                 doc.chunkCount() > 0
         ));
@@ -100,7 +111,7 @@ class FileIndexerTest {
         String content = validServiceCard("Unchanged.");
         Path file = writeFile("unchanged.md", content);
         String hash = sha256(content);
-        IndexedDocument existing = new IndexedDocument(1L, file.toString(), hash, null, 2, "indexed", null);
+        IndexedDocument existing = new IndexedDocument(1L, file.toString(), "SERVICE_CARD", hash, null, 2, "indexed", null);
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.of(existing));
 
         IndexResult result = indexer.indexFile(file.toString());
@@ -115,7 +126,7 @@ class FileIndexerTest {
     void indexFile_changedHash_deletesOldChunksThenReindexes() throws IOException {
         String newContent = validServiceCard("Updated content.");
         Path file = writeFile("changed.md", newContent);
-        IndexedDocument existing = new IndexedDocument(1L, file.toString(), "old-hash-value", null, 3, "indexed", null);
+        IndexedDocument existing = new IndexedDocument(1L, file.toString(), "SERVICE_CARD", "old-hash-value", null, 3, "indexed", null);
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.of(existing));
 
         indexer.indexFile(file.toString());
@@ -128,7 +139,7 @@ class FileIndexerTest {
     void indexFile_changedHash_updatesExistingRecord() throws IOException {
         String newContent = validServiceCard("Updated ADR.");
         Path file = writeFile("updated.md", newContent);
-        IndexedDocument existing = new IndexedDocument(42L, file.toString(), "stale-hash", null, 1, "indexed", null);
+        IndexedDocument existing = new IndexedDocument(42L, file.toString(), "SERVICE_CARD", "stale-hash", null, 1, "indexed", null);
         when(repository.findByFilePath(file.toString())).thenReturn(Optional.of(existing));
 
         indexer.indexFile(file.toString());
@@ -172,6 +183,46 @@ class FileIndexerTest {
                 "invalid".equals(doc.status()) &&
                 doc.errorMessage() != null && !doc.errorMessage().isBlank()
         ));
+    }
+
+    @Test
+    void indexFile_disabledRuntime_returnsDisabledWithoutTouchingDependencies() throws IOException {
+        RagChunkProperties chunkProperties = new RagChunkProperties();
+        FileIndexer disabledIndexer = new FileIndexer(
+                new ChunkSplitter(chunkProperties),
+                ollama,
+                openSearch,
+                repository,
+                new DocumentValidator(),
+                runtimeConfigService(false, tempDir.toString(), true, 10)
+        );
+        Path file = writeFile("disabled.md", validServiceCard("Disabled"));
+
+        IndexResult result = disabledIndexer.indexFile(file.toString());
+
+        assertThat(result.status()).isEqualTo("disabled");
+        verifyNoInteractions(ollama, openSearch, repository);
+    }
+
+    @Test
+    void indexFile_validationDisabled_indexesInvalidDocument() throws IOException {
+        RagChunkProperties chunkProperties = new RagChunkProperties();
+        FileIndexer validationOffIndexer = new FileIndexer(
+                new ChunkSplitter(chunkProperties),
+                ollama,
+                openSearch,
+                repository,
+                new DocumentValidator(),
+                runtimeConfigService(true, tempDir.toString(), false, 10)
+        );
+        Path file = writeFile("no-frontmatter.md", "# Just markdown\n\nText");
+        when(repository.findByFilePath(file.toString())).thenReturn(Optional.empty());
+
+        IndexResult result = validationOffIndexer.indexFile(file.toString());
+
+        assertThat(result.status()).isEqualTo("indexed");
+        verify(ollama, atLeastOnce()).embed(anyString());
+        verify(repository).save(argThat(doc -> "indexed".equals(doc.status())));
     }
 
     // --- helpers ---
@@ -248,5 +299,22 @@ class FileIndexerTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private RagRuntimeConfigService runtimeConfigService(boolean enabled,
+                                                         String inboxPath,
+                                                         boolean validationEnabled,
+                                                         int topK) {
+        return new RagRuntimeConfigService(
+                enabled,
+                true,
+                60000,
+                inboxPath,
+                "mxbai-embed-large",
+                topK,
+                "http://localhost:9200",
+                validationEnabled,
+                mock(RagControlAuditStore.class)
+        );
     }
 }

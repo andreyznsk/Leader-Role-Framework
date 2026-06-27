@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
+<head th:replace="~{fragments/layout :: head('Settings')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h4 mb-1">Settings</h1>
+            <div class="text-muted small">MemoryService control plane for plugin configuration and status.</div>
+        </div>
+        <div th:if="${saved != null}" class="alert alert-success py-2 px-3 mb-0">
+            <span th:text="${saved}">mail</span> settings applied.
+        </div>
+    </div>
+
+    <div th:if="${failed != null}" class="alert alert-warning mb-4">
+        <strong th:text="${failed}">plugin</strong>
+        <span th:text="${message != null ? message : 'Plugin update failed.'}">Plugin update failed.</span>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">System Settings</div>
+                <div class="card-body">
+                    <div class="los-kv"><span>Application</span><strong th:text="${system.application()}">java-memory-service</strong></div>
+                    <div class="los-kv"><span>Active Spring profile</span><strong th:text="${#strings.listJoin(system.activeProfiles(), ', ')}">local</strong></div>
+                    <div class="los-kv"><span>Agent provider</span><strong th:text="${system.agentProvider()}">mock</strong></div>
+                    <div class="los-kv"><span>Java version</span><strong th:text="${system.javaVersion()}">21</strong></div>
+                    <div class="los-kv"><span>MemoryService status</span><strong th:text="${system.status()}">UP</strong></div>
+                    <div class="los-kv"><span>Last config update</span><strong th:text="${system.lastConfigurationUpdateAt() != null ? #temporals.format(system.lastConfigurationUpdateAt(), 'yyyy-MM-dd HH:mm') : '—'}">—</strong></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Routing Settings</div>
+                <div class="card-body">
+                    <div th:each="entry : ${system.routingDefaults()}" class="los-kv">
+                        <span th:text="${entry.key}">REQUEST</span>
+                        <strong th:text="${entry.value}">create pending task</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Registered Control Plugins</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead>
+                    <tr>
+                        <th>Plugin</th>
+                        <th>Base URL</th>
+                        <th>Status</th>
+                        <th>Last sync</th>
+                        <th>Open</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="panel : ${plugins}">
+                        <td th:text="${panel.plugin().name()}">Mail Agent</td>
+                        <td th:text="${panel.plugin().baseUrl()}">http://localhost:8080</td>
+                        <td>
+                            <span class="badge"
+                                  th:classappend="${panel.plugin().status() == 'UP' ? ' bg-success-subtle text-success-emphasis' : ' bg-warning-subtle text-warning-emphasis'}"
+                                  th:text="${panel.plugin().status()}">UP</span>
+                        </td>
+                        <td th:text="${panel.plugin().lastSyncAt() != null ? #temporals.format(panel.plugin().lastSyncAt(), 'yyyy-MM-dd HH:mm:ss') : '—'}">—</td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-secondary"
+                               th:href="'/ui/settings?plugin=' + ${panel.plugin().code()} + '#plugin-' + ${panel.plugin().code()}">Open</a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div th:each="panel : ${plugins}" th:id="'plugin-' + ${panel.plugin().code()}" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <button class="btn btn-sm btn-outline-secondary los-collapse-toggle"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        th:attr="data-bs-target=${'#plugin-body-' + panel.plugin().code()},aria-controls=${'plugin-body-' + panel.plugin().code()},aria-expanded=${plugin == panel.plugin().code() ? 'true' : 'false'}">
+                    <span class="los-collapse-icon" aria-hidden="true">▾</span>
+                    <span>Settings</span>
+                </button>
+                <div>
+                    <div th:text="${panel.plugin().name()}">Mail Agent</div>
+                    <div class="text-muted small" th:text="${panel.plugin().baseUrl()}">http://localhost:8080</div>
+                </div>
+            </div>
+            <span class="badge"
+                  th:classappend="${panel.plugin().status() == 'UP' ? ' bg-success-subtle text-success-emphasis' : ' bg-warning-subtle text-warning-emphasis'}"
+                  th:text="${panel.plugin().status()}">UP</span>
+        </div>
+        <div class="collapse" th:id="'plugin-body-' + ${panel.plugin().code()}" th:classappend="${plugin == panel.plugin().code()} ? ' show' : ''">
+        <div class="card-body">
+            <div th:if="${panel.error() != null}" class="alert alert-warning mb-3">
+                <div th:text="${panel.error()}">Plugin unavailable.</div>
+                <div class="small text-muted mt-2" th:if="${panel.descriptor() != null}">
+                    Rendering last synced snapshot.
+                </div>
+            </div>
+
+            <div th:if="${panel.descriptor() == null}" class="text-muted">
+                Descriptor not available.
+            </div>
+
+            <form th:if="${panel.descriptor() != null}"
+                  method="post"
+                  th:action="'/ui/settings/plugins/' + ${panel.plugin().code()}"
+                  th:attr="data-plugin-code=${panel.plugin().code()},data-api-url=${'/api/settings/control/plugins/' + panel.plugin().code() + '/settings'},data-detect-url=${panel.plugin().code() == 'mail' ? '/api/settings/control/plugins/mail/detect-endpoint' : null},data-test-url=${panel.plugin().code() == 'mail' ? '/api/settings/control/plugins/mail/test-connection' : null},data-api-custom-handler='true'"
+                  class="row g-3">
+                <th:block th:if="${panel.plugin().code() == 'mail' and panel.descriptor().settings().containsKey('classificationPrompt')}"
+                          th:with="field=${panel.descriptor().settings().get('classificationPrompt')}">
+                    <div class="col-12">
+                        <div class="border rounded-2 p-3">
+                            <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                                <div>
+                                    <div class="form-label mb-1">
+                                        <span th:text="${field.label()}">Classification Prompt</span>
+                                        <span th:if="${field.required()}" class="text-danger">*</span>
+                                    </div>
+                                    <div class="small text-muted">Stored in Mail Agent database and applied to the next email classification without restart.</div>
+                                </div>
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis">Prompt Editor</span>
+                            </div>
+                            <textarea class="form-control font-monospace"
+                                      th:id="${'field-' + panel.plugin().code() + '-classificationPrompt'}"
+                                      th:name="${'settings[classificationPrompt]'}"
+                                      th:attr="data-plugin-field='classificationPrompt',data-field-type=${field.type()},data-protocol-scope=${null},spellcheck='false'"
+                                      rows="22"
+                                      th:text="${field.value()}"
+                                      th:disabled="${!field.editable()}"></textarea>
+                            <div th:if="${field.description() != null && !#strings.isEmpty(field.description())}"
+                                 class="form-text mt-2"
+                                 th:text="${field.description()}">Runtime prompt template for email classification.</div>
+                        </div>
+                    </div>
+                </th:block>
+
+                <th:block th:each="entry : ${panel.descriptor().settings()}">
+                <div th:unless="${entry.key == 'classificationPrompt'}" class="col-12">
+                    <div class="los-plugin-field" th:with="field=${entry.value}, key=${entry.key}">
+                        <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                            <label class="form-label mb-0" th:for="${'field-' + panel.plugin().code() + '-' + key}">
+                                <span th:text="${field.label()}">Enabled</span>
+                                <span th:if="${field.required()}" class="text-danger">*</span>
+                            </label>
+                            <span th:if="${!field.editable()}" class="badge bg-secondary-subtle text-secondary-emphasis">Read only</span>
+                        </div>
+
+                        <div th:if="${field.type() == 'boolean'}" class="form-check form-switch">
+                            <input type="hidden" th:name="${'settings[' + key + ']'}" value="false"/>
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                                   th:name="${'settings[' + key + ']'}"
+                                   th:attr="data-plugin-field=${key},data-field-type=${field.type()},data-protocol-scope=${key == 'ssl' ? 'imap' : null}"
+                                   value="true"
+                                   th:checked="${field.value() == 'true'}"
+                                   th:disabled="${!field.editable()}"/>
+                        </div>
+
+                        <select th:if="${field.type() == 'select'}"
+                                class="form-select"
+                                th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                                th:name="${'settings[' + key + ']'}"
+                                th:attr="data-plugin-field=${key},data-field-type=${field.type()},data-protocol-scope=${key == 'authType' ? 'ews' : null}"
+                                th:disabled="${!field.editable()}">
+                            <option th:each="option : ${field.options()}"
+                                    th:value="${option}"
+                                    th:text="${option}"
+                                    th:selected="${option == field.value()}">maildev</option>
+                        </select>
+
+                        <textarea th:if="${field.type() == 'text' || field.type() == 'list'}"
+                                  class="form-control"
+                                  th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                                  th:name="${'settings[' + key + ']'}"
+                                  th:attr="data-plugin-field=${key},data-field-type=${field.type()},data-protocol-scope=${null}"
+                                  rows="4"
+                                  th:text="${field.value()}"
+                                  th:disabled="${!field.editable()}"></textarea>
+
+                        <input th:if="${field.type() == 'number'}"
+                               class="form-control"
+                               type="number"
+                               th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                               th:name="${'settings[' + key + ']'}"
+                               th:attr="data-plugin-field=${key},data-field-type=${field.type()},data-protocol-scope=${key == 'port' ? 'imap' : null}"
+                               th:value="${field.value()}"
+                               th:disabled="${!field.editable()}"/>
+
+                        <input th:if="${field.type() == 'secret'}"
+                               class="form-control"
+                               type="password"
+                               th:with="secretPlaceholder=${field.value() != null && !#strings.isEmpty(field.value()) ? field.value() : 'Enter new secret'}"
+                               th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                               th:name="${'settings[' + key + ']'}"
+                               data-empty-placeholder="Enter new secret"
+                               th:attr="data-plugin-field=${key},data-field-type=${field.type()},data-secret-placeholder=${secretPlaceholder},data-protocol-scope=${null}"
+                               th:placeholder="${secretPlaceholder}"
+                               th:disabled="${!field.editable()}"/>
+
+                        <input th:if="${field.type() == 'string'}"
+                               class="form-control"
+                               type="text"
+                               th:id="${'field-' + panel.plugin().code() + '-' + key}"
+                               th:name="${'settings[' + key + ']'}"
+                               th:attr="data-plugin-field=${key},data-field-type=${field.type()},data-protocol-scope=${key == 'serverUrl' ? 'ews' : (key == 'host' ? 'imap' : null)}"
+                               th:value="${field.value()}"
+                               th:disabled="${!field.editable()}"/>
+
+                        <div th:if="${field.description() != null && !#strings.isEmpty(field.description())}"
+                             class="form-text"
+                             th:text="${field.description()}">Description</div>
+                    </div>
+                </div>
+                </th:block>
+                <div class="col-12 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                    <div class="text-muted small">
+                        Version <span th:text="${panel.descriptor().version()}">1</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <button th:if="${panel.plugin().code() == 'mail'}" type="button" class="btn btn-outline-secondary" data-detect-endpoint-button data-protocol-scope="ews">
+                            Detect Endpoint
+                        </button>
+                        <button th:if="${panel.plugin().code() == 'mail'}" type="button" class="btn btn-outline-secondary" data-test-connection-button data-protocol-scope="ews">
+                            Test Connection
+                        </button>
+                        <div class="small text-muted los-api-status" th:attr="data-plugin-status=${panel.plugin().code()}">
+                            Save uses browser fetch. Inspect in Chrome DevTools.
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="mt-4">
+                <div class="text-uppercase small text-muted mb-2">Recent Audit</div>
+                <div th:if="${#lists.isEmpty(panel.audit())}" class="text-muted small">No audit entries.</div>
+                <div th:each="item : ${panel.audit()}" class="los-audit-row">
+                    <div class="d-flex justify-content-between gap-3">
+                        <strong th:text="${item.action()}">APPLY_SETTINGS</strong>
+                        <span class="text-muted small" th:text="${item.createdAt() != null ? #temporals.format(item.createdAt(), 'yyyy-MM-dd HH:mm:ss') : '—'}">—</span>
+                    </div>
+                    <div class="small" th:text="${item.status()}">APPLIED</div>
+                    <div class="small text-muted" th:text="${item.message()}">Settings applied.</div>
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="mail-test-connection-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" data-mail-test-modal-title>Connection test</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small mb-3" data-mail-test-modal-message></div>
+                <div class="small text-muted" data-mail-test-modal-details></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    (function () {
+        const modalElement = document.getElementById('mail-test-connection-modal');
+        const modalTitle = document.querySelector('[data-mail-test-modal-title]');
+        const modalMessage = document.querySelector('[data-mail-test-modal-message]');
+        const modalDetails = document.querySelector('[data-mail-test-modal-details]');
+        const testConnectionModal = modalElement ? new bootstrap.Modal(modalElement) : null;
+
+        function formToPayload(form) {
+            const formData = new FormData(form);
+            const settings = {};
+            for (const [key, value] of formData.entries()) {
+                if (!key.startsWith('settings[') || !key.endsWith(']')) {
+                    continue;
+                }
+                const field = key.slice(9, -1);
+                settings[field] = value;
+            }
+
+            form.querySelectorAll('input[type="checkbox"][name^="settings["]').forEach(function (checkbox) {
+                if (checkbox.disabled) {
+                    return;
+                }
+                const field = checkbox.name.slice(9, -1);
+                settings[field] = checkbox.checked ? 'true' : 'false';
+            });
+
+            return {settings: settings};
+        }
+
+        function updateStatus(pluginCode, text, isError) {
+            const node = document.querySelector('[data-plugin-status="' + pluginCode + '"]');
+            if (!node) return;
+            node.textContent = text;
+            node.classList.toggle('text-danger', !!isError);
+            node.classList.toggle('text-muted', !isError);
+        }
+
+        function mailTestPayload(form) {
+            const payload = formToPayload(form).settings;
+            const splitLines = function (value) {
+                return (value || '')
+                    .split(/\r?\n/)
+                    .map(function (item) { return item.trim(); })
+                    .filter(Boolean);
+            };
+            return {
+                protocol: payload.protocol || null,
+                ewsUrl: payload.serverUrl || null,
+                username: payload.login || null,
+                password: payload.password || null,
+                authType: payload.authType || null,
+                host: payload.host || null,
+                port: payload.port ? Number(payload.port) : null,
+                ssl: payload.ssl === 'true',
+                folderExclude: splitLines(payload.foldersExclude)
+            };
+        }
+
+        function mailDetectPayload(form) {
+            const payload = formToPayload(form).settings;
+            return {
+                protocol: payload.protocol || null,
+                ewsUrl: payload.serverUrl || null
+            };
+        }
+
+        function showResultModal(result, mode) {
+            if (!testConnectionModal || !modalTitle || !modalMessage || !modalDetails) {
+                return;
+            }
+            const lines = [];
+            if (result.success && mode === 'detect') {
+                modalTitle.textContent = 'Success';
+                lines.push('Endpoint detected');
+                lines.push('Endpoint: OK');
+                lines.push('HTTPS: ' + (result.httpsOk ? 'OK' : 'Fail'));
+                lines.push('EWS Service: ' + (result.ewsDetected ? 'Detected' : 'Not detected'));
+                if (result.recommendedAuthType) {
+                    lines.push('Recommended Auth: ' + result.recommendedAuthType);
+                }
+                modalDetails.textContent = result.endpoint ? 'Endpoint: ' + result.endpoint : '';
+            } else if (result.success) {
+                modalTitle.textContent = 'Success';
+                lines.push('Connected');
+                lines.push('Endpoint: ' + (result.endpointReachable ? 'OK' : 'Fail'));
+                lines.push('Authentication: ' + (result.authenticationOk ? 'OK' : 'Fail'));
+                if (result.exchangeVersion) lines.push('Exchange Version: ' + result.exchangeVersion);
+                if (result.authType) lines.push('Auth: ' + result.authType);
+                if (result.mailbox) lines.push('Mailbox: ' + result.mailbox);
+                if (result.inboxFound !== null && result.inboxFound !== undefined) lines.push('Inbox: ' + (result.inboxFound ? 'OK' : 'Fail'));
+                if (result.foldersFound !== null && result.foldersFound !== undefined) lines.push('Folders found: ' + result.foldersFound);
+                modalDetails.textContent = result.endpoint ? 'Endpoint: ' + result.endpoint : '';
+            } else {
+                modalTitle.textContent = 'Fail';
+                lines.push(result.message || 'Connection failed');
+                if (mode === 'detect') {
+                    if (result.httpsOk !== undefined) lines.push('HTTPS: ' + (result.httpsOk ? 'OK' : 'Fail'));
+                    if (result.ewsDetected !== undefined) lines.push('EWS Service: ' + (result.ewsDetected ? 'Detected' : 'Not detected'));
+                } else {
+                    if (result.endpointReachable !== null && result.endpointReachable !== undefined) lines.push('Endpoint: ' + (result.endpointReachable ? 'OK' : 'Fail'));
+                    if (result.authType) lines.push('Auth: ' + result.authType);
+                }
+                if (result.endpoint) lines.push('Endpoint: ' + result.endpoint);
+                if (result.details) lines.push('Details: ' + result.details);
+                modalDetails.textContent = result.errorType ? 'Error Type: ' + result.errorType : '';
+            }
+            modalMessage.textContent = lines.join('\n');
+            testConnectionModal.show();
+        }
+
+        document.querySelectorAll('form[data-api-url]').forEach(function (form) {
+            const protocolSelect = form.querySelector('[data-plugin-field="protocol"]');
+            const authTypeSelect = form.querySelector('[data-plugin-field="authType"]');
+            const protocolScopedNodes = form.querySelectorAll('[data-protocol-scope]');
+
+            function updateProtocolScopedFields() {
+                if (!protocolSelect) {
+                    return;
+                }
+                const protocol = (protocolSelect.value || '').toLowerCase();
+                protocolScopedNodes.forEach(function (node) {
+                    const scope = (node.dataset.protocolScope || '').toLowerCase();
+                    if (!scope) {
+                        return;
+                    }
+                    const enabled = scope === protocol;
+                    node.disabled = !enabled;
+                    node.classList.toggle('opacity-50', !enabled);
+                });
+            }
+
+            if (authTypeSelect) {
+                authTypeSelect.dataset.userTouched = 'false';
+                authTypeSelect.addEventListener('change', function () {
+                    authTypeSelect.dataset.userTouched = 'true';
+                });
+            }
+            if (protocolSelect && authTypeSelect) {
+                protocolSelect.addEventListener('change', function () {
+                    const isEws = (protocolSelect.value || '').toLowerCase() === 'ews';
+                    if (isEws && authTypeSelect.dataset.userTouched !== 'true') {
+                        authTypeSelect.value = 'NTLM';
+                    }
+                    updateProtocolScopedFields();
+                });
+            }
+            updateProtocolScopedFields();
+
+            form.addEventListener('submit', async function (event) {
+                event.preventDefault();
+
+                const apiUrl = form.dataset.apiUrl;
+                const pluginCode = form.dataset.pluginCode || 'plugin';
+                const payload = formToPayload(form);
+
+                updateStatus(pluginCode, 'Sending fetch request to ' + apiUrl, false);
+
+                try {
+                    const result = await window.LeaderUiApi.request(apiUrl, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                    updateStatus(pluginCode, 'Saved via fetch. HTTP ' + result.response.status + '. See DevTools Network/Console.', false);
+                } catch (error) {
+                    updateStatus(pluginCode, 'Fetch failed — see DevTools Console', true);
+                }
+            });
+
+            const detectButton = form.querySelector('[data-detect-endpoint-button]');
+            if (detectButton && form.dataset.detectUrl) {
+                detectButton.addEventListener('click', async function () {
+                    const pluginCode = form.dataset.pluginCode || 'plugin';
+                    updateStatus(pluginCode, 'Detecting endpoint...', false);
+                    detectButton.disabled = true;
+                    try {
+                        const result = await window.LeaderUiApi.request(form.dataset.detectUrl, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(mailDetectPayload(form))
+                        });
+                        showResultModal(result.data, 'detect');
+                        const authTypeField = form.querySelector('[data-plugin-field="authType"]');
+                        if (authTypeField && !authTypeField.value) {
+                            authTypeField.value = result.data.recommendedAuthType || 'NTLM';
+                        }
+                        updateStatus(pluginCode, 'Endpoint detection completed. HTTP ' + result.response.status + '.', !result.data.success);
+                    } catch (error) {
+                        const response = error && error.data ? error.data : null;
+                        if (response) {
+                            showResultModal(response, 'detect');
+                        }
+                        updateStatus(pluginCode, 'Endpoint detection failed.', true);
+                    } finally {
+                        detectButton.disabled = false;
+                    }
+                });
+            }
+
+            const testButton = form.querySelector('[data-test-connection-button]');
+            if (testButton && form.dataset.testUrl) {
+                testButton.addEventListener('click', async function () {
+                    const pluginCode = form.dataset.pluginCode || 'plugin';
+                    updateStatus(pluginCode, 'Testing connection...', false);
+                    testButton.disabled = true;
+                    try {
+                        const result = await window.LeaderUiApi.request(form.dataset.testUrl, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(mailTestPayload(form))
+                        });
+                        showResultModal(result.data, 'test');
+                        updateStatus(pluginCode, 'Connection test completed. HTTP ' + result.response.status + '.', !result.data.success);
+                    } catch (error) {
+                        const response = error && error.data ? error.data : null;
+                        if (response) {
+                            showResultModal(response, 'test');
+                        }
+                        updateStatus(pluginCode, 'Connection test failed.', true);
+                    } finally {
+                        testButton.disabled = false;
+                    }
+                });
+            }
+        });
+    })();
+</script>
+</body>
+</html>

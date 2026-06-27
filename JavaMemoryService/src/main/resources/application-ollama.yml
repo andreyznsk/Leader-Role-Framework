@@ -1,0 +1,32 @@
+# Профиль: Ollama локальный (агентский режим)
+# Запуск: --spring.profiles.active=ollama
+# Модель: qwen3:8b — локальная Ollama localhost:11434
+
+spring:
+  datasource:
+    url: "jdbc:postgresql://172.80.2.1:5432/leader_framework?sslmode=disable"
+    driver-class-name: org.postgresql.Driver
+    username: memory_user
+    password: memory_password
+  flyway:
+    locations: classpath:db/migration
+    schemas: memory
+    default-schema: memory
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: qwen3:8b
+        options:
+          temperature: 0.0
+          top-p: 1.0
+          top-k: 20
+
+app:
+  capture:
+    inbox-dir: capture-inbox
+  rag:
+    inbox-dir: rag-inbox
+
+agent:
+  provider: ollama

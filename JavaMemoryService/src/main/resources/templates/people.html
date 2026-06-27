@@ -49,7 +49,8 @@
             </div>
 
             <!-- Add note form -->
-            <form method="post" th:action="@{/ui/people/{id}/note(id=${person.id})}" class="mt-2 d-flex gap-2">
+            <form method="post" th:action="@{/ui/people/{id}/note(id=${person.id})}" class="mt-2 d-flex gap-2"
+                  th:attr="data-api-url=@{/api/people/{id}/notes(id=${person.id})},data-api-method='POST',data-api-success='reload'">
                 <input type="text" name="note" class="form-control form-control-sm" placeholder="Заметка..."/>
                 <input type="text" name="tags" class="form-control form-control-sm" placeholder="теги" style="max-width:120px"/>
                 <button type="submit" class="btn btn-sm btn-outline-primary">+</button>
@@ -66,7 +67,8 @@
                         <h5 class="modal-title">Edit: <span th:text="${person.fullName}"></span></h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <form method="post" th:action="@{/ui/people/{id}/edit(id=${person.id})}">
+                    <form method="post" th:action="@{/ui/people/{id}/edit(id=${person.id})}"
+                          th:attr="data-api-url=@{/api/people/{id}(id=${person.id})},data-api-method='PUT',data-api-success='reload'">
                         <input type="hidden" name="_method" value="PUT">
                         <div class="modal-body">
                             <div class="mb-2">
@@ -114,7 +116,8 @@
                 <h5 class="modal-title">Добавить человека</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post" action="/ui/people/add">
+            <form method="post" action="/ui/people/add"
+                  data-api-url="/api/people" data-api-method="POST" data-api-success="reload">
                 <div class="modal-body">
                     <div class="mb-2">
                         <label class="form-label">ФИО *</label>

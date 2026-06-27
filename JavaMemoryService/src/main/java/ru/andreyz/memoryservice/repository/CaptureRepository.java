@@ -7,6 +7,7 @@ import ru.andreyz.memoryservice.domain.Capture;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 public interface CaptureRepository extends CrudRepository<Capture, Long> {
 
@@ -22,4 +23,6 @@ public interface CaptureRepository extends CrudRepository<Capture, Long> {
 
     @Query("SELECT * FROM captures ORDER BY captured_at DESC LIMIT 20")
     List<Capture> findRecent();
+
+    Optional<Capture> findBySourceAndSourceId(String source, String sourceId);
 }

@@ -1,0 +1,34 @@
+# Профиль: Ollama локальный (агентский режим)
+# Запуск: --spring.profiles.active=ollama
+# Модель: qwen3:8b — локальная Ollama localhost:11434
+
+spring:
+  datasource:
+    url: "jdbc:postgresql://172.80.2.1:5432/leader_framework?sslmode=disable"
+    username: mailagent_user
+    password: mailagent_password
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: qwen3:8b
+        options:
+          temperature: 0.0
+          top-p: 1.0
+          top-k: 20
+
+mail:
+  protocol: maildev
+  poll-interval-seconds: 30
+
+maildev:
+  api-url: http://172.80.2.1:18080
+
+memory:
+  service:
+    url: http://localhost:8090
+    enabled: true
+
+agent:
+  provider: agent
+  command: claude --print

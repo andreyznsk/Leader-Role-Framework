@@ -35,8 +35,12 @@ management:
 app:
   capture:
     inbox-dir: capture-inbox
+  plugins:
+    mail:
+      base-url: http://localhost:8080
   rag:
     inbox-dir: ../JavaRagService/rag-inbox
+    base-url: http://localhost:8081
   workspace:
     dir: workspace
 

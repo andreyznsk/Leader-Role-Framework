@@ -22,12 +22,18 @@ public class NoteController {
     @PostMapping
     public ResponseEntity<Note> create(@RequestBody CreateNoteRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(noteService.create(request.text(), request.tags(), request.source()));
+                .body(noteService.create(request.title(), request.text(), request.tags(), request.source()));
     }
 
     @GetMapping
     public ResponseEntity<List<Note>> list(@RequestParam(required = false) String tags,
                                            @RequestParam(required = false) Integer limit) {
         return ResponseEntity.ok(noteService.list(tags, limit));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        noteService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

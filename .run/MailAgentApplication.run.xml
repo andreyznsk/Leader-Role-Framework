@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="MailAgentApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
-    <option name="ACTIVE_PROFILES" value="local" />
+    <option name="ACTIVE_PROFILES" value="ollama" />
     <module name="JavaMailAgent" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="ru.andreyz.mailagent.MailAgentApplication" />
     <method v="2">

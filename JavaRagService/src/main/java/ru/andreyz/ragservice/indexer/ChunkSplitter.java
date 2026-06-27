@@ -8,8 +8,11 @@ import java.util.List;
 @Component
 public class ChunkSplitter {
 
-    private static final int MIN_CHUNK = 100;
-    private static final int MAX_CHUNK = 1000;
+    private final RagChunkProperties chunkProperties;
+
+    public ChunkSplitter(RagChunkProperties chunkProperties) {
+        this.chunkProperties = chunkProperties;
+    }
 
     public List<String> split(String content) {
         String[] paragraphs = content.split("\n\n+");
@@ -26,7 +29,7 @@ public class ChunkSplitter {
             String p = para.trim();
             if (p.isEmpty()) continue;
 
-            if (buf.length() > 0 && buf.length() < MIN_CHUNK) {
+            if (buf.length() > 0 && buf.length() < chunkProperties.getMinSize()) {
                 buf.append("\n\n").append(p);
             } else {
                 if (!buf.isEmpty()) result.add(buf.toString());
@@ -34,7 +37,7 @@ public class ChunkSplitter {
             }
         }
         if (!buf.isEmpty()) {
-            if (result.isEmpty() || buf.length() >= MIN_CHUNK) {
+            if (result.isEmpty() || buf.length() >= chunkProperties.getMinSize()) {
                 result.add(buf.toString());
             } else {
                 result.set(result.size() - 1, result.get(result.size() - 1) + "\n\n" + buf);
@@ -45,15 +48,16 @@ public class ChunkSplitter {
 
     private List<String> splitLongChunks(List<String> chunks) {
         List<String> result = new ArrayList<>();
+        int maxChunk = chunkProperties.getMaxSize();
         for (String chunk : chunks) {
-            if (chunk.length() <= MAX_CHUNK) {
+            if (chunk.length() <= maxChunk) {
                 result.add(chunk);
                 continue;
             }
             // Split at sentence boundaries
             int start = 0;
             while (start < chunk.length()) {
-                int end = Math.min(start + MAX_CHUNK, chunk.length());
+                int end = Math.min(start + maxChunk, chunk.length());
                 if (end < chunk.length()) {
                     // Look for last sentence end within the window
                     int sentenceEnd = lastSentenceEnd(chunk, start, end);

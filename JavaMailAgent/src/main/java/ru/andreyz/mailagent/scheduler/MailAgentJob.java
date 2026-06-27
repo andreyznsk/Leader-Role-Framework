@@ -11,18 +11,27 @@ import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.service.MailProcessingStateService;
+import ru.andreyz.mailagent.service.MailRuntimeConfig;
+import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 import ru.andreyz.mailagent.model.ProcessedEmail;
-import ru.andreyz.mailagent.repository.ProcessedEmailRepository;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 @Component
 public class MailAgentJob {
 
     private static final Logger log = LoggerFactory.getLogger(MailAgentJob.class);
+    private static final AgentResponseType[] RESPONSE_TYPES = AgentResponseType.values();
 
     private final MailClient mailClient;
     private final PromptBuilder promptBuilder;
@@ -30,9 +39,9 @@ public class MailAgentJob {
     private final ActionExecutor actionExecutor;
     private final MailConfig.MailProperties mailProperties;
     private final MailConfig.PathProperties pathProperties;
-    private final MailConfig.FolderProperties folderProperties;
-    private final ProcessedEmailRepository processedEmailRepository;
+    private final MailProcessingStateService processingStateService;
     private final ObjectMapper objectMapper;
+    private final MailRuntimeConfigService runtimeConfigService;
 
     public MailAgentJob(
         MailClient mailClient,
@@ -41,9 +50,9 @@ public class MailAgentJob {
         ActionExecutor actionExecutor,
         MailConfig.MailProperties mailProperties,
         MailConfig.PathProperties pathProperties,
-        MailConfig.FolderProperties folderProperties,
-        ProcessedEmailRepository processedEmailRepository,
-        ObjectMapper objectMapper
+        MailProcessingStateService processingStateService,
+        ObjectMapper objectMapper,
+        MailRuntimeConfigService runtimeConfigService
     ) {
         this.mailClient = mailClient;
         this.promptBuilder = promptBuilder;
@@ -51,29 +60,54 @@ public class MailAgentJob {
         this.actionExecutor = actionExecutor;
         this.mailProperties = mailProperties;
         this.pathProperties = pathProperties;
-        this.folderProperties = folderProperties;
-        this.processedEmailRepository = processedEmailRepository;
+        this.processingStateService = processingStateService;
         this.objectMapper = objectMapper;
+        this.runtimeConfigService = runtimeConfigService;
     }
 
-    @Scheduled(fixedDelayString = "${mail.poll-interval-seconds:60}000")
+    @Scheduled(fixedDelayString = "#{${mail.poll-interval-seconds:60} * 1000}")
     public void poll() {
+        MailRuntimeConfig runtime = runtimeConfigService.snapshot();
+        if (!runtime.enabled()) {
+            return;
+        }
+        int total = 0, errors = 0;
+        int[] counts = emptyCounts();
+
+        List<ProcessedEmail> errorQueue = processingStateService.findErrorQueue();
+        if (!errorQueue.isEmpty()) {
+            log.info("Retrying {} email(s) from ERROR queue", errorQueue.size());
+            for (ProcessedEmail failedEmail : errorQueue) {
+                try {
+                    actionExecutor.retry(failedEmail);
+                    total++;
+                    countByType(failedEmail.responseType(), counts);
+                } catch (Exception e) {
+                    errors++;
+                    log.warn("Retry for email {} failed: {}", failedEmail.emailId(), e.getMessage());
+                    finishPoll(total, errors, counts);
+                    return;
+                }
+            }
+        }
+
         int limit = mailProperties.getFetchLimit();
-        List<String> excludeFolders = folderProperties.getExclude();
+        List<String> excludeFolders = runtime.foldersExclude();
 
         List<String> folders;
         try {
             folders = mailClient.listFolders(excludeFolders);
+            folders = filterIncludedFolders(folders, runtime.foldersInclude());
         } catch (Exception e) {
             log.error("Failed to list folders: {}", e.getMessage());
+            log.debug("", e);
+            runtimeConfigService.registerPollResult("Folder list failed: " + e.getMessage());
             return;
         }
 
         log.info("Poll started — scanning {} folder(s): {}", folders.size(), folders);
 
-        int total = 0, errors = 0;
-        int[] counts = {0, 0, 0, 0}; // REQUEST, DRAFT, NOISE, CAPTURE
-
+        List<Email> emailsToProcess = new ArrayList<>();
         for (String folder : folders) {
             List<Email> emails;
             try {
@@ -83,32 +117,34 @@ public class MailAgentJob {
                 continue;
             }
 
-            log.info("Folder [{}]: {} unread email(s)", folder, emails.size());
+            log.debug("Folder [{}]: {} unread email(s)", folder, emails.size());
+            if (!emails.isEmpty()) {
+                log.info("Folder [{}]: {} unread email(s)", folder, emails.size());
+            }
 
             for (Email email : emails) {
-                if (processedEmailRepository.existsByEmailId(email.id())) {
-                    log.debug("Email {} already processed, skipping", email.id());
+                if (processingStateService.findByEmailId(email.id()).isPresent()) {
+                    log.debug("Email {} already has processing state, skipping", email.id());
                     continue;
                 }
-                total++;
-                try {
-                    AgentResponse resp = processEmail(email);
-                    switch (resp.type()) {
-                        case REQUEST -> counts[0]++;
-                        case DRAFT   -> counts[1]++;
-                        case NOISE   -> counts[2]++;
-                        case CAPTURE -> counts[3]++;
-                    }
-                    processedEmailRepository.save(ProcessedEmail.of(email, resp.type().name()));
-                } catch (Exception e) {
-                    errors++;
-                    log.warn("Email {} failed: {}, will retry next poll", email.id(), e.getMessage());
-                }
+                emailsToProcess.add(email);
             }
         }
 
-        log.info("Poll finished: {} processed ({} REQUEST, {} DRAFT, {} NOISE, {} CAPTURE, {} errors)",
-            total - errors, counts[0], counts[1], counts[2], counts[3], errors);
+        total += emailsToProcess.size();
+        ProcessingBatchResult batchResult = processBatch(emailsToProcess);
+        errors += batchResult.errors();
+        mergeCounts(counts, batchResult.counts());
+
+        finishPoll(total, errors, counts);
+    }
+
+    int resolveProcessingParallelism() {
+        Integer configured = mailProperties.getProcessingParallelism();
+        if (configured != null && configured > 0) {
+            return configured;
+        }
+        return Math.max(1, Runtime.getRuntime().availableProcessors());
     }
 
     private AgentResponse processEmail(Email email) throws Exception {
@@ -120,12 +156,91 @@ public class MailAgentJob {
         AgentResponse resp = parseAgentResponse(raw);
         log.info("Classified as {}{}", resp.type(),
             resp.priority() != null ? ", priority " + resp.priority() : "");
-        actionExecutor.execute(resp);
-        if (resp.type() == AgentResponseType.NOISE) {
-            mailClient.markAsRead(email.id(), email.folder());
-            log.info("Email {} marked as read (NOISE)", email.id());
-        }
         return resp;
+    }
+
+    private ProcessingBatchResult processBatch(List<Email> emails) {
+        if (emails.isEmpty()) {
+            return new ProcessingBatchResult(0, emptyCounts());
+        }
+
+        int parallelism = Math.min(emails.size(), resolveProcessingParallelism());
+        log.info("Collected {} email(s) for processing with {} worker(s)", emails.size(), parallelism);
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(parallelism)) {
+            List<Future<ProcessingOutcome>> futures = emails.stream()
+                .map(email -> executor.submit(() -> processSingleEmail(email)))
+                .toList();
+
+            int errors = 0;
+            int[] counts = emptyCounts();
+            for (Future<ProcessingOutcome> future : futures) {
+                try {
+                    ProcessingOutcome outcome = future.get();
+                    if (outcome.errorMessage() != null) {
+                        errors++;
+                        log.warn("Email {} failed: {}, will retry next poll", outcome.emailId(), outcome.errorMessage());
+                        continue;
+                    }
+                    countByType(outcome.responseType(), counts);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    errors++;
+                    log.warn("Mail processing interrupted: {}", e.getMessage());
+                } catch (ExecutionException e) {
+                    errors++;
+                    Throwable cause = e.getCause() != null ? e.getCause() : e;
+                    log.warn("Unexpected mail processing failure: {}", cause.getMessage());
+                    log.debug("", cause);
+                }
+            }
+            return new ProcessingBatchResult(errors, counts);
+        }
+    }
+
+    private ProcessingOutcome processSingleEmail(Email email) {
+        try {
+            AgentResponse resp = processEmail(email);
+            actionExecutor.execute(email, resp);
+            return new ProcessingOutcome(email.id(), resp.type().name(), null);
+        } catch (Exception e) {
+            return new ProcessingOutcome(email.id(), null, e.getMessage());
+        }
+    }
+
+    private void countByType(String responseType, int[] counts) {
+        AgentResponseType type = AgentResponseType.valueOf(responseType);
+        counts[type.ordinal()]++;
+    }
+
+    private void mergeCounts(int[] target, int[] source) {
+        for (int i = 0; i < target.length; i++) {
+            target[i] += source[i];
+        }
+    }
+
+    private void finishPoll(int total, int errors, int[] counts) {
+        String result = "%d processed (%d REQUEST, %d DRAFT, %d NOISE, %d CAPTURE, %d NOTICE, %d NOTE, %d errors)"
+            .formatted(
+                Math.max(0, total - errors),
+                countFor(AgentResponseType.REQUEST, counts),
+                countFor(AgentResponseType.DRAFT, counts),
+                countFor(AgentResponseType.NOISE, counts),
+                countFor(AgentResponseType.CAPTURE, counts),
+                countFor(AgentResponseType.NOTICE, counts),
+                countFor(AgentResponseType.NOTE, counts),
+                errors
+            );
+        log.info("Poll finished: {}", result);
+        runtimeConfigService.registerPollResult(result);
+    }
+
+    private int[] emptyCounts() {
+        return new int[RESPONSE_TYPES.length];
+    }
+
+    private int countFor(AgentResponseType type, int[] counts) {
+        return counts[type.ordinal()];
     }
 
     private AgentResponse parseAgentResponse(String raw) throws IOException {
@@ -146,5 +261,30 @@ public class MailAgentJob {
         Files.createDirectories(inboxDir);
         Path file = inboxDir.resolve(ActionExecutor.sanitize(email.id()) + ".json");
         Files.writeString(file, objectMapper.writeValueAsString(email));
+    }
+
+    private List<String> filterIncludedFolders(List<String> folders, List<String> includeFolders) {
+        if (includeFolders == null || includeFolders.isEmpty()) {
+            return folders;
+        }
+        List<String> normalizedIncludes = includeFolders.stream()
+                .map(this::normalizeFolder)
+                .toList();
+        return folders.stream()
+                .filter(folder -> normalizedIncludes.contains(normalizeFolder(folder)))
+                .toList();
+    }
+
+    private String normalizeFolder(String folder) {
+        return folder == null ? "" : folder.trim()
+                .replace('\\', '/')
+                .replaceAll("/+", "/")
+                .toLowerCase(Locale.ROOT);
+    }
+
+    private record ProcessingOutcome(String emailId, String responseType, String errorMessage) {
+    }
+
+    private record ProcessingBatchResult(int errors, int[] counts) {
     }
 }

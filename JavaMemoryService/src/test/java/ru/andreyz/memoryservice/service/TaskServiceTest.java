@@ -68,4 +68,15 @@ class TaskServiceTest {
 
         assertThat(done.status()).isEqualTo("DONE");
     }
+
+    @Test
+    void toggleDone_reopensDoneTaskAsTodo() {
+        Task task = taskService.createConfirmed(LocalDate.now(), "Task to reopen",
+                "NORMAL", null, "MANUAL", null);
+        Task done = taskService.markDone(task.id());
+
+        Task reopened = taskService.toggleDone(done.id());
+
+        assertThat(reopened.status()).isEqualTo("TODO");
+    }
 }
