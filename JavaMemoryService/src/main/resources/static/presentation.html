@@ -123,8 +123,8 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 
 /* SCENARIO */
 .sc-wrap{flex:1;display:flex;flex-direction:column;gap:14px;min-height:0;align-items:center;justify-content:center}
-.sc-left{width:min(1040px,100%);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.sc-right{width:min(1100px,100%);min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;flex:1;min-height:0}
+.sc-left{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.sc-right{width:100%;min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:visible}
 @media(max-width:900px){.sc-left{grid-template-columns:1fr}}
 .pain-block{background:var(--bg2);border:1px solid var(--accent3);border-radius:10px;padding:14px 16px}
 .pain-title{font-family:var(--mono);font-size:10px;color:var(--accent3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
@@ -136,7 +136,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .result-title{font-family:var(--mono);font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
 .result-text{font-size:13px;color:var(--text2);line-height:1.5}
 .sc-diagram-title{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;text-align:center}
-.sc-mwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sc-mwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:visible}
 .sc-mwrap .mermaid svg{max-height:calc((100vh - 310px) / var(--diagram-scale))}
 
 /* ROADMAP */
@@ -263,93 +263,8 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
   <div class="subtitle">Три Spring Boot сервиса + общий AI-слой + управляемые интеграции.</div>
   <div class="body">
     <div class="arch-layout">
-      <div class="arch-main">
-        <div class="mwrap" style="width:100%">
-        <div class="mermaid">
-flowchart TB
-  subgraph ENT["🏢 Enterprise Systems"]
-    EWS["Exchange EWS"]
-    JIRA["Jira"]
-    CONF["Confluence"]
-    GIT["GitHub / Bitbucket"]
-    K8S["Kubernetes"]
-  end
-
-  subgraph LOS["⬡ LeaderOS Platform"]
-    COMMON["common :library<br/>AgentClient<br/>Claude · Codex · Ollama · GigaChat · Mock"]:::core
-
-    subgraph MAIL["JavaMailAgent :8080"]
-      MAIL_FLOW["Mail routing<br/>REQUEST · CAPTURE · NOTICE · DRAFT · NOISE"]:::agent
-      MAIL_DB[("PG: mailagent")]:::db
-    end
-
-    subgraph MEM["JavaMemoryService :8082"]
-      MEM_CORE["Operational Memory<br/>Tasks · Risks · Notes · Incidents · People"]:::mcp
-      MEM_CTRL["Plugin Control Plane<br/>/ui/settings"]:::mcp
-      MEM_DB[("PG: memory")]:::db
-    end
-
-    subgraph RAG["JavaRagService :8081"]
-      RAG_FLOW["RAG indexing + search<br/>documents · chunks · status"]:::rag
-      RAG_DB[("PG: rag")]:::db
-      OS[("OpenSearch")]:::db
-    end
-
-    WS[("Workspace files<br/>capture-inbox · plans · drafts · rag-inbox")]:::file
-  end
-
-  subgraph AI["🤖 AI Runtime"]
-    AGENTS["Interactive Agent<br/>Claude Code · Codex<br/>Test Runner · Arch Analyst"]:::agent
-    OLLAMA["Ollama<br/>mxbai-embed-large"]:::rag
-  end
-
-  ENT -->|"MCP · REST · EWS/IMAP"| LOS
-  COMMON --> MAIL_FLOW
-  COMMON --> MEM_CORE
-  COMMON --> RAG_FLOW
-  AGENTS -->|"MCP tools"| MEM_CORE
-  AGENTS -->|"CR / code / tests"| COMMON
-  MAIL_FLOW -->|"POST /api/tasks/pending<br/>POST /api/capture<br/>POST /api/notes"| MEM_CORE
-  MEM_CORE -->|"/api/knowledge/search"| RAG_FLOW
-  MEM_CTRL -->|"GET/PUT /api/control/*"| MAIL_FLOW
-  MEM_CTRL -->|"GET/PUT /api/control/*"| RAG_FLOW
-  RAG_FLOW --> OLLAMA
-  RAG_FLOW --> OS
-  MAIL_FLOW --> MAIL_DB
-  MEM_CORE --> MEM_DB
-  RAG_FLOW --> RAG_DB
-  MAIL_FLOW --> WS
-  MEM_CORE --> WS
-  RAG_FLOW --> WS
-
-  classDef core fill:#162030,stroke:#4A9EFF,color:#E6EDF3,font-weight:bold
-  classDef agent fill:#2D1B1B,stroke:#F78166,color:#F78166
-  classDef mcp fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
-  classDef rag fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
-  classDef db fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
-  classDef file fill:#2A2418,stroke:#D2A8FF,color:#D2A8FF
-        </div>
-      </div>
-      </div>
-      <div class="arch-side">
-        <div class="card" style="border-color:#4A9EFF;background:rgba(74,158,255,.06);padding:12px 14px;text-align:center">
-          <div style="font-family:var(--mono);font-size:10px;color:#4A9EFF;margin-bottom:4px">AI-AGNOSTIC</div>
-          <div style="font-size:11px;color:var(--text2)">common скрывает конкретного LLM-провайдера</div>
-        </div>
-        <div class="card" style="border-color:#00D4AA;background:rgba(0,212,170,.06);padding:12px 14px;text-align:center">
-          <div style="font-family:var(--mono);font-size:10px;color:#00D4AA;margin-bottom:4px">MEMORY HUB</div>
-          <div style="font-size:11px;color:var(--text2)">все агенты работают через Memory / MCP</div>
-        </div>
-        <div class="card" style="border-color:#D2A8FF;background:rgba(210,168,255,.06);padding:12px 14px;text-align:center">
-          <div style="font-family:var(--mono);font-size:10px;color:#D2A8FF;margin-bottom:4px">CONTROL PLANE</div>
-          <div style="font-size:11px;color:var(--text2)">настройки плагинов из единого UI</div>
-        </div>
-        <div class="card" style="padding:12px 14px;text-align:center">
-          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Стек</div>
-          <div style="font-size:11px;color:var(--text2);line-height:1.9;text-align:center">
-          Java 21 · Spring Boot 3<br>Spring AI · MCP tools<br>PostgreSQL · Flyway<br>OpenSearch · Ollama<br>Kubernetes-ready
-          </div>
-        </div>
+      <div class="arch-main" style="flex:1;min-height:0;width:100%">
+        <img src="page_4.png" alt="LeaderOS Technology Architecture" style="width:100%;height:100%;object-fit:contain;border-radius:8px">
       </div>
     </div>
   </div>
@@ -379,7 +294,7 @@ flowchart TB
         </div>
         <div class="g2" style="gap:10px">
           <div class="card" style="text-align:center;padding:14px"><div style="font-family:var(--mono);font-size:20px;color:var(--accent)">1</div><div style="font-size:12px;color:var(--text2)">единый контекст дня</div></div>
-          <div class="card" style="text-align:center;padding:14px"><div style="font-family:var(--mono);font-size:20px;color:var(--accent)">5</div><div style="font-size:12px;color:var(--text2)">маршрутов писем</div></div>
+          <div class="card" style="text-align:center;padding:14px"><div style="font-family:var(--mono);font-size:20px;color:var(--accent)">6</div><div style="font-size:12px;color:var(--text2)">маршрутов писем</div></div>
           <div class="card" style="text-align:center;padding:14px"><div style="font-family:var(--mono);font-size:20px;color:var(--accent)">∞</div><div style="font-size:12px;color:var(--text2)">история решений</div></div>
           <div class="card" style="text-align:center;padding:14px"><div style="font-family:var(--mono);font-size:20px;color:var(--accent)">AI</div><div style="font-size:12px;color:var(--text2)">агенты в контексте</div></div>
         </div>
@@ -392,30 +307,35 @@ flowchart TB
 <!-- 6. СЦЕНАРИЙ 1 -->
 <div class="slide" data-t="~6:00">
   <div class="eyebrow e3">Сценарий 1</div>
-  <div class="title">📧 Письмо → Задача · Знания</div>
+  <div class="title">📧 Письмо → Задача · Заметка · Знания</div>
   <div class="body">
     <div class="sc-wrap">
       <div class="sc-left">
         <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Письма теряются в потоке. Важные запросы не фиксируются. Полезные знания из писем никуда не сохраняются.</div></div>
         <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">Шедулер каждые 60 сек сканирует почту</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">5 маршрутов: задача, заметка, знание в RAG, черновик или шум — каждое письмо попадает куда надо.</div></div>
+        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">6 маршрутов: задача, capture, операционная заметка, знание в RAG, черновик или шум — каждое письмо попадает в нужное хранилище.</div></div>
       </div>
       <div class="sc-right">
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
 flowchart TD
   A(["📬 Exchange EWS"]) --> B["Mail Agent\nScheduler"]
-  B -->|"agent --print"| C{"AI-Agent\n5 маршрутов"}
+  B -->|"agent --print"| C{"AI-Agent\n6 маршрутов"}
   C -->|"REQUEST"| D["Memory Service\n/api/tasks/pending"]
   C -->|"CAPTURE"| G["Memory Service\n/api/capture"]
+  C -->|"NOTE"| N["Memory Service\n/api/notes"]
   C -->|"NOTICE"| H["rag-inbox/\nдокумент знаний"]
   C -->|"DRAFT"| F(["💾 drafts/"])
   C -->|"NOISE"| E(["✓ прочитано"])
   D --> I(["⏳ PENDING задача\n→ подтверждение в UI"])
+  G --> J(["📥 raw capture"])
+  N --> K(["📝 Operational Notes"])
   H -->|"RAG Scheduler"| L(["📚 OpenSearch\nвекторная база"])
   style C fill:#2D1B1B,stroke:#F78166,color:#F78166
   style D fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
   style G fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style N fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style K fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
   style H fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
   style L fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
         </div></div>
@@ -458,28 +378,50 @@ flowchart TD
 <!-- 8. СЦЕНАРИЙ 3 -->
 <div class="slide" data-t="~8:00">
   <div class="eyebrow e2">Сценарий 3</div>
-  <div class="title">🔍 Поиск по документации</div>
+  <div class="title">🔍 Global Search · Поиск по всему LeaderOS</div>
   <div class="body">
     <div class="sc-wrap">
       <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Поиск в Confluence занимает 20-30 минут. Документация устаревшая. Никто не знает где что лежит.</div></div>
-        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">"как у нас проходит релиз?"</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">Ответ за 3 секунды с указанием источника. Поиск на русском языке.</div></div>
+        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Информация разбросана: заметки, задачи, люди, риски, документы. Невозможно найти нужное быстро.</div></div>
+        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">/ui/search · пишу запрос · выбираю слои и режим</div></div>
+        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">6 слоёв · QUICK за ~1 сек · DEEP с AI Summary · пресеты: Notice only, Everything, Documentation, People & Tasks</div></div>
       </div>
       <div class="sc-right">
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
 flowchart TD
-  A(["❓ Вопрос тимлида"]) --> B["AI-Agent\nинтерактивный"]
-  B -->|"MCP rag_search"| C["RAG Service :8081"]
-  C -->|"embeddings"| D["Ollama\nmxbai-embed-large"]
-  D --> C
-  C -->|"kNN поиск"| E[("OpenSearch\nвекторное хранилище")]
-  E -->|"top-3 чанка"| C
-  C -->|"релевантные фрагменты"| B
-  B --> F(["💬 Ответ с источниками\nза ~3 секунды"])
-  style B fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
-  style D fill:#2D2A1B,stroke:#4A9EFF,color:#4A9EFF
+  A(["❓ Вопрос техлида"]) --> B["/ui/search\nGlobal Search UI"]
+  B -->|"Пресеты · чекбоксы слоёв"| C["POST /api/search\nquery · layers · mode"]
+  C --> D{"GlobalSearchService"}
+
+  subgraph LAYERS["🔍 6 Search Providers"]
+    direction LR
+    P1["📌 Notice"]
+    P2["✅ Tasks"]
+    P3["👤 People"]
+    P4["⚠️ Risks"]
+    P5["🔴 Incidents"]
+    P6["📚 Knowledge → RAG"]
+  end
+
+  D --> LAYERS
+  LAYERS --> M["Merge · Sort by score · Group by layer"]
+
+  M -->|"QUICK"| R(["📋 Результаты по слоям\nза ~1 сек"])
+  M -->|"DEEP"| AI["SearchPromptBuilder\n+ AgentClient"]
+  AI --> S(["💬 AI Summary\n+ источники"])
+
+  style D fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style LAYERS fill:#0D1117,stroke:#4A9EFF,color:#E6EDF3
+  style P1 fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style P2 fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style P3 fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style P4 fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style P5 fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style P6 fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
+  style AI fill:#2D2A1B,stroke:#D2A8FF,color:#D2A8FF
+  style S fill:#2D2A1B,stroke:#D2A8FF,color:#D2A8FF
+  style R fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
         </div></div>
       </div>
     </div>

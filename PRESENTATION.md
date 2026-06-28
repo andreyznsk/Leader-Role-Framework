@@ -123,7 +123,7 @@ PostgreSQL · Flyway · OpenSearch · Ollama · Kubernetes-ready
 
 ---
 
-### Слайд 6 — Сценарий 1: Письмо → Задача · Знания
+### Слайд 6 — Сценарий 1: Письмо → Задача · Заметка · Знания
 
 **Боль:** Письма теряются в потоке. Важные запросы не фиксируются. Полезные знания из писем никуда не сохраняются.
 
@@ -133,15 +133,16 @@ PostgreSQL · Flyway · OpenSearch · Ollama · Kubernetes-ready
 ```
 📬 Exchange EWS
     → Mail Agent Scheduler
-    → AI-Agent (5 маршрутов):
+    → AI-Agent (6 маршрутов):
         REQUEST  → Memory Service /api/tasks/pending  → PENDING задача → подтверждение в UI
-        CAPTURE  → Memory Service /api/capture
-        NOTICE   → rag-inbox/ → RAG Scheduler → OpenSearch (векторная база)
+        CAPTURE  → Memory Service /api/capture         → raw capture
+        NOTE     → Memory Service /api/notes           → Operational Notes
+        NOTICE   → rag-inbox/                          → RAG Scheduler → OpenSearch
         DRAFT    → drafts/
         NOISE    → ✓ прочитано
 ```
 
-**Результат:** 5 маршрутов — каждое письмо попадает куда надо.
+**Результат:** 6 маршрутов — задача, capture, операционная заметка, знание в RAG, черновик или шум. Каждое письмо автоматически попадает в нужное хранилище.
 
 ---
 
@@ -168,24 +169,31 @@ PostgreSQL · Flyway · OpenSearch · Ollama · Kubernetes-ready
 
 ---
 
-### Слайд 8 — Сценарий 3: Поиск по документации
+### Слайд 8 — Сценарий 3: Global Search · Поиск по всему LeaderOS
 
-**Боль:** Поиск в Confluence занимает 20–30 минут. Документация устаревшая. Никто не знает где что лежит.
+**Боль:** Информация разбросана: заметки, задачи, люди, риски, документы. Невозможно найти нужное быстро.
 
-**Триггер:** `"как у нас проходит релиз?"`
+**Триггер:** `/ui/search` — пишу запрос, выбираю слои и режим
 
 **Flow:**
 ```
-❓ Вопрос тимлида
-    → AI-Agent интерактивный
-    → MCP rag_search → RAG Service :8081
-    → embeddings → Ollama mxbai-embed-large
-    → kNN поиск → OpenSearch (векторное хранилище)
-    → top-3 чанка → релевантные фрагменты
-    → 💬 Ответ с источниками за ~3 секунды
+❓ Вопрос техлида
+    → /ui/search · Global Search UI (пресеты · чекбоксы слоёв)
+    → POST /api/search (query · layers · mode)
+    → GlobalSearchService
+    → 6 Search Providers параллельно:
+        📌 NoticeSearchProvider
+        ✅ TaskSearchProvider
+        👤 PeopleSearchProvider
+        ⚠️ RiskSearchProvider
+        🔴 IncidentSearchProvider
+        📚 KnowledgeSearchProvider → JavaRagService
+    → Merge · Sort by score · Group by layer
+    → QUICK → 📋 Результаты по слоям (~1 сек)
+    → DEEP  → SearchPromptBuilder + AgentClient → 💬 AI Summary + источники
 ```
 
-**Результат:** Ответ за 3 секунды с указанием источника. Поиск на русском языке.
+**Результат:** 6 слоёв · QUICK за ~1 сек · DEEP с AI Summary · пресеты: Notice only, Everything, Documentation, People & Tasks
 
 ---
 
