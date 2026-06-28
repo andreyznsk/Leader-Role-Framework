@@ -109,6 +109,12 @@ ROOT_ARCHITECTURE_DOCS=(
   "README.md"
   "RFC-test-runner.md"
   "LeaderOS_Daily_Cycle_concept.md"
+  "PRESENTATION.md"
+)
+
+# Files that must land at the Drive folder root (not preserving source path).
+ROOT_FLAT_FILES=(
+  "JavaMemoryService/src/main/resources/static/presentation.html"
 )
 
 for file in "${ROOT_ARCHITECTURE_DOCS[@]}"; do
@@ -137,6 +143,31 @@ copy_file() {
     --drive-root-folder-id "$folder_id"
     --files-from "$files_list"
     --create-empty-src-dirs=false
+    --progress
+  )
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    args+=(--dry-run)
+  fi
+
+  rclone "${args[@]}"
+}
+
+copy_to_root() {
+  local folder_id="$1"
+  local src="$2"
+  local dest
+  dest="$(basename "$src")"
+
+  [[ -f "$REPO_ROOT/$src" ]] || { log "Skipping (not found): $src"; return 0; }
+
+  log "copy ${src} -> ${REMOTE_NAME}:${dest} (flat)"
+
+  local args=(
+    copyto
+    "$REPO_ROOT/$src"
+    "${REMOTE_NAME}:${dest}"
+    --drive-root-folder-id "$folder_id"
     --progress
   )
 
@@ -196,5 +227,9 @@ log "Ideas folder ID: ${IDEAS_FOLDER_ID}"
 
 copy_group "architecture docs" "$ARCHITECTURE_FOLDER_ID" "${ARCHITECTURE_LIST[@]}"
 copy_group "ideas docs" "$IDEAS_FOLDER_ID" "${IDEAS_LIST[@]}"
+
+for flat_file in "${ROOT_FLAT_FILES[@]}"; do
+  copy_to_root "$ARCHITECTURE_FOLDER_ID" "$flat_file"
+done
 
 log "Done."
