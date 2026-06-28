@@ -38,7 +38,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .eyebrow.e3::before,.eyebrow.e3::after{background:var(--accent3)}
 .eyebrow.e4{color:var(--accent4)}
 .eyebrow.e4::before,.eyebrow.e4::after{background:var(--accent4)}
-.title{font-family:var(--mono);font-size:clamp(24px,3.6vw,46px);font-weight:700;line-height:1.15;margin-bottom:10px;text-align:center}
+.title{font-family:var(--mono);font-size:clamp(16px,3.6vw,30px);font-weight:700;line-height:1.15;margin-bottom:10px;text-align:left}
 .subtitle{font-size:15px;color:var(--text2);margin-bottom:18px;line-height:1.55;text-align:center}
 .body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px;min-height:0;overflow:hidden}
 
@@ -76,13 +76,13 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 @media(max-width:760px){.g3{grid-template-columns:1fr 1fr}}
 
 /* PAIN */
-.bignum{font-family:var(--mono);font-size:clamp(32px,4.5vw,50px);font-weight:700;color:var(--accent3);line-height:1;margin-bottom:6px;text-align:center}
-.numlbl{font-size:13px;color:var(--text2);line-height:1.4;text-align:center}
-.numsub{font-size:11px;color:var(--text3);margin-top:4px;font-family:var(--mono);text-align:center}
+.bignum{font-family:var(--mono);font-size:clamp(100px,4.5vw,60px);font-weight:1000;color:var(--accent3);line-height:1;margin-bottom:6px;text-align:center}
+.numlbl{font-size:32px;color:var(--text2);line-height:1.4;text-align:center}
+.numsub{font-size:16px;color:var(--text3);margin-top:4px;font-family:var(--mono);text-align:center}
 
 /* CONCEPT */
-.concept-wrap{flex:1;display:flex;gap:14px;min-height:0}
-.concept-col{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.concept-wrap{flex:1;display:flex;gap:14px;min-height:0;align-items:stretch}
+.concept-col{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px;height:100%}
 .concept-col.hi{border-color:var(--accent)}
 .concept-col.hi2{border-color:var(--accent2)}
 .col-title{font-family:var(--mono);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;padding-bottom:10px;border-bottom:1px solid var(--border);text-align:center}
@@ -126,9 +126,9 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .sc-left{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .sc-right{width:100%;min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:visible}
 @media(max-width:900px){.sc-left{grid-template-columns:1fr}}
-.pain-block{background:var(--bg2);border:1px solid var(--accent3);border-radius:10px;padding:14px 16px}
-.pain-title{font-family:var(--mono);font-size:10px;color:var(--accent3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
-.pain-text{font-size:13px;color:var(--text2);line-height:1.5}
+.pain-block{background:var(--bg2);border:1px solid var(--accent3);border-radius:10px;padding:14px 16px;justify-content:center}
+.pain-title{font-family:var(--mono);font-size:24px;color:var(--accent3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.pain-text{font-size:20px;color:var(--text2);line-height:1.5}
 .trigger-block{background:var(--bg2);border:1px solid var(--accent2);border-radius:10px;padding:14px 16px}
 .trigger-title{font-family:var(--mono);font-size:10px;color:var(--accent2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
 .trigger-text{font-family:var(--mono);font-size:12px;color:var(--text);line-height:1.5}
@@ -175,16 +175,27 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .slide-tribe .scl{font-size:14px}
 .slide-tribe .final{font-size:18px}
 
-/* SLIDE 3 — +20% text */
-.slide-concept .eyebrow{font-size:14.4px}
-.slide-concept .title{font-size:clamp(28.8px,4.32vw,55.2px)}
-.slide-concept .col-title{font-size:14.4px}
-.slide-concept .ci-title{font-size:14.4px}
-.slide-concept .ci-desc{font-size:17.3px}
-.slide-concept .analogy{font-size:20.2px}
+/* SLIDE 3 — +15% text */
+.slide-concept .body{justify-content:flex-start;gap:0}
+.slide-concept .concept-wrap{flex:0 0 auto;align-items:stretch}
+.slide-concept .concept-col{padding:18px;gap:10px;height:auto}
+.slide-concept .concept-item{gap:10px}
+.slide-concept .eyebrow{font-size:18.3px}
+.slide-concept .title{font-size:clamp(36.4px,5.47vw,69.9px)}
+.slide-concept .col-title{font-size:18.3px}
+.slide-concept .ci-icon{font-size:22.8px}
+.slide-concept .ci-title{font-size:18.3px}
+.slide-concept .ci-desc{font-size:21.9px}
+.slide-concept .analogy{font-size:25.5px}
 
 /* AGENT AI LAYER */
+.slide-ai{font-size:24px}
+.slide-ai .eyebrow{font-size:24px}
+.slide-ai .title{font-size:clamp(24px,4.14vw,34.5px)}
+.slide-ai .subtitle{font-size:24px}
 .slide-ai .body{justify-content:center}
+.slide-ai .sc-diagram-title{font-size:30px}
+.slide-ai .mermaid svg{font-size:70px}
 .ai-layout{
   flex:1;
   min-height:0;
@@ -219,6 +230,18 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
   .ai-layout{grid-template-columns:1fr}
 }
 
+/* SLIDE 9 - SEARCH */
+.slide-search .eyebrow{font-size:14.4px}
+.slide-search .title{font-size:clamp(19.2px,4.32vw,36px)}
+.slide-search .pain-title,
+.slide-search .trigger-title,
+.slide-search .result-title,
+.slide-search .sc-diagram-title{font-size:12px}
+.slide-search .pain-text,
+.slide-search .result-text{font-size:15.6px}
+.slide-search .trigger-text{font-size:14.4px}
+.slide-search .mermaid svg{font-size:120%}
+
 /* TITLE */
 .pulsedot{width:9px;height:9px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;flex-shrink:0}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -251,18 +274,15 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 <!-- 2. БОЛЬ -->
 <div class="slide" data-t="~1:00">
   <div class="eyebrow e3">Часть 1 — Боль</div>
-  <div class="title">Реальность техлида<br>в большой команде</div>
+  <div class="title">Каждый день тимлид обрабатывает сотни входящих сигналов:</div>
+  <div class="title">почта, встречи, сберчат, jira, документы, звонки.</div>
+  <div class="title">Важные задачи легко теряются среди информационного шума</div>
   <div class="body">
     <div class="g2">
       <div class="card"><div class="bignum">3–5</div><div class="numlbl">часов в неделю на рутину</div><div class="numsub">почта · планирование · поиск</div></div>
       <div class="card"><div class="bignum">~30%</div><div class="numlbl">рабочего времени — не инженерия</div><div class="numsub">встречи · согласования</div></div>
-      <div class="card"><div class="bignum">2–3</div><div class="numlbl">месяца онбординга тимлида</div><div class="numsub">до уверенной работы</div></div>
+      <div class="card"><div class="bignum">∞</div><div class="numlbl">источников информации</div><div class="numsub">почта, встречи, сберчат, jira, документы, звонки</div></div>
       <div class="card"><div class="bignum">0</div><div class="numlbl">инструментов автоматизации</div><div class="numsub">каждый изобретает велосипед</div></div>
-    </div>
-    <div class="card hi" style="text-align:center">
-      <div style="font-family:var(--mono);font-size:clamp(12px,1.6vw,16px);color:var(--text2);margin-bottom:8px"><b style="color:var(--accent)">20 тимлидов</b> × <b style="color:var(--accent)">4 ч/нед</b> × <b style="color:var(--accent)">48 недель</b></div>
-      <div style="font-family:var(--mono);font-size:clamp(28px,4vw,44px);font-weight:700;color:var(--accent);line-height:1">3 840 часов/год</div>
-      <div style="font-size:12px;color:var(--text3);margin-top:4px">~2 FTE инженеров работающих вхолостую</div>
     </div>
   </div>
 </div>
@@ -288,7 +308,6 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
         <div class="concept-item"><div class="ci-icon">🤖</div><div><div class="ci-title">AI-Agent</div><div class="ci-desc">Всегда в контексте — читает workspace, управляет через MCP tools</div></div></div>
       </div>
     </div>
-    <div class="analogy">Разработчик не пишет код в блокноте. <b>Техлид не должен управлять командой в чатах и Excel.</b></div>
   </div>
 </div>
 
@@ -304,40 +323,6 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
       </div>
     </div>
   </div>
-</div>
-
-<!-- 5. АРХИТЕКТУРА ПРОДУКТА -->
-<div class="slide slide-product" data-t="~4:30">
-  <div class="eyebrow">Product Architecture</div>
-  <div class="title">LeaderOS — <span style="color:var(--accent)">операционная система</span><br><span style="color:var(--text3);font-size:.72em">для технического лидера</span></div>
-  <div class="subtitle">Не набор сервисов, а единая среда: контекст, знания, автоматизация и AI-агенты.</div>
-  <div class="body">
-    <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:14px;flex:1;min-height:0;align-items:stretch">
-      <div class="card hi" style="display:flex;flex-direction:column;justify-content:center;gap:10px;padding:18px">
-        <div style="font-family:var(--mono);font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:.12em;text-align:center;margin-bottom:2px">LeaderOS Core</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <div class="card" style="padding:12px 16px;border-color:#F78166;background:rgba(247,129,102,.05)"><b style="color:#F78166;font-family:var(--mono)">🤖 AI Agents Layer</b><br><span style="font-size:12px;color:var(--text2)">Interactive Agent · Claude Code · Codex · Test Runner · Arch Analyst</span></div>
-          <div class="card" style="padding:12px 16px;border-color:#00D4AA;background:rgba(0,212,170,.05)"><b style="color:#00D4AA;font-family:var(--mono)">🧠 Operational Memory Layer</b><br><span style="font-size:12px;color:var(--text2)">Tasks · Risks · Incidents · People · Notes · Context · Daily Plan</span></div>
-          <div class="card" style="padding:12px 16px;border-color:#4A9EFF;background:rgba(74,158,255,.05)"><b style="color:#4A9EFF;font-family:var(--mono)">📚 Knowledge Layer</b><br><span style="font-size:12px;color:var(--text2)">Documentation · ADR · RFC · Service Cards · Semantic Search · RAG</span></div>
-          <div class="card" style="padding:12px 16px;border-color:#D2A8FF;background:rgba(210,168,255,.05)"><b style="color:#D2A8FF;font-family:var(--mono)">⚙️ Automation Layer</b><br><span style="font-size:12px;color:var(--text2)">Mail routing · Capture Bot · Schedulers · Daily Cycle · Plugin Control</span></div>
-          <div class="card" style="padding:12px 16px"><b style="color:var(--text);font-family:var(--mono)">🏢 Enterprise Integration Layer</b><br><span style="font-size:12px;color:var(--text2)">Exchange · Jira · Confluence · GitHub/Bitbucket · Kubernetes · Calendar</span></div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:12px;justify-content:center">
-        <div class="card hi2" style="text-align:center;padding:18px">
-          <div style="font-family:var(--mono);font-size:13px;color:var(--accent2);margin-bottom:8px">Главная идея</div>
-          <div style="font-size:17px;line-height:1.55;color:var(--text)">Техлид получает не чатбота, а <b style="color:var(--accent)">рабочую среду</b>, которая помнит контекст и сама раскладывает операционный поток.</div>
-        </div>
-        <div class="g2" style="gap:10px">
-          <div class="card" style="text-align:center;padding:14px"><div style="font-family:var(--mono);font-size:20px;color:var(--accent)">1</div><div style="font-size:12px;color:var(--text2)">единый контекст дня</div></div>
-          <div class="card" style="text-align:center;padding:14px"><div style="font-family:var(--mono);font-size:20px;color:var(--accent)">6</div><div style="font-size:12px;color:var(--text2)">маршрутов писем</div></div>
-          <div class="card" style="text-align:center;padding:14px"><div style="font-family:var(--mono);font-size:20px;color:var(--accent)">∞</div><div style="font-size:12px;color:var(--text2)">история решений</div></div>
-          <div class="card" style="text-align:center;padding:14px"><div style="font-family:var(--mono);font-size:20px;color:var(--accent)">AI</div><div style="font-size:12px;color:var(--text2)">агенты в контексте</div></div>
-        </div>
-        <div class="analogy" style="font-size:15px">LeaderOS объединяет <b>память</b>, <b>знания</b>, <b>автоматизацию</b> и <b>агентов</b> в одну операционную систему техлида.</div>
-      </div>
-    </div>
-</div>
 </div>
 
 <!-- 6. AGENT AI LAYER -->
@@ -374,6 +359,7 @@ flowchart TB
   CLIENT --> CLAUDE_RT["Claude"]
   CLIENT --> CODEX_RT["Codex"]
   CLIENT --> GIGA_RT["GigaChat"]
+  CLIENT --> GIGA_CODE_RT["GigaCode"]
   CLIENT --> OLLAMA_RT["Ollama"]
   CLIENT --> MOCK_RT["Mock"]
 
@@ -385,21 +371,22 @@ flowchart TB
   style CLAUDE_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
   style CODEX_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
   style GIGA_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style GIGA_CODE_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
   style OLLAMA_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
   style MOCK_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
         </div></div>
       </div>
       <div class="ai-right">
         <div class="card hi2" style="text-align:center;padding:18px">
-          <div style="font-family:var(--mono);font-size:13px;color:var(--accent2);margin-bottom:8px">Главная идея</div>
-          <div style="font-size:17px;line-height:1.55;color:var(--text)">AI является <b style="color:var(--accent)">сменным компонентом</b> системы. Для перехода на нового provider достаточно заменить реализацию клиента.</div>
+          <div style="font-family:var(--mono);font-size:14.95px;color:var(--accent2);margin-bottom:8px">Главная идея</div>
+          <div style="font-size:19.55px;line-height:1.55;color:var(--text)">AI является <b style="color:var(--accent)">сменным компонентом</b> системы. Для перехода на нового provider достаточно заменить реализацию клиента.</div>
         </div>
         <div class="ai-points">
-          <div class="card" style="padding:14px 16px;border-color:#4A9EFF;background:rgba(74,158,255,.05)"><b style="color:#4A9EFF;font-family:var(--mono)">Prompt Contract</b><br><span style="font-size:12px;color:var(--text2)">Один файл <span style="font-family:var(--mono);color:var(--text)">AGENT.md</span> и симлинки для Claude, Codex и GigaCode.</span></div>
-          <div class="card" style="padding:14px 16px;border-color:#00D4AA;background:rgba(0,212,170,.05)"><b style="color:#00D4AA;font-family:var(--mono)">Java API</b><br><span style="font-size:12px;color:var(--text2)">Mail Agent, Memory Service и RAG Service работают только через <span style="font-family:var(--mono);color:var(--text)">AgentClient</span>.</span></div>
-          <div class="card" style="padding:14px 16px;border-color:#F78166;background:rgba(247,129,102,.05)"><b style="color:#F78166;font-family:var(--mono)">Runtime Swap</b><br><span style="font-size:12px;color:var(--text2)">Подключаем Claude, Codex, GigaChat, Ollama или Mock без переписывания сервисов.</span></div>
+          <div class="card" style="padding:14px 16px;border-color:#4A9EFF;background:rgba(74,158,255,.05)"><b style="color:#4A9EFF;font-family:var(--mono)">Prompt Contract</b><br><span style="font-size:13.8px;color:var(--text2)">Один файл <span style="font-family:var(--mono);color:var(--text)">AGENT.md</span> и симлинки для Claude, Codex и GigaCode.</span></div>
+          <div class="card" style="padding:14px 16px;border-color:#00D4AA;background:rgba(0,212,170,.05)"><b style="color:#00D4AA;font-family:var(--mono)">Java API</b><br><span style="font-size:13.8px;color:var(--text2)">Mail Agent, Memory Service и RAG Service работают только через <span style="font-family:var(--mono);color:var(--text)">AgentClient</span>.</span></div>
+          <div class="card" style="padding:14px 16px;border-color:#F78166;background:rgba(247,129,102,.05)"><b style="color:#F78166;font-family:var(--mono)">Runtime Swap</b><br><span style="font-size:13.8px;color:var(--text2)">Подключаем Claude, Codex, GigaChat, Ollama или Mock без переписывания сервисов.</span></div>
         </div>
-        <div class="analogy" style="font-size:15px">Меняется <b>AI Runtime</b> — архитектура <b>LeaderOS</b> остаётся неизменной.</div>
+        <div class="analogy" style="font-size:17.25px">Меняется <b>AI Runtime</b> — архитектура <b>LeaderOS</b> остаётся неизменной.</div>
       </div>
     </div>
   </div>
@@ -411,11 +398,6 @@ flowchart TB
   <div class="title">📧 Письмо → Задача · Заметка · Знания</div>
   <div class="body">
     <div class="sc-wrap">
-      <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Письма теряются в потоке. Важные запросы не фиксируются. Полезные знания из писем никуда не сохраняются.</div></div>
-        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">Шедулер каждые 60 сек сканирует почту</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">6 маршрутов: задача, capture, операционная заметка, знание в RAG, черновик или шум — каждое письмо попадает в нужное хранилище.</div></div>
-      </div>
       <div class="sc-right">
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
@@ -451,15 +433,10 @@ flowchart TD
   <div class="title">📝 Capture Bot → Классификация</div>
   <div class="body">
     <div class="sc-wrap">
-      <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Мысли теряются в течение дня. Некогда классифицировать — надо просто записать и двигаться.</div></div>
-        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">"запомни: Иванов хочет перейти в другую команду"</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">Ни одна мысль не теряется. Всё разложено по местам вечером автоматически.</div></div>
-      </div>
       <div class="sc-right">
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
-flowchart TD
+flowchart LR
   A(["💬 Заметка тимлида"]) --> B["POST /api/capture\nMemory Service"]
   B --> C["capture-inbox/\nбез интерпретации"]
   C -->|"Шедулер 18:00"| D{"AI-Agent\nклассификация"}
@@ -477,20 +454,15 @@ flowchart TD
 </div>
 
 <!-- 9. СЦЕНАРИЙ 3 -->
-<div class="slide" data-t="~8:30">
+<div class="slide slide-search" data-t="~8:30">
   <div class="eyebrow e2">Сценарий 3</div>
   <div class="title">🔍 Global Search · Поиск по всему LeaderOS</div>
   <div class="body">
     <div class="sc-wrap">
-      <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Информация разбросана: заметки, задачи, люди, риски, документы. Невозможно найти нужное быстро.</div></div>
-        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">/ui/search · пишу запрос · выбираю слои и режим</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">6 слоёв · QUICK за ~1 сек · DEEP с AI Summary · пресеты: Notice only, Everything, Documentation, People & Tasks</div></div>
-      </div>
       <div class="sc-right">
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
-flowchart TD
+flowchart LR
   A(["❓ Вопрос техлида"]) --> B["/ui/search\nGlobal Search UI"]
   B -->|"Пресеты · чекбоксы слоёв"| C["POST /api/search\nquery · layers · mode"]
   C --> D{"GlobalSearchService"}
@@ -532,14 +504,9 @@ flowchart TD
 <!-- 10. СЦЕНАРИЙ 4 -->
 <div class="slide" data-t="~9:30">
   <div class="eyebrow">Сценарий 4</div>
-  <div class="title">🌅 Утренний контекст дня</div>
+  <div class="title">🌅 ИДЕЯ! Утренний Бриф</div>
   <div class="body">
     <div class="sc-wrap">
-      <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Каждое утро 15-20 минут на восстановление контекста — что горит, что ждёт, кто что делает.</div></div>
-        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">Начало рабочего дня — открываю LeaderOS</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">За 30 секунд полный контекст: что горит, что ждёт, кто что делает.</div></div>
-      </div>
       <div class="sc-right">
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
@@ -560,36 +527,6 @@ flowchart TD
   </div>
 </div>
 
-<!-- 11. СЦЕНАРИЙ 5 -->
-<div class="slide" data-t="~10:30">
-  <div class="eyebrow e3">Сценарий 5</div>
-  <div class="title">🚨 Фиксация инцидента</div>
-  <div class="body">
-    <div class="sc-wrap">
-      <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Инциденты фиксируются хаотично. Нет истории. Одни и те же проблемы повторяются.</div></div>
-        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">"зафикси P1: платежи не проходят"</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">История инцидентов, постмортемы, паттерны проблем — всё в одном месте.</div></div>
-      </div>
-      <div class="sc-right">
-        <div class="sc-diagram-title">Flow диаграмма</div>
-        <div class="sc-mwrap"><div class="mermaid">
-flowchart TD
-  A(["🚨 Сообщение тимлида"]) --> B["AI-Agent\nпоказывает карточку"]
-  B -->|"подтвердить"| C["MCP createIncident\nP1 · OPEN"]
-  C --> D["Memory Service\nИнцидент зафиксирован"]
-  D --> E["OPEN → INVESTIGATING"]
-  E -->|"решено"| F["MCP resolveIncident\nroot_cause + action_items"]
-  F --> G(["✅ RESOLVED\nПостмортем сохранён"])
-  D -->|"виден в"| H(["📊 Утренний брифинг"])
-  style B fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
-  style G fill:#1B2D1B,stroke:#00D4AA,color:#00D4AA
-        </div></div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- 12. ROADMAP -->
 <div class="slide slide-roadmap" data-t="~11:30">
   <div class="eyebrow e2">Развитие проекта</div>
@@ -604,7 +541,6 @@ flowchart TD
         <div class="ri"><span>🗺️</span>Arch Analyst агент</div>
         <div class="ri"><span>🔗</span>MCP: Jira, Confluence, k8s</div>
         <div class="ri"><span>📝</span>Capture Bot</div>
-        <div class="ri"><span>🧪</span>E2E: 44 PASS / 0 FAIL</div>
         <div class="ri"><span>🧩</span>Common LLM модуль<br><span style="font-size:10px;color:var(--text3);padding-left:18px">GigaChat · YandexGPT · Claude</span></div>
       </div>
       <div class="card" style="display:flex;flex-direction:column;gap:8px">
