@@ -242,6 +242,59 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .slide-search .trigger-text{font-size:14.4px}
 .slide-search .mermaid svg{font-size:120%}
 
+/* SLIDE 2 - PAIN */
+.slide-pain{gap:16px}
+.slide-pain .title{margin-bottom:0}
+.slide-pain .body{justify-content:flex-start;gap:16px}
+.slide-pain .pain-hero{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:12px;
+  align-items:center;
+}
+.slide-pain .pain-copy{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:8px;
+}
+.slide-pain .pain-meme{
+  min-height:0;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  flex:0 0 auto;
+}
+.slide-pain .pain-meme img{
+  max-width:70%;
+  max-height:70%;
+  object-fit:contain;
+}
+@media(max-width:900px){
+  .slide-pain .pain-hero{grid-template-columns:1fr}
+}
+
+/* SLIDE 13 - DEV FLOW */
+.slide-devflow .body{justify-content:flex-start}
+.slide-devflow .devflow-photo{
+  height:30vh;
+  min-height:180px;
+  max-height:30vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-bottom:12px;
+}
+.slide-devflow .devflow-photo img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  border-radius:8px;
+}
+.slide-devflow .analogy{
+  margin-bottom:12px;
+}
+
 /* TITLE */
 .pulsedot{width:9px;height:9px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;flex-shrink:0}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -272,11 +325,18 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 </div>
 
 <!-- 2. БОЛЬ -->
-<div class="slide" data-t="~1:00">
+<div class="slide slide-pain" data-t="~1:00">
   <div class="eyebrow e3">Часть 1 — Боль</div>
-  <div class="title">Каждый день тимлид обрабатывает сотни входящих сигналов:</div>
-  <div class="title">почта, встречи, сберчат, jira, документы, звонки.</div>
-  <div class="title">Важные задачи легко теряются среди информационного шума</div>
+  <div class="pain-hero">
+    <div class="pain-meme">
+      <img src="teemLeadPain.png" alt="Мем про боли тимлида">
+    </div>
+    <div class="pain-copy">
+      <div class="title">Каждый день тимлид обрабатывает сотни входящих сигналов:</div>
+      <div class="title">почта, встречи, сберчат, jira, документы, звонки.</div>
+      <div class="title">Важные задачи легко теряются среди информационного шума</div>
+    </div>
+  </div>
   <div class="body">
     <div class="g2">
       <div class="card"><div class="bignum">3–5</div><div class="numlbl">часов в неделю на рутину</div><div class="numsub">почта · планирование · поиск</div></div>
@@ -566,10 +626,13 @@ flowchart TD
 </div>
 
 <!-- 13. DEV FLOW -->
-<div class="slide" data-t="~12:30">
+<div class="slide slide-devflow" data-t="~12:30">
   <div class="eyebrow e2">Как мы разрабатываем</div>
   <div class="title">Идея → CR → Agent → <span style="color:var(--accent2)">Code</span></div>
   <div class="body">
+    <div class="devflow-photo">
+      <img src="photo_2026-06-29_00-31-21.jpg" alt="Фото процесса разработки">
+    </div>
     <div class="mwrap">
       <div class="mermaid">
 flowchart LR
