@@ -3,6 +3,7 @@ package ru.andreyz.memoryservice.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import ru.andreyz.memoryservice.domain.Capture;
 import ru.andreyz.memoryservice.domain.Risk;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.domain.UsageEventType;
@@ -46,11 +47,18 @@ public class CaptureProcessingService {
 
         log.info("Processing {} capture files via agent", pending.size());
 
+        // Collect IDs of today's NEW captures to drive state machine
+        List<Long> processingIds = captureService.findTodayNew().stream()
+                .map(Capture::id)
+                .toList();
+        processingIds.forEach(id -> captureService.markProcessing(id));
+
         List<ClassifiedCapture> classified;
         try {
             classified = classifierAgent.classifyFiles(pending, buildDayContext());
         } catch (Exception e) {
             log.error("Classification failed: {}", e.getMessage(), e);
+            processingIds.forEach(id -> captureService.markError(id, e.getMessage()));
             return new ProcessResult(pending.size(), 0);
         }
 
@@ -81,10 +89,64 @@ public class CaptureProcessingService {
                 log.warn("Failed to move capture file {} after route: {}", c.file(), e.getMessage(), e);
             } catch (Exception e) {
                 log.warn("Failed to route capture {}: {}", captureRef(c), e.getMessage(), e);
+                if (c.captureId() != null) {
+                    captureService.markError(c.captureId(), e.getMessage());
+                }
             }
         }
 
         return new ProcessResult(pending.size(), routed);
+    }
+
+    public void processSingle(Long id) {
+        Capture capture = captureService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Capture not found: " + id));
+
+        captureService.markProcessing(id);
+
+        try {
+            CaptureService.CaptureFile file = new CaptureService.CaptureFile(
+                    String.valueOf(id), capture.rawText());
+            List<ClassifiedCapture> classified = classifierAgent.classifyFiles(
+                    List.of(file), buildDayContext());
+
+            if (classified.isEmpty()) {
+                captureService.markError(id, "No classification result returned");
+                return;
+            }
+
+            ClassifiedCapture c = classified.get(0);
+            String routedTo = captureRouter.route(c);
+            captureService.markProcessed(id, c.type(), routedTo);
+
+            usageEventService.record(new UsageEventCommand(
+                    UsageEventType.CAPTURE_PROCESSED,
+                    "capture-bot",
+                    "SUCCESS",
+                    null,
+                    "capture",
+                    String.valueOf(id),
+                    null,
+                    null,
+                    java.util.Map.of("classification", c.type(), "routedTo", routedTo)
+            ));
+            log.info("Single capture {} → {} ({})", id, c.type(), routedTo);
+
+        } catch (Exception e) {
+            log.error("Failed to process capture {}: {}", id, e.getMessage(), e);
+            captureService.markError(id, e.getMessage());
+            usageEventService.record(new UsageEventCommand(
+                    UsageEventType.CAPTURE_FAILED,
+                    "capture-bot",
+                    "FAILED",
+                    null,
+                    "capture",
+                    String.valueOf(id),
+                    null,
+                    null,
+                    java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "unknown")
+            ));
+        }
     }
 
     private String buildDayContext() {

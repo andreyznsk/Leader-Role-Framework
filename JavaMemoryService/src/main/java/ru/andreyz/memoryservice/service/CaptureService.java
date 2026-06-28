@@ -16,13 +16,15 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 public class CaptureService {
@@ -60,38 +62,114 @@ public class CaptureService {
         // Email captures are already classified by MailAgent — skip re-classification queue
         if ("email".equals(source)) {
             Capture capture = new Capture(null, req.text(), source, req.sourceId(), "PROCESSED",
-                    "email", "capture", now, now);
+                    "email", "capture", null, null, null, null, null, null, now, now, now, null);
             Capture saved = captureRepository.save(capture);
             recordCaptureCreated(saved);
             return new CaptureSaveResult(saved, null);
         }
 
-        Capture capture = new Capture(null, req.text(), source, req.sourceId(), "PENDING",
-                null, null, now, null);
+        Capture capture = new Capture(null, req.text(), source, req.sourceId(), "NEW",
+                null, null, null, null, null, null, null, null, now, null, now, null);
         Capture saved = captureRepository.save(capture);
         recordCaptureCreated(saved);
         Path file = writeToInbox(saved);
+
+        // Persist the file path so the UI can show the backup location
+        String filePath = (file != null && !file.equals(inboxDir)) ? file.toString() : null;
+        if (filePath != null) {
+            saved = captureRepository.save(withFilePath(saved, filePath));
+        }
+
         return new CaptureSaveResult(saved, file);
+    }
+
+    public Optional<Capture> findById(Long id) {
+        return captureRepository.findById(id);
     }
 
     public List<Capture> findToday() {
         return captureRepository.findByDay(startOfToday(), startOfTomorrow());
     }
 
+    public List<Capture> findTodayNew() {
+        return captureRepository.findByStatusAndDay("NEW", startOfToday(), startOfTomorrow());
+    }
+
     public List<Capture> findTodayPending() {
-        return captureRepository.findByStatusAndDay("PENDING", startOfToday(), startOfTomorrow());
+        return findTodayNew();
     }
 
     public List<Capture> findRecent() {
         return captureRepository.findRecent();
     }
 
+    public List<Capture> findWithFilters(String status, LocalDate date, String source,
+                                         String route, String q) {
+        List<Capture> candidates;
+        if (status != null && !status.isBlank()) {
+            candidates = captureRepository.findByStatus(status);
+        } else {
+            candidates = captureRepository.findAllOrdered();
+        }
+
+        Stream<Capture> stream = candidates.stream();
+
+        if (date != null) {
+            stream = stream.filter(c -> isOnDate(c.capturedAt(), date));
+        }
+        if (source != null && !source.isBlank()) {
+            stream = stream.filter(c -> source.equalsIgnoreCase(c.source()));
+        }
+        if (route != null && !route.isBlank()) {
+            stream = stream.filter(c -> route.equalsIgnoreCase(c.classified())
+                    || route.equalsIgnoreCase(c.route()));
+        }
+        if (q != null && !q.isBlank()) {
+            String qLower = q.toLowerCase();
+            stream = stream.filter(c -> c.rawText() != null
+                    && c.rawText().toLowerCase().contains(qLower));
+        }
+
+        return stream
+                .sorted(Comparator.comparing(Capture::capturedAt).reversed())
+                .limit(200)
+                .toList();
+    }
+
+    public Capture markProcessing(Long id) {
+        Capture c = requireById(id);
+        return captureRepository.save(transition(c, "PROCESSING", c.classified(), c.routedTo(),
+                null, c.capturedAt(), null));
+    }
+
     public Capture markProcessed(Long id, String classified, String routedTo) {
-        Capture c = captureRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Capture not found: " + id));
-        Capture updated = new Capture(c.id(), c.rawText(), c.source(), c.sourceId(), "PROCESSED",
-                classified, routedTo, c.capturedAt(), Instant.now());
-        return captureRepository.save(updated);
+        Capture c = requireById(id);
+        return captureRepository.save(transition(c, "PROCESSED", classified, routedTo,
+                null, c.capturedAt(), Instant.now()));
+    }
+
+    public Capture markError(Long id, String errorMessage) {
+        Capture c = requireById(id);
+        return captureRepository.save(transition(c, "ERROR", c.classified(), c.routedTo(),
+                errorMessage, c.capturedAt(), c.processedAt()));
+    }
+
+    public Capture archive(Long id) {
+        Capture c = requireById(id);
+        Instant now = Instant.now();
+        Capture archived = new Capture(c.id(), c.rawText(), c.source(), c.sourceId(),
+                "ARCHIVED", c.classified(), c.routedTo(), c.route(), c.targetType(),
+                c.targetId(), c.targetRef(), c.filePath(), c.errorMessage(),
+                c.capturedAt(), c.processedAt(), now, now);
+        return captureRepository.save(archived);
+    }
+
+    public Capture reprocess(Long id) {
+        Capture c = requireById(id);
+        Capture reset = new Capture(c.id(), c.rawText(), c.source(), c.sourceId(),
+                "NEW", null, null, null, null, null, null, c.filePath(), null,
+                c.capturedAt(), null, Instant.now(), null);
+        return captureRepository.save(reset);
     }
 
     public List<CaptureFile> findTodayFiles() {
@@ -189,12 +267,37 @@ public class CaptureService {
         }
     }
 
+    private Capture transition(Capture c, String status, String classified, String routedTo,
+                               String errorMessage, Instant capturedAt, Instant processedAt) {
+        return new Capture(c.id(), c.rawText(), c.source(), c.sourceId(),
+                status, classified, routedTo, classified, c.targetType(),
+                c.targetId(), routedTo, c.filePath(), errorMessage,
+                capturedAt, processedAt, Instant.now(), c.archivedAt());
+    }
+
+    private Capture withFilePath(Capture c, String filePath) {
+        return new Capture(c.id(), c.rawText(), c.source(), c.sourceId(),
+                c.status(), c.classified(), c.routedTo(), c.route(), c.targetType(),
+                c.targetId(), c.targetRef(), filePath, c.errorMessage(),
+                c.capturedAt(), c.processedAt(), c.updatedAt(), c.archivedAt());
+    }
+
+    private Capture requireById(Long id) {
+        return captureRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Capture not found: " + id));
+    }
+
     private Instant startOfToday() {
         return LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
     }
 
     private Instant startOfTomorrow() {
         return LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+    }
+
+    private boolean isOnDate(Instant instant, LocalDate date) {
+        if (instant == null) return false;
+        return instant.atZone(ZoneId.systemDefault()).toLocalDate().equals(date);
     }
 
     public record CaptureSaveResult(Capture capture, Path file) {}

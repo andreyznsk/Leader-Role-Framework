@@ -14,6 +14,14 @@ public record Capture(
         String status,
         String classified,
         String routedTo,
+        String route,
+        String targetType,
+        String targetId,
+        String targetRef,
+        String filePath,
+        String errorMessage,
         Instant capturedAt,
-        Instant processedAt
+        Instant processedAt,
+        Instant updatedAt,
+        Instant archivedAt
 ) {}

@@ -183,6 +183,42 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .slide-concept .ci-desc{font-size:17.3px}
 .slide-concept .analogy{font-size:20.2px}
 
+/* AGENT AI LAYER */
+.slide-ai .body{justify-content:center}
+.ai-layout{
+  flex:1;
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);
+  gap:14px;
+  align-items:stretch;
+}
+.ai-left,.ai-right{
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+}
+.ai-left{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:18px;
+}
+.ai-left .sc-diagram-title{margin-bottom:12px}
+.ai-left .mermaid svg{
+  max-width:min(100%,calc(88vw / var(--diagram-scale)));
+  max-height:calc((100vh - 300px) / var(--diagram-scale));
+}
+.ai-right{gap:12px}
+.ai-points{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+@media(max-width:900px){
+  .ai-layout{grid-template-columns:1fr}
+}
+
 /* TITLE */
 .pulsedot{width:9px;height:9px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;flex-shrink:0}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -386,11 +422,76 @@ flowchart TB
         <div class="analogy" style="font-size:15px">LeaderOS объединяет <b>память</b>, <b>знания</b>, <b>автоматизацию</b> и <b>агентов</b> в одну операционную систему техлида.</div>
       </div>
     </div>
+</div>
+</div>
+
+<!-- 6. AGENT AI LAYER -->
+<div class="slide slide-ai" data-t="~5:30">
+  <div class="eyebrow e3">Agent AI Layer</div>
+  <div class="title">LeaderOS не зависит<br>от <span style="color:var(--accent3)">конкретного AI-агента</span></div>
+  <div class="subtitle">Единый Prompt Contract и единый Java API отделяют бизнес-логику от AI Runtime.</div>
+  <div class="body">
+    <div class="ai-layout">
+      <div class="ai-left">
+        <div class="sc-diagram-title">Prompt Contract + AgentClient</div>
+        <div class="sc-mwrap"><div class="mermaid">
+flowchart TB
+  AGENT["AGENT.md"]
+
+  CLAUDE["CLAUDE.md"]
+  CODEX["CODEX.md"]
+  GIGA["GIGACODE.md"]
+
+  CLAUDE -.-> AGENT
+  CODEX -.-> AGENT
+  GIGA -.-> AGENT
+
+  AGENT --> CLIENT["common::AgentClient"]
+
+  MAIL["Mail Agent"]
+  MEMORY["Memory Service"]
+  RAG["RAG Service"]
+
+  MAIL --> CLIENT
+  MEMORY --> CLIENT
+  RAG --> CLIENT
+
+  CLIENT --> CLAUDE_RT["Claude"]
+  CLIENT --> CODEX_RT["Codex"]
+  CLIENT --> GIGA_RT["GigaChat"]
+  CLIENT --> OLLAMA_RT["Ollama"]
+  CLIENT --> MOCK_RT["Mock"]
+
+  style AGENT fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
+  style CLIENT fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style MAIL fill:#21262D,stroke:#30363D,color:#E6EDF3
+  style MEMORY fill:#21262D,stroke:#30363D,color:#E6EDF3
+  style RAG fill:#21262D,stroke:#30363D,color:#E6EDF3
+  style CLAUDE_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style CODEX_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style GIGA_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style OLLAMA_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style MOCK_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+        </div></div>
+      </div>
+      <div class="ai-right">
+        <div class="card hi2" style="text-align:center;padding:18px">
+          <div style="font-family:var(--mono);font-size:13px;color:var(--accent2);margin-bottom:8px">Главная идея</div>
+          <div style="font-size:17px;line-height:1.55;color:var(--text)">AI является <b style="color:var(--accent)">сменным компонентом</b> системы. Для перехода на нового provider достаточно заменить реализацию клиента.</div>
+        </div>
+        <div class="ai-points">
+          <div class="card" style="padding:14px 16px;border-color:#4A9EFF;background:rgba(74,158,255,.05)"><b style="color:#4A9EFF;font-family:var(--mono)">Prompt Contract</b><br><span style="font-size:12px;color:var(--text2)">Один файл <span style="font-family:var(--mono);color:var(--text)">AGENT.md</span> и симлинки для Claude, Codex и GigaCode.</span></div>
+          <div class="card" style="padding:14px 16px;border-color:#00D4AA;background:rgba(0,212,170,.05)"><b style="color:#00D4AA;font-family:var(--mono)">Java API</b><br><span style="font-size:12px;color:var(--text2)">Mail Agent, Memory Service и RAG Service работают только через <span style="font-family:var(--mono);color:var(--text)">AgentClient</span>.</span></div>
+          <div class="card" style="padding:14px 16px;border-color:#F78166;background:rgba(247,129,102,.05)"><b style="color:#F78166;font-family:var(--mono)">Runtime Swap</b><br><span style="font-size:12px;color:var(--text2)">Подключаем Claude, Codex, GigaChat, Ollama или Mock без переписывания сервисов.</span></div>
+        </div>
+        <div class="analogy" style="font-size:15px">Меняется <b>AI Runtime</b> — архитектура <b>LeaderOS</b> остаётся неизменной.</div>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- 5. СЦЕНАРИЙ 1 -->
-<div class="slide" data-t="~6:00">
+<!-- 7. СЦЕНАРИЙ 1 -->
+<div class="slide" data-t="~6:30">
   <div class="eyebrow e3">Сценарий 1</div>
   <div class="title">📧 Письмо → Задача · Знания</div>
   <div class="body">
@@ -424,8 +525,8 @@ flowchart TD
   </div>
 </div>
 
-<!-- 6. СЦЕНАРИЙ 2 -->
-<div class="slide" data-t="~7:00">
+<!-- 8. СЦЕНАРИЙ 2 -->
+<div class="slide" data-t="~7:30">
   <div class="eyebrow e4">Сценарий 2</div>
   <div class="title">📝 Capture Bot → Классификация</div>
   <div class="body">
@@ -456,7 +557,7 @@ flowchart TD
 </div>
 
 <!-- 7. СЦЕНАРИЙ 3 -->
-<div class="slide" data-t="~8:00">
+<div class="slide" data-t="~8:30">
   <div class="eyebrow e2">Сценарий 3</div>
   <div class="title">🔍 Поиск по документации</div>
   <div class="body">
@@ -487,7 +588,7 @@ flowchart TD
 </div>
 
 <!-- 8. СЦЕНАРИЙ 4 -->
-<div class="slide" data-t="~9:00">
+<div class="slide" data-t="~9:30">
   <div class="eyebrow">Сценарий 4</div>
   <div class="title">🌅 Утренний контекст дня</div>
   <div class="body">
@@ -518,7 +619,7 @@ flowchart TD
 </div>
 
 <!-- 9. СЦЕНАРИЙ 5 -->
-<div class="slide" data-t="~10:00">
+<div class="slide" data-t="~10:30">
   <div class="eyebrow e3">Сценарий 5</div>
   <div class="title">🚨 Фиксация инцидента</div>
   <div class="body">
@@ -548,7 +649,7 @@ flowchart TD
 </div>
 
 <!-- 10. ROADMAP -->
-<div class="slide slide-roadmap" data-t="~11:00">
+<div class="slide slide-roadmap" data-t="~11:30">
   <div class="eyebrow e2">Развитие проекта</div>
   <div class="title">Что есть. Что будет.</div>
   <div class="body">
@@ -587,7 +688,7 @@ flowchart TD
 </div>
 
 <!-- 11. DEV FLOW -->
-<div class="slide" data-t="~12:00">
+<div class="slide" data-t="~12:30">
   <div class="eyebrow e2">Как мы разрабатываем</div>
   <div class="title">Идея → CR → Agent → <span style="color:var(--accent2)">Code</span></div>
   <div class="body">
@@ -615,7 +716,7 @@ flowchart LR
 </div>
 
 <!-- 12. DOC STRUCTURE -->
-<div class="slide" data-t="~13:00">
+<div class="slide" data-t="~13:30">
   <div class="eyebrow e4">Организация документации</div>
   <div class="title">RFC на модуль.<br><span style="color:var(--text3);font-size:.7em">ARCHITECTURE.md — одна мастер-спека для всех агентов.</span></div>
   <div class="body">
@@ -671,7 +772,7 @@ flowchart TB
 </div>
 
 <!-- 13. ФИНАЛ -->
-<div class="slide" data-t="~14:00">
+<div class="slide" data-t="~14:30">
   <div class="body" style="justify-content:center;align-items:center;text-align:center">
     <div style="font-family:var(--mono);font-size:clamp(32px,5vw,64px);font-weight:700;color:var(--accent);line-height:1.1;margin-bottom:20px">Спасибо за внимание</div>
     <div style="font-size:clamp(18px,2.4vw,28px);color:var(--text2);margin-bottom:40px">Ваши вопросы?</div>
@@ -692,7 +793,7 @@ flowchart TB
 <div class="nav" id="navbar">
   <button class="nbtn" onclick="nav(-1)">←</button>
   <div class="dots" id="dots"></div>
-  <span class="ncnt" id="cnt">1/12</span>
+  <span class="ncnt" id="cnt">1/15</span>
   <span class="ntim" id="tm"></span>
   <button class="nbtn" onclick="nav(1)">→</button>
 </div>
