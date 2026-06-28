@@ -1,0 +1,4 @@
+-- CR-MEM-009: Global Search placeholder migration.
+-- GIN full-text indexes for PostgreSQL are applied via scripts/search_indexes_pg.sql
+-- when needed for performance at scale. Search providers use Java-side text matching
+-- which works without database FTS indexes.

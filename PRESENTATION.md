@@ -14,7 +14,7 @@
 
 ---
 
-## Структура презентации (13 слайдов)
+## Структура презентации (14 слайдов)
 
 ### Слайд 1 — Title
 
@@ -69,42 +69,61 @@ AI-система которая автоматизирует рутину те�
 
 ---
 
-### Слайд 4 — Архитектура
+### Слайд 4 — Technology Architecture
 
-**Production-grade. Не игрушка.**
+**Как построен LeaderOS**
 
 ```
-🏢 Корпоративная среда
-   Exchange EWS · Confluence · Jira · Kubernetes · Bitbucket
+🏢 Enterprise Systems
+   Exchange · Jira · Confluence · GitHub/Bitbucket · Kubernetes
          │
-         ↓ MCP / EWS/IMAP
-⬡ LeaderOS
-   ┌─ Mail Agent :8080
-   │     Scheduler 60сек → PG: mailagent
-   ├─ Memory Service :8082
-   │     Capture Bot 18:00 · MCP Tools → PG: memory
-   └─ RAG Service :8081
-         Scheduler 60сек → PG: rag + OpenSearch
-         │
-         ↓
-🤖 AI слой
-   agent --print (batch) · AI-Agent интерактивный · Ollama mxbai-embed-large
+         ↓ MCP · REST · EWS/IMAP
+⬡ LeaderOS Platform
+   common :library
+     AgentClient → Claude · Codex · Ollama · GigaChat · Mock
+   JavaMailAgent :8080
+     Mail routing → PG: mailagent
+   JavaMemoryService :8082
+     Operational Memory · Plugin Control Plane → PG: memory
+   JavaRagService :8081
+     RAG indexing + search → PG: rag + OpenSearch
+   Workspace files
+     capture-inbox · plans · drafts · rag-inbox
+
+🤖 AI Runtime
+   Interactive Agent · Claude Code · Codex · Test Runner · Arch Analyst
+   Ollama mxbai-embed-large
 ```
 
-**Режимы работы:**
-- 🔴 **BATCH АВТО** — Mail Agent каждые 60 сек
-- 🟣 **BATCH АВТО** — Capture Bot в 18:00
-- 🟢 **ИНТЕРАКТИВ** — AI-Agent + MCP
+**Ключевые тезисы:**
+- `common :library` скрывает конкретного AI-провайдера через `AgentClient`
+- все агенты работают через `Memory Service` и MCP tools
+- `Plugin Control Plane` управляет интеграциями из единого UI
 
 **Технологический стек:**
 ```
 Java 21 · Spring Boot 3 · Spring AI · MCP tools
-PostgreSQL · Flyway · OpenSearch · RAG · Kubernetes-ready
+PostgreSQL · Flyway · OpenSearch · Ollama · Kubernetes-ready
 ```
 
 ---
 
-### Слайд 5 — Сценарий 1: Письмо → Задача · Знания
+### Слайд 5 — Product Architecture
+
+**LeaderOS — операционная система для технического лидера**
+
+Слои продукта:
+- **AI Agents Layer** — Interactive Agent, Claude Code, Codex, Test Runner, Arch Analyst
+- **Operational Memory Layer** — задачи, риски, инциденты, люди, заметки, daily plan
+- **Knowledge Layer** — документация, ADR, RFC, service cards, semantic search, RAG
+- **Automation Layer** — mail routing, capture bot, schedulers, daily cycle, plugin control
+- **Enterprise Integration Layer** — Exchange, Jira, Confluence, GitHub/Bitbucket, Kubernetes, Calendar
+
+**Главный тезис:** техлид получает не чатбота, а рабочую среду, которая объединяет память, знания, автоматизацию и агентов в одну систему.
+
+---
+
+### Слайд 6 — Сценарий 1: Письмо → Задача · Знания
 
 **Боль:** Письма теряются в потоке. Важные запросы не фиксируются. Полезные знания из писем никуда не сохраняются.
 
@@ -126,7 +145,7 @@ PostgreSQL · Flyway · OpenSearch · RAG · Kubernetes-ready
 
 ---
 
-### Слайд 6 — Сценарий 2: Capture Bot → Классификация
+### Слайд 7 — Сценарий 2: Capture Bot → Классификация
 
 **Боль:** Мысли теряются в течение дня. Некогда классифицировать — надо просто записать и двигаться.
 
@@ -149,7 +168,7 @@ PostgreSQL · Flyway · OpenSearch · RAG · Kubernetes-ready
 
 ---
 
-### Слайд 7 — Сценарий 3: Поиск по документации
+### Слайд 8 — Сценарий 3: Поиск по документации
 
 **Боль:** Поиск в Confluence занимает 20–30 минут. Документация устаревшая. Никто не знает где что лежит.
 
@@ -170,7 +189,7 @@ PostgreSQL · Flyway · OpenSearch · RAG · Kubernetes-ready
 
 ---
 
-### Слайд 8 — Сценарий 4: Утренний контекст дня
+### Слайд 9 — Сценарий 4: Утренний контекст дня
 
 **Боль:** Каждое утро 15–20 минут на восстановление контекста — что горит, что ждёт, кто что делает.
 
@@ -192,7 +211,7 @@ PostgreSQL · Flyway · OpenSearch · RAG · Kubernetes-ready
 
 ---
 
-### Слайд 9 — Сценарий 5: Фиксация инцидента
+### Слайд 10 — Сценарий 5: Фиксация инцидента
 
 **Боль:** Инциденты фиксируются хаотично. Нет истории. Одни и те же проблемы повторяются.
 
@@ -214,7 +233,7 @@ PostgreSQL · Flyway · OpenSearch · RAG · Kubernetes-ready
 
 ---
 
-### Слайд 10 — Roadmap
+### Слайд 11 — Roadmap
 
 #### ✅ Реализовано
 - 📧 Mail Agent + Exchange EWS
@@ -244,7 +263,7 @@ PostgreSQL · Flyway · OpenSearch · RAG · Kubernetes-ready
 
 ---
 
-### Слайд 11 — Dev Flow
+### Слайд 12 — Dev Flow
 
 **Идея → CR → Agent → Code**
 
@@ -266,7 +285,7 @@ PostgreSQL · Flyway · OpenSearch · RAG · Kubernetes-ready
 
 ---
 
-### Слайд 12 — Организация документации
+### Слайд 13 — Организация документации
 
 **RFC на модуль. ARCHITECTURE.md — одна мастер-спека для всех агентов.**
 
@@ -287,7 +306,7 @@ PostgreSQL · Flyway · OpenSearch · RAG · Kubernetes-ready
 
 ---
 
-### Слайд 13 — Финал
+### Слайд 14 — Финал
 
 **Спасибо за внимание. Ваши вопросы?**
 
@@ -300,8 +319,8 @@ PostgreSQL · Flyway · OpenSearch · RAG · Kubernetes-ready
 | Параметр | Значение |
 |----------|----------|
 | Формат | HTML single-file, fullscreen |
-| Слайдов | 13 |
-| Ориентировочное время | ~13 минут |
+| Слайдов | 14 |
+| Ориентировочное время | ~14 минут |
 | Навигация | Клавиши ←/→, свайп, точки |
 | Диаграммы | Mermaid.js 10 (flowchart) |
 | Шрифты | JetBrains Mono, Inter |
