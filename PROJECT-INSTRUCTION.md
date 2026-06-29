@@ -36,6 +36,18 @@ ui
 
 Tools:
 GitHub - Actions: ALL
+ChatGPT Codex Connector
+Installed 5 months ago  Developed by openai  https://www.chatgpt.com
+Bring ChatGPT and Codex to your GitHub repositories.
+Permissions
+Read access to checks, commit statuses, and metadata
+Read and write access to actions, code, issues, pull requests, and workflows
+Repository access
+Only select repositories
+Select at least one repository. Also includes public repositories (read-only).
+Selected 1 repository.
+andreyznsk/Leader-Role-Framework
+
 
 Google Календарь
 
