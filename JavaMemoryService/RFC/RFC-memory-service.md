@@ -185,7 +185,7 @@ CREATE TABLE tasks (
     plan_id     BIGINT       REFERENCES daily_plans(id) ON DELETE CASCADE,
     title       VARCHAR(500) NOT NULL,
     description TEXT,
-    status      VARCHAR(20)  NOT NULL DEFAULT 'TODO',    -- PENDING | TODO | IN_PROGRESS | DONE | BLOCKED | DELETED
+    status      VARCHAR(20)  NOT NULL DEFAULT 'TODO',    -- PENDING | TODO | IN_PROGRESS | DONE | BLOCKED | ARCHIVED | DELETED(legacy)
     priority    VARCHAR(10)  NOT NULL DEFAULT 'NORMAL',  -- LOW | NORMAL | HIGH | CRITICAL
     due_date    DATE,
     source      VARCHAR(20)  NOT NULL DEFAULT 'MANUAL',  -- MANUAL | EMAIL | AGENT
@@ -285,10 +285,28 @@ src/main/resources/db/
 │   ├── V2__add_capture_tables.sql
 │   ├── V3__add_task_sort_order.sql
 │   ├── V4__add_notes_and_capture.sql
-│   └── V10__notes_title_and_optional_text.sql
+│   ├── V10__notes_title_and_optional_text.sql
+│   └── V11__agent_workspace_runs.sql
 └── migration-h2/        # H2 патчи (local/test)
     └── V1_1__h2_compat.sql
 ```
+
+`V11__agent_workspace_runs.sql` (CR-MEM-012):
+```sql
+CREATE TABLE memory.agent_workspace_runs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    mode VARCHAR(32) NOT NULL,
+    provider VARCHAR(64) NOT NULL,
+    prompt TEXT,
+    status VARCHAR(32) NOT NULL,
+    duration_ms BIGINT,
+    error_message TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+```
+
+Режимы (`mode`): `CHAT`, `CONSOLE`  
+Статусы (`status`): `STARTED`, `SUCCESS`, `ERROR`, `STOPPED`
 
 `V10__notes_title_and_optional_text.sql` (CR-MEM-011):
 ```sql
@@ -372,7 +390,7 @@ public record Task(
     Long planId,
     String title,
     String description,
-    String status,      // PENDING | TODO | IN_PROGRESS | DONE | BLOCKED | DELETED
+    String status,      // PENDING | TODO | IN_PROGRESS | DONE | BLOCKED | ARCHIVED | DELETED(legacy)
     String priority,    // LOW | NORMAL | HIGH | CRITICAL
     LocalDate dueDate,
     String source,      // MANUAL | EMAIL | AGENT
@@ -473,6 +491,18 @@ public record PersonNameNote(
     String note,
     Instant createdAt
 ) {}
+
+@Table("agent_workspace_runs")
+public record AgentWorkspaceRun(
+    @Id UUID id,
+    String mode,         // CHAT | CONSOLE
+    String provider,
+    String prompt,
+    String status,       // STARTED | SUCCESS | ERROR | STOPPED
+    Long durationMs,
+    String errorMessage,
+    Instant createdAt
+) {}
 ```
 
 ---
@@ -539,8 +569,8 @@ public interface PersonNameNoteRepository extends CrudRepository<PersonNameNote,
 @Service
 public class ContextService {
     public ContextDto buildContext() {
-        // today plan + tasks (status != DELETED && status != PENDING)
-        // tomorrow plan + tasks (status != DELETED && status != PENDING)
+        // today plan + tasks (status != ARCHIVED && status != DELETED && status != PENDING)
+        // tomorrow plan + tasks (status != ARCHIVED && status != DELETED && status != PENDING)
         // open incidents (status == OPEN)
         // open risks (status == OPEN)
         // recent people notes (last 10)
@@ -562,8 +592,11 @@ public class TaskService {
     // UI: подтвердить PENDING задачу → статус TODO
     public Task confirm(Long id);
 
-    // UI: отклонить PENDING задачу → статус DELETED
+    // UI: отклонить PENDING задачу → статус ARCHIVED
     public Task reject(Long id);
+
+    // UI: архивировать задачу
+    public Task archive(Long id);
 
     // UI или агент: редактировать перед подтверждением
     public Task edit(Long id, EditTaskRequest req);
@@ -572,7 +605,7 @@ public class TaskService {
     public Task moveToDate(Long id, LocalDate toDate);
     public Task updateStatus(Long id, String status);
     public Task reorder(Long id, String direction, Integer position);
-    public List<Task> findByDate(LocalDate date); // без DELETED, с сортировкой sort_order
+    public List<Task> findByDate(LocalDate date); // без ARCHIVED/DELETED, с сортировкой sort_order
 }
 
 @Service
@@ -605,8 +638,9 @@ PATCH /api/tasks/{id}/status             body: { "status": "TODO|IN_PROGRESS|BLO
 POST /api/tasks/{id}/done
 POST /api/tasks/{id}/move                body: { "toDate": "2026-06-09" }
 POST /api/tasks/{id}/reorder             body: { "direction": "up"|"down" } | { "position": N }
-POST   /api/tasks/{id}/delete            # мягкое удаление (статус → DELETED)
-DELETE /api/tasks/{id}                   # мягкое удаление (статус → DELETED), REST-алиас
+POST /api/tasks/{id}/archive             # архивирование (статус → ARCHIVED)
+POST /api/tasks/{id}/delete              # legacy alias: архивирование (статус → ARCHIVED)
+DELETE /api/tasks/{id}                   # legacy alias: архивирование (статус → ARCHIVED)
 POST /api/search                         # Global Search по operational layers + RAG layer
 
 # Knowledge Gateway proxy (без прямого JDBC в schema rag)
@@ -621,12 +655,14 @@ GET  /api/notices                       # legacy alias/filter type=NOTICE
 GET  /api/tasks/{id}/description         # JSON TaskDescriptionResponse или text/plain по Accept
 PUT  /api/tasks/{id}/description         # JSON {contentMd} или text/plain; обновляет PostgreSQL, не пишет файл
 GET  /api/tasks/{id}/description/export-md
+GET  /api/tasks/{id}/timeline            # audit timeline событий задачи
+POST /api/tasks/{id}/timeline/comment    # добавить ручной комментарий в timeline
 
 # Очередь подтверждения (PENDING)
 GET  /api/tasks/pending                  # все задачи со статусом PENDING
 POST /api/tasks/pending                  # создать PENDING задачу (вызывает mail-agent)
 POST /api/tasks/{id}/confirm             # PENDING → TODO
-POST /api/tasks/{id}/reject              # PENDING → DELETED
+POST /api/tasks/{id}/reject              # PENDING → ARCHIVED
 
 # Инциденты
 GET  /api/incidents?status=OPEN
@@ -673,7 +709,32 @@ POST /api/questions
 
 # Health
 GET  /actuator/health
+
+# Agent Workspace (CR-MEM-012)
+POST /api/agent/chat/run              # { prompt, provider, includeContext } → { status, provider, durationMs, response, error }
 ```
+
+### WebSocket API (CR-MEM-012)
+
+Endpoint: `/ws/agent-console`
+
+**Client → Server:**
+```json
+{ "type": "START", "provider": "claude" }
+{ "type": "STDIN", "data": "..." }
+{ "type": "STOP" }
+```
+
+**Server → Client:**
+```json
+{ "type": "SESSION_STARTED", "sessionId": "..." }
+{ "type": "STDOUT", "data": "..." }
+{ "type": "STDERR", "data": "..." }
+{ "type": "SESSION_STOPPED", "exitCode": 0 }
+{ "type": "ERROR", "message": "..." }
+```
+
+Разрешённые команды задаются через `agentWorkspace.console.allowedCommands` (whitelist). Shell (`bash`, `sh`, `zsh`, `cmd`, `powershell`) запрещён. Для MVP: `allowedCommands: [claude]`.
 
 ---
 
@@ -723,7 +784,7 @@ Base: `http://localhost:8082/ui`
 | Иконка флага | циклически менять приоритет | `PUT /api/tasks/{id}` |
 | Название задачи | открыть форму редактирования | `GET /ui/tasks/{id}/edit` |
 | Кнопка `Завтра` | сдвинуть дедлайн на +1 день | `PUT /api/tasks/{id}` |
-| Иконка удаления | открыть modal подтверждения и удалить задачу | `DELETE /api/tasks/{id}` |
+| Иконка удаления | открыть modal подтверждения и архивировать задачу | `DELETE /api/tasks/{id}` |
 
 Добавление задачи: зелёная кнопка `Добавить / задачу` расположена рядом с `Применить` и `Сбросить`, открывает modal-форму с полями `title`, `description`, `priority`, `status`, `dueDate`. Расширенное markdown-описание сохраняется в `memory.task_descriptions`; файловая выгрузка делается только через explicit export.
 
@@ -807,6 +868,21 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 - не самостоятельный экран
 - redirect на `/ui/knowledge?type=NOTICE`
 
+**`/ui/agent-workspace`** — Agent Workspace (CR-MEM-012)
+
+Две вкладки: `Chat` и `Console`.
+
+**Chat mode:**
+- Форма: `Provider` (claude | ollama | gigachat | mock), `Prompt` textarea, кнопка `Run`
+- `POST /api/agent/chat/run` → отображает `status`, `duration`, `provider`, `response`/`error`
+
+**Console mode:**
+- Псевдоконсоль на HTML/CSS/JS + WebSocket `/ws/agent-console`
+- Кнопки: `Start`, `Stop`; поле ввода stdin
+- stdout/stderr отображаются потоково с временными метками
+- Закрытие вкладки / WebSocket завершает процесс
+- `xterm.js` не используется в этом CR (простая браузерная консоль)
+
 **Global Search → edit-flow navigation**
 - Результат `TASK` обязан вести сразу в `/ui/tasks/{id}/edit`.
 - Результаты `NOTE`, `PERSON`, `RISK`, `INCIDENT` ведут на страницу слоя с query-param `edit={id}` и anchor на конкретный DOM-элемент; страница автоматически открывает соответствующий Bootstrap modal редактирования.
@@ -866,6 +942,7 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 | `searchPeople` | Найти человека по имени | "Что я знаю про Иванова?" |
 
 `getTaskDescription` реализован поверх `GET /api/tasks/{id}/description`; source of truth — `memory.task_descriptions`, а markdown-файл создаётся только через export endpoint.
+Task timeline доступен через `GET /api/tasks/{id}/timeline`; любые значимые изменения задачи создают immutable event в `task_events`.
 
 ### Правило подтверждения (ОБЯЗАТЕЛЬНО в CLAUDE.md агента)
 
@@ -974,7 +1051,7 @@ Leader-Role-Framework/
 
 **`TaskFileService`** — создаёт директорию при старте (`@PostConstruct`), читает/пишет файлы через `Files.readString` / `Files.writeString`. Если файл отсутствует при чтении — возвращает пустую строку (нормально для старых задач).
 
-При удалении задачи через `POST /api/tasks/{id}/delete` или `DELETE /api/tasks/{id}` файл описания удаляется (`Files.deleteIfExists`).
+Удаление из пользовательского flow работает как archive: `POST /api/tasks/{id}/archive`, `POST /api/tasks/{id}/delete` и `DELETE /api/tasks/{id}` переводят задачу в `ARCHIVED`, а описание и timeline сохраняются.
 
 ---
 
@@ -1282,6 +1359,21 @@ JavaMemoryService/
     │   │   │   ├── RiskViewController.java
     │   │   │   ├── PeopleViewController.java
     │   │   │   └── NotesViewController.java
+    │   │   ├── agentworkspace/
+    │   │   │   ├── AgentWorkspacePageController.java
+    │   │   │   ├── AgentChatRestController.java
+    │   │   │   ├── AgentConsoleWebSocketConfig.java
+    │   │   │   ├── AgentConsoleWebSocketHandler.java
+    │   │   │   ├── AgentWorkspaceService.java
+    │   │   │   ├── AgentProcessRunner.java
+    │   │   │   ├── AgentWorkspaceRunRepository.java
+    │   │   │   ├── dto/
+    │   │   │   │   ├── AgentChatRunRequest.java
+    │   │   │   │   ├── AgentChatRunResponse.java
+    │   │   │   │   ├── AgentConsoleClientMessage.java
+    │   │   │   │   └── AgentConsoleServerMessage.java
+    │   │   │   └── model/
+    │   │   │       └── AgentWorkspaceRun.java
     │   │   ├── mcp/
     │   │   │   ├── McpConfig.java
     │   │   │   ├── ContextTools.java
@@ -1312,7 +1404,8 @@ JavaMemoryService/
     │       │   │   ├── V1__init_schema.sql
     │       │   │   ├── V2__add_capture_tables.sql
     │       │   │   ├── V3__add_task_sort_order.sql
-    │       │   │   └── V4__add_notes_and_capture.sql
+    │       │   │   ├── V4__add_notes_and_capture.sql
+    │       │   │   └── V11__agent_workspace_runs.sql
     │       │   └── migration-h2/
     │       │       └── V1_1__h2_compat.sql
     │       ├── templates/
@@ -1322,8 +1415,13 @@ JavaMemoryService/
     │       │   ├── incidents.html
     │       │   ├── risks.html
     │       │   ├── people.html
-    │       │   └── notes.html
+    │       │   ├── notes.html
+    │       │   └── agent-workspace.html
     │       └── static/
+    │           ├── js/
+    │           │   └── agent-workspace.js
+    │           └── css/
+    │               └── agent-workspace.css
     └── test/
         ├── java/ru/andreyz/memoryservice/
         │   ├── service/
@@ -1392,6 +1490,11 @@ JavaMemoryService/
     <dependency>
         <groupId>org.springframework.ai</groupId>
         <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
+    </dependency>
+    <!-- CR-MEM-012: Agent Workspace Console (WebSocket) -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-websocket</artifactId>
     </dependency>
     <dependency>
         <groupId>org.springframework.boot</groupId>

@@ -8,6 +8,7 @@ import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
 import ru.andreyz.memoryservice.service.TaskDescriptionService;
 import ru.andreyz.memoryservice.service.TaskService;
+import ru.andreyz.memoryservice.service.TaskTimelineService;
 
 import java.time.LocalDate;
 
@@ -17,10 +18,14 @@ public class TaskEditController {
 
     private final TaskService taskService;
     private final TaskDescriptionService taskDescriptionService;
+    private final TaskTimelineService taskTimelineService;
 
-    public TaskEditController(TaskService taskService, TaskDescriptionService taskDescriptionService) {
+    public TaskEditController(TaskService taskService,
+                              TaskDescriptionService taskDescriptionService,
+                              TaskTimelineService taskTimelineService) {
         this.taskService = taskService;
         this.taskDescriptionService = taskDescriptionService;
+        this.taskTimelineService = taskTimelineService;
     }
 
     @GetMapping("/{id}/edit")
@@ -29,6 +34,7 @@ public class TaskEditController {
         String description = taskDescriptionService.getContent(id);
         model.addAttribute("task", task);
         model.addAttribute("description", description);
+        model.addAttribute("timeline", taskTimelineService.findEvents(id));
         model.addAttribute("exportUrl", "/api/tasks/%d/description/export-md".formatted(id));
         return "task-edit";
     }

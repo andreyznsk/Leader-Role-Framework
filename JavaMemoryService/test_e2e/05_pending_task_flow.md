@@ -9,7 +9,7 @@
 Симулирует поток от JavaMailAgent: создать PENDING задачу через POST /api/tasks/pending,
 убедиться что она попадает в очередь ожидания, подтвердить через /confirm,
 проверить что статус стал TODO и задача появилась в плане дня.
-Отдельно проверить reject: PENDING → DELETED.
+Отдельно проверить reject: PENDING → ARCHIVED.
 
 ## Preconditions
 - JavaMemoryService запущен на :8082
@@ -98,7 +98,7 @@ echo "Task 2 ID: $TASK_ID_2"
 **Expected:** HTTP 201, `"status":"PENDING"`
 **Extract:** `id` → `$TASK_ID_2`
 
-### Step 9 — Отклонить вторую задачу: PENDING → DELETED
+### Step 9 — Отклонить вторую задачу: PENDING → ARCHIVED
 ```bash
 RESPONSE=$(curl -s -w "\n%{http_code}" \
   -X POST "http://localhost:8082/api/tasks/$TASK_ID_2/reject")
@@ -106,7 +106,7 @@ HTTP_CODE=$(echo "$RESPONSE" | tail -1)
 BODY=$(echo "$RESPONSE" | head -n -1)
 echo "HTTP: $HTTP_CODE | Status: $(echo "$BODY" | jq -r '.status')"
 ```
-**Expected:** HTTP 200, `"status":"DELETED"`
+**Expected:** HTTP 200, `"status":"ARCHIVED"`
 
 ### Step 10 — Отклонённая задача не видна нигде
 ```bash

@@ -1,7 +1,7 @@
 # 2026-06-29_CR-MEM-012: Agent Workspace UI
 
 **Дата:** 2026-06-29  
-**Статус:** Draft  
+**Статус:** Approved  
 **Сервис:** MEM  
 **Компонент:** JavaMemoryService / UI / Agent Runtime Bridge  
 **Связанный Issue:** будет создан после коммита CR

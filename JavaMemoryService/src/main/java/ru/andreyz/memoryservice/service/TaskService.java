@@ -20,15 +20,18 @@ public class TaskService {
     private final DailyPlanRepository planRepository;
     private final UsageEventService usageEventService;
     private final TaskDescriptionService taskDescriptionService;
+    private final TaskTimelineService taskTimelineService;
 
     public TaskService(TaskRepository taskRepository,
                        DailyPlanRepository planRepository,
                        UsageEventService usageEventService,
-                       TaskDescriptionService taskDescriptionService) {
+                       TaskDescriptionService taskDescriptionService,
+                       TaskTimelineService taskTimelineService) {
         this.taskRepository = taskRepository;
         this.planRepository = planRepository;
         this.usageEventService = usageEventService;
         this.taskDescriptionService = taskDescriptionService;
+        this.taskTimelineService = taskTimelineService;
     }
 
     public Task createConfirmed(LocalDate date, String title, String priority,
@@ -47,6 +50,7 @@ public class TaskService {
                 sortOrder, Instant.now(), Instant.now());
         Task saved = taskRepository.save(task);
         taskDescriptionService.initializeFromTaskField(saved);
+        taskTimelineService.recordTaskCreated(saved);
         recordTaskCreated(saved, usageSource(source), false);
         return saved;
     }
@@ -78,6 +82,7 @@ public class TaskService {
                 0, Instant.now(), Instant.now());
         Task saved = taskRepository.save(task);
         taskDescriptionService.initializeFromTaskField(saved);
+        taskTimelineService.recordPendingTaskCreated(saved);
         boolean mailTask = "mail-agent".equals(usageSource);
         if (mailTask) {
             usageEventService.record(new UsageEventCommand(
@@ -104,28 +109,48 @@ public class TaskService {
         Task confirmed = new Task(task.id(), planId, task.title(), task.description(),
                 "TODO", task.priority(), today, task.source(), task.emailId(),
                 sortOrder, task.createdAt(), Instant.now());
-        return taskRepository.save(confirmed);
+        Task saved = taskRepository.save(confirmed);
+        taskTimelineService.recordPendingConfirmed(task, saved);
+        return saved;
     }
 
     public Task reject(Long id) {
-        return updateStatus(id, "DELETED");
+        return archive(id);
     }
 
     public void deleteTask(Long id) {
-        updateStatus(id, "DELETED");
+        archive(id);
+    }
+
+    public Task archive(Long id) {
+        Task task = findById(id);
+        if ("ARCHIVED".equals(task.status())) {
+            return task;
+        }
+        Task archived = new Task(task.id(), task.planId(), task.title(), task.description(),
+                "ARCHIVED", task.priority(), task.dueDate(), task.source(), task.emailId(),
+                task.sortOrder(), task.createdAt(), Instant.now());
+        Task saved = taskRepository.save(archived);
+        taskTimelineService.recordTaskArchived(task);
+        return saved;
     }
 
     public Task edit(Long id, EditTaskRequest req) {
         Task task = findById(id);
+        String newTitle = req.title() != null ? req.title() : task.title();
+        String newStatus = req.status() != null ? req.status() : task.status();
+        String newPriority = req.priority() != null ? req.priority() : task.priority();
+        LocalDate newDueDate = req.dueDate() != null ? req.dueDate() : task.dueDate();
         Task updated = new Task(task.id(), task.planId(),
-                req.title() != null ? req.title() : task.title(),
+                newTitle,
                 task.description(),
-                req.status() != null ? req.status() : task.status(),
-                req.priority() != null ? req.priority() : task.priority(),
-                req.dueDate() != null ? req.dueDate() : task.dueDate(),
+                newStatus,
+                newPriority,
+                newDueDate,
                 task.source(), task.emailId(),
                 task.sortOrder(), task.createdAt(), Instant.now());
         Task saved = taskRepository.save(updated);
+        recordEditTimeline(task, newTitle, newStatus, newPriority, newDueDate);
         if (req.description() != null) {
             taskDescriptionService.update(id, req.description());
             return findById(id);
@@ -146,19 +171,31 @@ public class TaskService {
         Task task = findById(id);
         Long planId = getOrCreatePlan(toDate).id();
         int sortOrder = taskRepository.findMaxSortOrderByPlanId(planId) + 1;
+        String newStatus = task.status().equals("DONE") ? "TODO" : task.status();
         Task moved = new Task(task.id(), planId, task.title(), task.description(),
-                task.status().equals("DONE") ? "TODO" : task.status(),
+                newStatus,
                 task.priority(), toDate, task.source(), task.emailId(),
                 sortOrder, task.createdAt(), Instant.now());
-        return taskRepository.save(moved);
+        Task saved = taskRepository.save(moved);
+        if (!equalsNullable(task.dueDate(), toDate)) {
+            taskTimelineService.recordDueDateChanged(task, toDate);
+        }
+        if (!equalsNullable(task.status(), newStatus)) {
+            taskTimelineService.recordStatusChanged(task, newStatus);
+        }
+        return saved;
     }
 
     public Task updateStatus(Long id, String status) {
         Task task = findById(id);
+        if (equalsNullable(task.status(), status)) {
+            return task;
+        }
         Task updated = new Task(task.id(), task.planId(), task.title(), task.description(),
                 status, task.priority(), task.dueDate(), task.source(), task.emailId(),
                 task.sortOrder(), task.createdAt(), Instant.now());
         Task saved = taskRepository.save(updated);
+        taskTimelineService.recordStatusChanged(task, status);
         if ("DONE".equals(status) && !"DONE".equals(task.status())) {
             usageEventService.record(new UsageEventCommand(
                     UsageEventType.TASK_COMPLETED,
@@ -180,7 +217,7 @@ public class TaskService {
         if (task.planId() == null) return task;
 
         List<Task> siblings = taskRepository.findByPlanIdOrderBySortOrder(task.planId()).stream()
-                .filter(t -> !"DELETED".equals(t.status()) && !"PENDING".equals(t.status()))
+                .filter(t -> !"DELETED".equals(t.status()) && !"PENDING".equals(t.status()) && !"ARCHIVED".equals(t.status()))
                 .toList();
 
         int idx = -1;
@@ -230,7 +267,9 @@ public class TaskService {
 
     public List<Task> findByDate(LocalDate date) {
         return planRepository.findByPlanDate(date)
-                .map(plan -> taskRepository.findByPlanIdAndStatusNotOrderBySortOrder(plan.id(), "DELETED"))
+                .map(plan -> taskRepository.findByPlanIdOrderBySortOrder(plan.id()).stream()
+                        .filter(task -> !"DELETED".equals(task.status()) && !"ARCHIVED".equals(task.status()))
+                        .toList())
                 .orElse(List.of());
     }
 
@@ -288,5 +327,24 @@ public class TaskService {
             return "ai-agent";
         }
         return source.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private void recordEditTimeline(Task original, String newTitle, String newStatus, String newPriority, LocalDate newDueDate) {
+        if (!equalsNullable(original.title(), newTitle)) {
+            taskTimelineService.recordTitleUpdated(original, newTitle);
+        }
+        if (!equalsNullable(original.status(), newStatus)) {
+            taskTimelineService.recordStatusChanged(original, newStatus);
+        }
+        if (!equalsNullable(original.priority(), newPriority)) {
+            taskTimelineService.recordPriorityChanged(original, newPriority);
+        }
+        if (!equalsNullable(original.dueDate(), newDueDate)) {
+            taskTimelineService.recordDueDateChanged(original, newDueDate);
+        }
+    }
+
+    private static boolean equalsNullable(Object left, Object right) {
+        return left == null ? right == null : left.equals(right);
     }
 }

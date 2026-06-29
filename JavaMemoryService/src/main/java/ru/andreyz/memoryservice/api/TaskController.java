@@ -89,10 +89,15 @@ public class TaskController {
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<Task> updateStatus(@PathVariable Long id, @RequestBody UpdateTaskStatusRequest req) {
-        if ("PENDING".equals(req.status()) || "DELETED".equals(req.status())) {
+        if ("PENDING".equals(req.status()) || "DELETED".equals(req.status()) || "ARCHIVED".equals(req.status())) {
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok(taskService.updateStatus(id, req.status()));
+    }
+
+    @PostMapping("/{id}/archive")
+    public ResponseEntity<Task> archiveTask(@PathVariable Long id) {
+        return ResponseEntity.ok(taskService.archive(id));
     }
 
     @PostMapping("/{id}/reorder")
@@ -102,13 +107,13 @@ public class TaskController {
 
     @PostMapping("/{id}/delete")
     public ResponseEntity<Void> deleteTaskPost(@PathVariable Long id) {
-        taskService.deleteTask(id);
+        taskService.archive(id);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
-        taskService.deleteTask(id);
+        taskService.archive(id);
         return ResponseEntity.noContent().build();
     }
 }

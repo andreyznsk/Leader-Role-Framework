@@ -183,7 +183,7 @@ public class TodayViewController {
 
     @PostMapping("/tasks/{id}/delete")
     public String deleteTask(@PathVariable Long id) {
-        taskService.deleteTask(id);
+        taskService.archive(id);
         return "redirect:/ui/today";
     }
 

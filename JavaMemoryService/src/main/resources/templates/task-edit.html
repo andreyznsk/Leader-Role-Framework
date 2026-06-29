@@ -82,10 +82,49 @@
                     id="delete-btn"
                     th:data-api-url=@{/api/tasks/{id}(id=${task.id})}
                     onclick="confirmDelete(this)">
-                Удалить
+                Архивировать
             </button>
         </div>
     </form>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <div class="d-flex align-items-center justify-content-between">
+                <h5 class="mb-0">Timeline</h5>
+                <span class="text-muted small" th:text="${#lists.size(timeline) + ' events'}">0 events</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <div th:if="${#lists.isEmpty(timeline)}" class="text-muted">Событий пока нет.</div>
+            <div th:unless="${#lists.isEmpty(timeline)}" class="list-group list-group-flush">
+                <div th:each="event : ${timeline}" class="list-group-item px-0">
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                            <div class="fw-semibold" th:text="${event.summary}">Событие</div>
+                            <div class="small text-muted">
+                                <span th:text="${event.eventType}">EVENT_TYPE</span>
+                                <span th:if="${event.actorType}" th:text="${' · ' + event.actorType}"></span>
+                                <span th:if="${event.sourceType}" th:text="${' · ' + event.sourceType}"></span>
+                            </div>
+                        </div>
+                        <div class="small text-muted text-nowrap"
+                             th:text="${#temporals.format(event.createdAt.atZone(T(java.time.ZoneId).systemDefault()), 'yyyy-MM-dd HH:mm')}">
+                            2026-06-29 15:30
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <form id="timeline-comment-form" class="mt-3" th:attr="data-task-id=${task.id}">
+                <label for="timeline-comment" class="form-label fw-semibold">Комментарий</label>
+                <textarea id="timeline-comment" class="form-control" rows="3" placeholder="Добавить комментарий в timeline"></textarea>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <div id="timeline-comment-status" class="small text-success d-none">Комментарий добавлен</div>
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Добавить</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Hidden delete form -->
     <form id="delete-form" method="post" th:action="@{/ui/tasks/{id}/delete(id=${task.id})}"></form>
@@ -132,7 +171,7 @@ function confirmDelete(btn) {
     }
     btn.dataset.confirmed = 'true';
     const original = btn.textContent;
-    btn.textContent = 'Точно удалить?';
+    btn.textContent = 'Точно архивировать?';
     btn.classList.replace('btn-outline-danger', 'btn-danger');
     deleteTimer = setTimeout(() => {
         btn.dataset.confirmed = 'false';
@@ -196,8 +235,28 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
             window.LeaderUiApi.handleSuccess('redirect:/ui/today', {response: {status: 200}, data: null});
             return;
         }
-        saveStatus.textContent = 'Задача сохранена';
-        saveStatus.classList.remove('d-none');
+        window.location.reload();
+    } catch (error) {}
+});
+
+document.getElementById('timeline-comment-form')?.addEventListener('submit', async function (event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const taskId = form.dataset.taskId;
+    const textarea = document.getElementById('timeline-comment');
+    const status = document.getElementById('timeline-comment-status');
+    const text = textarea.value.trim();
+    if (!text) return;
+
+    try {
+        await window.LeaderUiApi.request('/api/tasks/' + taskId + '/timeline/comment', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text})
+        });
+        status.classList.remove('d-none');
+        window.location.reload();
     } catch (error) {}
 });
 </script>

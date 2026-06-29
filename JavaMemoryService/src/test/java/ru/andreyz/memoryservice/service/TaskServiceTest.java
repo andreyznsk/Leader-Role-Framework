@@ -51,7 +51,7 @@ class TaskServiceTest {
 
         Task rejected = taskService.reject(pending.id());
 
-        assertThat(rejected.status()).isEqualTo("DELETED");
+        assertThat(rejected.status()).isEqualTo("ARCHIVED");
     }
 
     @Test
@@ -100,5 +100,16 @@ class TaskServiceTest {
         assertThat(updated.status()).isEqualTo("IN_PROGRESS");
         assertThat(taskDescriptionService.getContent(task.id())).isEqualTo("## Context\nblocked by qa approval");
         assertThat(taskService.findById(task.id()).description()).contains("blocked by qa approval");
+    }
+
+    @Test
+    void archive_hidesTaskFromDateListing() {
+        LocalDate date = LocalDate.now().plusDays(5);
+        Task task = taskService.createConfirmed(date, "Archive me", "NORMAL", null, "MANUAL", null);
+
+        taskService.archive(task.id());
+
+        assertThat(taskService.findByDate(date)).noneMatch(it -> it.id().equals(task.id()));
+        assertThat(taskService.findById(task.id()).status()).isEqualTo("ARCHIVED");
     }
 }
