@@ -39,9 +39,13 @@ public class TaskEditController {
                            @RequestParam(required = false) String priority,
                            @RequestParam(required = false) String status,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
-                           @RequestParam(required = false, defaultValue = "") String description) {
+                           @RequestParam(required = false, defaultValue = "") String description,
+                           @RequestParam(required = false, defaultValue = "save_close") String action) {
         taskService.edit(id, new EditTaskRequest(title, null, priority, status, dueDate));
         taskDescriptionService.update(id, description);
+        if ("save".equalsIgnoreCase(action)) {
+            return "redirect:/ui/tasks/%d/edit".formatted(id);
+        }
         return "redirect:/ui/today";
     }
 }

@@ -72,8 +72,12 @@
         </div>
 
         <!-- Buttons -->
+        <div id="save-status" class="alert alert-success py-2 px-3 mb-3 d-none" role="status"></div>
         <div class="d-flex justify-content-between">
-            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" name="action" value="save">Сохранить</button>
+                <button type="submit" class="btn btn-outline-primary" name="action" value="save_close" data-close-after-save="true">Сохранить и закрыть</button>
+            </div>
             <button type="button" class="btn btn-outline-danger"
                     id="delete-btn"
                     th:data-api-url=@{/api/tasks/{id}(id=${task.id})}
@@ -164,6 +168,9 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
 
     const form = event.currentTarget;
     const taskId = form.dataset.taskId;
+    const submitter = event.submitter;
+    const closeAfterSave = submitter && submitter.dataset.closeAfterSave === 'true';
+    const saveStatus = document.getElementById('save-status');
     const formData = new FormData(form);
     const metaPayload = {
         title: formData.get('title'),
@@ -174,6 +181,7 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
     const description = formData.get('description') || '';
 
     try {
+        saveStatus.classList.add('d-none');
         await window.LeaderUiApi.request('/api/tasks/' + taskId, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
@@ -186,7 +194,12 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
             body: description
         });
 
-        window.LeaderUiApi.handleSuccess('redirect:/ui/today', {response: {status: 200}, data: null});
+        if (closeAfterSave) {
+            window.LeaderUiApi.handleSuccess('redirect:/ui/today', {response: {status: 200}, data: null});
+            return;
+        }
+        saveStatus.textContent = 'Задача сохранена';
+        saveStatus.classList.remove('d-none');
     } catch (error) {}
 });
 </script>

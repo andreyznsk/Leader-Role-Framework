@@ -88,6 +88,17 @@ KNOWLEDGE
   score: 0.69
 ```
 
+### Навигация из результата
+
+Клик по найденному элементу должен открывать edit-flow самой сущности, а не только страницу списка слоя.
+
+- `TASK` → `/ui/tasks/{id}/edit`
+- `NOTE` → `/ui/notes?edit={id}#note-{id}` + auto-open edit modal
+- `PERSON` → `/ui/people?edit={id}#person-{id}` + auto-open edit modal
+- `RISK` → `/ui/risks?edit={id}#risk-{id}` + auto-open edit modal
+- `INCIDENT` → `/ui/incidents?edit={id}#incident-{id}` + auto-open edit modal
+- `KNOWLEDGE` → `/ui/knowledge?id={id}` + открыть документ в editor pane
+
 ## Search Modes
 
 ### QUICK
@@ -409,6 +420,7 @@ KnowledgeSearchProvider
 12. Пустой результат отображается корректно.
 13. Ошибка AgentClient в DEEP mode не ломает поиск: результаты возвращаются, summary содержит понятное сообщение или `null`.
 14. Добавлены E2E сценарии для `/api/search` и `/ui/search`.
+15. Клик по результату открывает edit-flow найденной сущности, а не только базовую страницу списка.
 
 ## Как тестировать
 

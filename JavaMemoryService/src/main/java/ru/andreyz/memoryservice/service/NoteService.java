@@ -49,6 +49,21 @@ public class NoteService {
         noteRepository.deleteById(id);
     }
 
+    public Note update(Long id, String title, String text, String tags, String source) {
+        Note existing = noteRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Note not found: " + id));
+        String normalizedText = normalizeText(text);
+        String normalizedTitle = normalizeTitle(title, normalizedText != null ? normalizedText : existing.text());
+        return noteRepository.save(new Note(
+                existing.id(),
+                normalizedTitle,
+                normalizedText,
+                normalizeTags(tags),
+                source != null && !source.isBlank() ? source : existing.source(),
+                existing.createdAt()
+        ));
+    }
+
     private String normalizeTags(String tags) {
         Set<String> parsed = parseTags(tags);
         return parsed.isEmpty() ? null : String.join(",", parsed);

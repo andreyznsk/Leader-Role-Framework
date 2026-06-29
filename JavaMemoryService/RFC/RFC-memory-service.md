@@ -666,6 +666,7 @@ POST /api/capture/process-now            # alias process-today
 GET    /api/notes?tags=risk,person&limit=50
 POST   /api/notes                    # 201 Created; body: { title, text?, tags, source }
                                      # title обязательный; если не передан — auto-derived из text
+PUT    /api/notes/{id}               # body: { title, text?, tags, source }
 DELETE /api/notes/{id}               # 204 No Content / 404 Not Found (hard delete, CR-MEM-011)
 GET  /api/questions?status=OPEN
 POST /api/questions
@@ -743,18 +744,18 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 
 **`/ui/incidents`** — Активные инциденты
 - Список с severity badge (P1/P2/P3)
-- Кнопка [Edit] → форма редактирования inline
+- Кнопка [Edit] → Bootstrap modal редактирования инцидента
 - Кнопка [Resolve] → модалка с полями root_cause и action_items
 - Форма создать новый инцидент
 
 **`/ui/risks`** — Карта рисков
 - Таблица: title / probability / impact / status / mitigation
-- Кнопка [Edit] inline
+- Кнопка [Edit] → Bootstrap modal
 - Фильтр по статусу
 
 **`/ui/people`** — Команда и стейкхолдеры
 - Карточки людей: ФИО, логин, домен, текущая задача, capacity
-- Кнопка [Edit] → форма редактирования карточки
+- Кнопка [Edit] → Bootstrap modal редактирования карточки
 - Хронологические заметки под каждой карточкой
 - Форма добавить заметку
 
@@ -762,6 +763,7 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 - Список notes из PostgreSQL, сортировка от новых к старым
 - Фильтр по тегам через `GET /api/notes?tags=...`
 - Кнопка `+ Добавить заметку` открывает Bootstrap modal с полями `title` (обязательный), `text` (опциональный), `tags`; `source` = `manual-ui`; отправляет `POST /api/notes`
+- Кнопка `Edit` на каждой карточке открывает Bootstrap modal; сохранение идёт через `PUT /api/notes/{id}`
 - Кнопка `Удалить` на каждой карточке с подтверждением; отправляет `DELETE /api/notes/{id}`
 - Кнопка `→ В задачу` создаёт PENDING задачу через `POST /api/tasks/pending`
 - Operational Notes: это не RAG knowledge и не source of truth для `NOTICE`
@@ -774,10 +776,17 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 - список документов из JavaRagService REST API
 - фильтры по типам (`NOTICE`, `ADR`, `PROCESS`, `SERVICE_CARD`, `GLOSSARY`)
 - edit/reindex без JDBC-доступа к схеме `rag`
+- открытие конкретного документа по `?id={documentId}` и редактирование в правой панели
 
 **`/ui/notice`**
 - не самостоятельный экран
 - redirect на `/ui/knowledge?type=NOTICE`
+
+**Global Search → edit-flow navigation**
+- Результат `TASK` обязан вести сразу в `/ui/tasks/{id}/edit`.
+- Результаты `NOTE`, `PERSON`, `RISK`, `INCIDENT` ведут на страницу слоя с query-param `edit={id}` и anchor на конкретный DOM-элемент; страница автоматически открывает соответствующий Bootstrap modal редактирования.
+- Результат `KNOWLEDGE` ведёт в `/ui/knowledge?id={id}` и открывает документ в editor pane.
+- Global Search не должен вести пользователя только в общий list view без открытия найденного элемента.
 
 **Capture UI / ручной запуск**
 - Capture сохраняется через REST `POST /api/capture`

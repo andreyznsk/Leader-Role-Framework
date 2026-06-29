@@ -68,7 +68,7 @@ public class KnowledgeSearchProvider implements SearchProvider {
                 SearchLayer.KNOWLEDGE,
                 title != null ? title : "Knowledge document",
                 snippet,
-                null,
+                entityId != null ? "/ui/knowledge?id=" + entityId : "/ui/knowledge",
                 entityId,
                 "KNOWLEDGE",
                 score,
