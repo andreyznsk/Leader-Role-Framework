@@ -62,6 +62,7 @@ public class MailRuntimeConfigService {
                 Math.max(1, mailProperties.getPollIntervalSeconds()),
                 sanitizeList(folderProperties.getInclude()),
                 sanitizeList(folderProperties.getExclude()),
+                mailProperties.isMarkAsReadEnabled(),
                 true,
                 true,
                 pathProperties.getProcessed(),
@@ -98,6 +99,8 @@ public class MailRuntimeConfigService {
                 "One folder per line", true, false, false, null));
         settings.put("foldersExclude", descriptor(joinLines(config.foldersExclude()), "list", "Folders exclude",
                 "One folder per line. Example: Inbox/CI/CD", true, false, false, null));
+        settings.put("markAsReadEnabled", descriptor(bool(config.markAsReadEnabled()), "boolean", "Mark emails as read",
+                "Global switch for mailClient.markAsRead. When disabled, MailAgent only logs that the email could be marked as read.", true, false, false, null));
         settings.put("markNoiseAsRead", descriptor(bool(config.markNoiseAsRead()), "boolean", "Mark noise as read",
                 null, true, false, false, null));
         settings.put("moveProcessedMail", descriptor(bool(config.moveProcessedMail()), "boolean", "Move processed mail",
@@ -128,6 +131,7 @@ public class MailRuntimeConfigService {
         int pollIntervalSeconds = parseInt(incoming, "pollIntervalSeconds", previous.pollIntervalSeconds(), true);
         List<String> foldersInclude = parseLines(incoming, "foldersInclude", previous.foldersInclude(), false);
         List<String> foldersExclude = parseLines(incoming, "foldersExclude", previous.foldersExclude(), false);
+        boolean markAsReadEnabled = parseBoolean(incoming, "markAsReadEnabled", previous.markAsReadEnabled());
         boolean markNoiseAsRead = parseBoolean(incoming, "markNoiseAsRead", previous.markNoiseAsRead());
         boolean moveProcessedMail = parseBoolean(incoming, "moveProcessedMail", previous.moveProcessedMail());
         String processedFolder = parseString(incoming, "processedFolder", previous.processedFolder());
@@ -147,6 +151,7 @@ public class MailRuntimeConfigService {
                 pollIntervalSeconds,
                 foldersInclude,
                 foldersExclude,
+                markAsReadEnabled,
                 markNoiseAsRead,
                 moveProcessedMail,
                 processedFolder,
@@ -236,6 +241,7 @@ public class MailRuntimeConfigService {
         maybeAdd(changed, "pollIntervalSeconds", previous.pollIntervalSeconds(), updated.pollIntervalSeconds());
         maybeAdd(changed, "foldersInclude", previous.foldersInclude(), updated.foldersInclude());
         maybeAdd(changed, "foldersExclude", previous.foldersExclude(), updated.foldersExclude());
+        maybeAdd(changed, "markAsReadEnabled", previous.markAsReadEnabled(), updated.markAsReadEnabled());
         maybeAdd(changed, "markNoiseAsRead", previous.markNoiseAsRead(), updated.markNoiseAsRead());
         maybeAdd(changed, "moveProcessedMail", previous.moveProcessedMail(), updated.moveProcessedMail());
         maybeAdd(changed, "processedFolder", previous.processedFolder(), updated.processedFolder());
@@ -263,6 +269,7 @@ public class MailRuntimeConfigService {
         applied.put("pollIntervalSeconds", String.valueOf(config.pollIntervalSeconds()));
         applied.put("foldersInclude", joinLines(config.foldersInclude()));
         applied.put("foldersExclude", joinLines(config.foldersExclude()));
+        applied.put("markAsReadEnabled", bool(config.markAsReadEnabled()));
         applied.put("markNoiseAsRead", bool(config.markNoiseAsRead()));
         applied.put("moveProcessedMail", bool(config.moveProcessedMail()));
         applied.put("processedFolder", config.processedFolder());

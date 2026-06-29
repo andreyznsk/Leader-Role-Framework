@@ -59,6 +59,7 @@ class MailRuntimeConfigServiceTest {
         assertEquals("*****", response.settings().get("password").value());
         assertEquals(List.of("maildev", "imap", "ews"), response.settings().get("protocol").options());
         assertEquals(List.of("BASIC", "NTLM", "OAUTH2"), response.settings().get("authType").options());
+        assertEquals("true", response.settings().get("markAsReadEnabled").value());
         assertEquals("text", response.settings().get("classificationPrompt").type());
     }
 
@@ -70,6 +71,7 @@ class MailRuntimeConfigServiceTest {
                 "password", "new-secret",
                 "serverUrl", "https://exchange.example.com/EWS/Exchange.asmx",
                 "authType", "NTLM",
+                "markAsReadEnabled", "false",
                 "foldersExclude", "Inbox/CI/CD\nJunk Email",
                 "classificationPrompt", "Updated prompt"
         ));
@@ -78,6 +80,7 @@ class MailRuntimeConfigServiceTest {
         assertEquals("false", response.applied().get("enabled"));
         assertEquals("ews", response.applied().get("protocol"));
         assertEquals("NTLM", response.applied().get("authType"));
+        assertEquals("false", response.applied().get("markAsReadEnabled"));
         assertFalse(response.applied().containsKey("password"));
         assertEquals("secret value accepted but not returned", response.ignored().get("password"));
 
@@ -85,6 +88,7 @@ class MailRuntimeConfigServiceTest {
         assertFalse(status.enabled());
         assertEquals("ews", status.protocol());
         assertEquals(MailAuthType.NTLM, service.snapshot().authType());
+        assertFalse(service.snapshot().markAsReadEnabled());
         assertEquals("Updated prompt", service.snapshot().classificationPrompt());
 
         verify(auditStore).save(eq(2L), any(), any(), any(), eq("APPLIED"), any());

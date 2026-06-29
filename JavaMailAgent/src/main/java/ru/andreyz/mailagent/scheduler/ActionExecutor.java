@@ -186,9 +186,7 @@ public class ActionExecutor {
                 yield new StepResult(MailProcessingRoute.MARK_AS_READ, payload, null, null);
             }
             case MARK_AS_READ -> {
-                if (payload.markAsRead()) {
-                    mailClient.markAsRead(email.id(), email.folder());
-                }
+                markAsReadIfEnabled(email, payload.markAsRead(), "NOTICE");
                 yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
             }
             default -> throw new IllegalStateException("Unsupported NOTICE route: " + route);
@@ -211,7 +209,7 @@ public class ActionExecutor {
                 yield new StepResult(MailProcessingRoute.MARK_AS_READ, payload, null, null);
             }
             case MARK_AS_READ -> {
-                mailClient.markAsRead(email.id(), email.folder());
+                markAsReadIfEnabled(email, true, "NOTE");
                 yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
             }
             default -> throw new IllegalStateException("Unsupported NOTE route: " + route);
@@ -230,13 +228,24 @@ public class ActionExecutor {
                 yield new StepResult(next, payload, null, null);
             }
             case MARK_AS_READ -> {
-                if (payload.markAsRead()) {
-                    mailClient.markAsRead(email.id(), email.folder());
-                }
+                markAsReadIfEnabled(email, payload.markAsRead(), "NOISE");
                 yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
             }
             default -> throw new IllegalStateException("Unsupported mail side-effect route: " + route);
         };
+    }
+
+    private void markAsReadIfEnabled(Email email, boolean requested, String reason) throws Exception {
+        if (!requested) {
+            return;
+        }
+        MailRuntimeConfig runtime = runtimeConfigService.snapshot();
+        if (!runtime.markAsReadEnabled()) {
+            log.info("Email {} in folder [{}] could be marked as read for {} but markAsReadEnabled=false; leaving unread",
+                email.id(), email.folder(), reason);
+            return;
+        }
+        mailClient.markAsRead(email.id(), email.folder());
     }
 
     private Object buildPayload(AgentResponse response, MailRuntimeConfig runtime) {

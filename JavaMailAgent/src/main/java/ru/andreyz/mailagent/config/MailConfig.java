@@ -28,6 +28,7 @@ public class MailConfig {
         private String password;
         private int pollIntervalSeconds = 60;
         private int fetchLimit = 20;
+        private boolean markAsReadEnabled = true;
         private Integer processingParallelism;
 
         public String getProtocol() { return protocol; }
@@ -40,6 +41,8 @@ public class MailConfig {
         public void setPollIntervalSeconds(int v) { this.pollIntervalSeconds = v; }
         public int getFetchLimit() { return fetchLimit; }
         public void setFetchLimit(int v) { this.fetchLimit = v; }
+        public boolean isMarkAsReadEnabled() { return markAsReadEnabled; }
+        public void setMarkAsReadEnabled(boolean v) { this.markAsReadEnabled = v; }
         public Integer getProcessingParallelism() { return processingParallelism; }
         public void setProcessingParallelism(Integer v) { this.processingParallelism = v; }
     }

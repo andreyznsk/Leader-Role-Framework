@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -254,6 +255,25 @@ class ActionExecutorTest {
         assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
         verify(mailClient).markAsRead(emailId, "INBOX");
+    }
+
+    @Test
+    void markAsReadDryRunLeavesNoticeUnread() throws Exception {
+        runtimeConfigService.apply(Map.of("markAsReadEnabled", "false"));
+        Path inbox = tempDir.resolve("inbox");
+        Files.createDirectories(inbox);
+        String emailId = "test-notice-dry-run-001";
+        Files.writeString(inbox.resolve(emailId + ".json"), "{}");
+
+        AgentResponse response = new AgentResponse(
+            AgentResponseType.NOTICE, emailId,
+            "Новая release-практика команды", null, null, null, null, null, null, null, null
+        );
+
+        executor.execute(email(emailId), response);
+
+        verify(mailClient, never()).markAsRead(anyString(), anyString());
+        assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
     }
 
     private Email email(String emailId) {

@@ -5,6 +5,7 @@ maildev.api-url=http://localhost:1080
 
 memory.service.enabled=false
 mail.poll-interval-seconds=30
+mail.mark-as-read-enabled=true
 mail.test-connection.timeout-seconds=15
 mail.test-connection.max-folders-to-scan=500
 agent.provider=mock
