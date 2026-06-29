@@ -62,9 +62,9 @@
                         <label class="mb-0">
                             <input type="radio" name="status" th:value="${s}"
                                    th:checked="${task.status == s}" class="visually-hidden status-radio"/>
-                            <span class="badge border px-2 py-1"
+                            <span class="badge px-2 py-1 status-option"
                                   th:text="${s}"
-                                  th:classappend="${task.status == s} ? ' bg-primary text-white' : ' bg-light text-dark status-pill'"></span>
+                                  th:classappend="${(s == 'TODO' ? ' status-option--todo' : (s == 'IN_PROGRESS' ? ' status-option--in-progress' : (s == 'BLOCKED' ? ' status-option--blocked' : ' status-option--done'))) + (task.status == s ? ' is-selected' : '')}"></span>
                         </label>
                     </th:block>
                 </div>
@@ -153,11 +153,9 @@ document.querySelectorAll('.status-radio').forEach(radio => {
         document.querySelectorAll('.status-radio').forEach(r => {
             const pill = r.nextElementSibling;
             if (r.checked) {
-                pill.classList.add('bg-primary', 'text-white');
-                pill.classList.remove('bg-light', 'text-dark');
+                pill.classList.add('is-selected');
             } else {
-                pill.classList.remove('bg-primary', 'text-white');
-                pill.classList.add('bg-light', 'text-dark');
+                pill.classList.remove('is-selected');
             }
         });
     });
