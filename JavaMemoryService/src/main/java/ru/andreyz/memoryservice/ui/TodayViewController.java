@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Controller
@@ -47,6 +48,8 @@ public class TodayViewController {
     public String today(@RequestParam(required = false) String priority,
                         @RequestParam(required = false) String status,
                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDateFrom,
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDateTo,
                         @RequestParam(required = false) String sortBy,
                         @RequestParam(required = false) String sortDir,
                         Model model) {
@@ -58,9 +61,13 @@ public class TodayViewController {
         List<Task> currentTasks = allCurrentTasks.stream()
                 .filter(task -> isFilterMatch(task.priority(), priority))
                 .filter(task -> isFilterMatch(task.status(), status))
-                .filter(task -> dueDate == null || dueDate.equals(task.dueDate()))
+                .filter(task -> matchesDateFilter(task.dueDate(), dueDate, dueDateFrom, dueDateTo))
                 .sorted(taskComparator(sortBy, sortDir))
                 .toList();
+
+        Map<String, Long> deadlineCounts = allCurrentTasks.stream()
+                .filter(t -> t.dueDate() != null)
+                .collect(Collectors.groupingBy(t -> t.dueDate().toString(), Collectors.counting()));
 
         long doneTodayCount = allCurrentTasks.stream().filter(t -> "DONE".equals(t.status())).count();
         long openIncidentsCount = incidentRepository.findByStatus("OPEN").size();
@@ -76,10 +83,13 @@ public class TodayViewController {
         model.addAttribute("priorityFilter", normalizeFilter(priority));
         model.addAttribute("statusFilter", normalizeFilter(status));
         model.addAttribute("dueDateFilter", dueDate);
+        model.addAttribute("dueDateFromFilter", dueDateFrom);
+        model.addAttribute("dueDateToFilter", dueDateTo);
         model.addAttribute("sortBy", normalizeFilter(sortBy) != null ? normalizeFilter(sortBy) : "status");
         model.addAttribute("sortDir", normalizeFilter(sortBy) != null ? normalizeSortDir(sortDir) : "asc");
         model.addAttribute("priorityOptions", List.of("LOW", "NORMAL", "HIGH", "CRITICAL"));
         model.addAttribute("statusOptions", List.of("TODO", "IN_PROGRESS", "BLOCKED", "DONE"));
+        model.addAttribute("deadlineCounts", deadlineCounts);
         planRepository.findByPlanDate(today).ifPresent(p -> model.addAttribute("todaySummary", p.summary()));
         return "today";
     }
@@ -116,6 +126,15 @@ public class TodayViewController {
             comparator = comparator.reversed();
         }
         return comparator.thenComparing(fallback);
+    }
+
+    private boolean matchesDateFilter(LocalDate taskDate, LocalDate exact, LocalDate from, LocalDate to) {
+        if (exact != null) return exact.equals(taskDate);
+        if (from == null && to == null) return true;
+        if (taskDate == null) return false;
+        if (from != null && taskDate.isBefore(from)) return false;
+        if (to != null && taskDate.isAfter(to)) return false;
+        return true;
     }
 
     private boolean isFilterMatch(String value, String filter) {
