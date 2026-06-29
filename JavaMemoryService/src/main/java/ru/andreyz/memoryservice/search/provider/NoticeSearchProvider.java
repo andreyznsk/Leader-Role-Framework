@@ -1,29 +1,46 @@
 package ru.andreyz.memoryservice.search.provider;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
+import ru.andreyz.memoryservice.repository.NoteRepository;
+import ru.andreyz.memoryservice.search.PostgresSearchRuntime;
 import ru.andreyz.memoryservice.search.SearchLayer;
 import ru.andreyz.memoryservice.search.SearchProvider;
+import ru.andreyz.memoryservice.search.SearchQueryParser;
 import ru.andreyz.memoryservice.search.SearchResultItem;
-import ru.andreyz.memoryservice.service.KnowledgeService;
+import ru.andreyz.memoryservice.search.SearchSupport;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
-/**
- * Searches Notice documents via the existing KnowledgeService proxy to JavaRagService.
- * Notices are stored in RAG (not in local PostgreSQL), so this uses a listing + client-side match.
- */
 @Component
 public class NoticeSearchProvider implements SearchProvider {
 
-    private static final Logger log = LoggerFactory.getLogger(NoticeSearchProvider.class);
+    private static final String NOTICE_SEARCH_SQL = """
+            SELECT id, title, text, tags, source, created_at,
+                   ts_rank_cd(search_vector, (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))) AS rank
+            FROM notes
+            WHERE search_vector @@ (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))
+            ORDER BY rank DESC, created_at DESC
+            LIMIT :limit
+            """;
 
-    private final KnowledgeService knowledgeService;
+    private final NoteRepository noteRepository;
+    private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final PostgresSearchRuntime postgresSearchRuntime;
+    private final SearchQueryParser searchQueryParser;
 
-    public NoticeSearchProvider(KnowledgeService knowledgeService) {
-        this.knowledgeService = knowledgeService;
+    public NoticeSearchProvider(NoteRepository noteRepository,
+                                NamedParameterJdbcTemplate jdbcTemplate,
+                                PostgresSearchRuntime postgresSearchRuntime,
+                                SearchQueryParser searchQueryParser) {
+        this.noteRepository = noteRepository;
+        this.jdbcTemplate = jdbcTemplate;
+        this.postgresSearchRuntime = postgresSearchRuntime;
+        this.searchQueryParser = searchQueryParser;
     }
 
     @Override
@@ -33,33 +50,53 @@ public class NoticeSearchProvider implements SearchProvider {
 
     @Override
     public List<SearchResultItem> search(String query, int limit) {
-        String q = query.toLowerCase();
-        var results = new ArrayList<SearchResultItem>();
-
-        List<KnowledgeService.KnowledgeDocumentSummary> notices;
-        try {
-            notices = knowledgeService.list("NOTICE");
-        } catch (Exception e) {
-            log.warn("Notice search unavailable: {}", e.getMessage());
-            return List.of();
+        var parsed = searchQueryParser.parse(query);
+        if (postgresSearchRuntime.isPostgres()) {
+            return jdbcTemplate.query(NOTICE_SEARCH_SQL,
+                    new MapSqlParameterSource()
+                            .addValue("query", parsed.normalizedQuery().isBlank() ? parsed.originalQuery() : parsed.normalizedQuery())
+                            .addValue("limit", limit),
+                    (rs, rowNum) -> new SearchResultItem(
+                            SearchLayer.NOTICE,
+                            rs.getString("title"),
+                            SearchSupport.firstNonBlank(rs.getString("text"), rs.getString("tags"), rs.getString("source")),
+                            "/ui/notes",
+                            String.valueOf(rs.getLong("id")),
+                            "NOTICE",
+                            SearchSupport.clamp((rs.getDouble("rank") * 0.55) + sourceBoost(rs.getString("source"))),
+                            rs.getTimestamp("created_at").toInstant(),
+                            SearchSupport.matchedFields(parsed.keywords(), orderedFields(
+                                    rs.getString("title"),
+                                    rs.getString("text"),
+                                    rs.getString("tags"),
+                                    rs.getString("source")
+                            ))
+                    ));
         }
 
-        for (var doc : notices) {
-            double score = scoreNotice(q, doc);
+        var results = new ArrayList<SearchResultItem>();
+        noteRepository.findTop200ByOrderByCreatedAtDesc().forEach(note -> {
+            double score = 0.0;
+            if (SearchSupport.containsAnyKeyword(note.title(), parsed.keywords())) score += 0.58;
+            if (SearchSupport.containsAnyKeyword(note.text(), parsed.keywords())) score += 0.18;
+            if (SearchSupport.containsAnyKeyword(note.tags(), parsed.keywords())) score += 0.12;
+            score += sourceBoost(note.source());
             if (score > 0) {
-                String snippet = doc.subject() != null ? doc.subject() : doc.fileName();
                 results.add(new SearchResultItem(
                         SearchLayer.NOTICE,
-                        titleOf(doc),
-                        snippet,
-                        null,
-                        String.valueOf(doc.id()),
+                        note.title(),
+                        SearchSupport.firstNonBlank(note.text(), note.tags(), note.source()),
+                        "/ui/notes",
+                        String.valueOf(note.id()),
                         "NOTICE",
-                        score,
-                        null
+                        SearchSupport.clamp(score),
+                        note.createdAt(),
+                        SearchSupport.matchedFields(parsed.keywords(), orderedFields(
+                                note.title(), note.text(), note.tags(), note.source()
+                        ))
                 ));
             }
-        }
+        });
 
         return results.stream()
                 .sorted((a, b) -> Double.compare(b.score(), a.score()))
@@ -67,17 +104,19 @@ public class NoticeSearchProvider implements SearchProvider {
                 .toList();
     }
 
-    private double scoreNotice(String query, KnowledgeService.KnowledgeDocumentSummary doc) {
-        String title = titleOf(doc).toLowerCase();
-        if (title.contains(query)) return 0.85;
-        if (doc.subject() != null && doc.subject().toLowerCase().contains(query)) return 0.60;
-        if (doc.sender() != null && doc.sender().toLowerCase().contains(query)) return 0.40;
-        return 0.0;
+    private static double sourceBoost(String source) {
+        return switch (source == null ? "" : source) {
+            case "email", "capture" -> 0.10;
+            default -> 0.0;
+        };
     }
 
-    private String titleOf(KnowledgeService.KnowledgeDocumentSummary doc) {
-        if (doc.title() != null && !doc.title().isBlank()) return doc.title();
-        if (doc.subject() != null && !doc.subject().isBlank()) return doc.subject();
-        return doc.fileName() != null ? doc.fileName() : "Notice #" + doc.id();
+    private static Map<String, String> orderedFields(String title, String text, String tags, String source) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("title", title);
+        fields.put("text", text);
+        fields.put("tags", tags);
+        fields.put("source", source);
+        return fields;
     }
 }
