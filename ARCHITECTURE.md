@@ -191,6 +191,7 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `POST` | `/api/capture/process-now` | Ручной запуск классификации capture-файлов |
 | `POST` | `/api/knowledge/search` | Memory-owned прокси к JavaRagService `/api/search` + usage events |
 | `GET/PUT/POST` | `/api/knowledge/documents/**` | Browser-facing proxy управления RAG-документами |
+| `POST` | `/api/search` | Global Search: PostgreSQL FTS по operational layers + RAG search для `KNOWLEDGE` |
 | `GET` | `/api/stats/usage?period=7d` | Usage Statistics: агрегаты по usage events |
 | `GET/POST` | `/api/notes` | Лента заметок (`POST` → `201 Created`; поля: `title` обязательный, `text` опциональный, `tags`, `source`) |
 | `DELETE` | `/api/notes/{id}` | Удалить заметку: `204 No Content` / `404 Not Found` (hard delete, CR-MEM-011) |
@@ -354,7 +355,7 @@ Leader-Role-Framework/
 │       └── YYYY-MM-DD/
 │           └── HH-MM-SS.md
 ├── workspace/
-│   ├── tasks/          ← файлы задач по id
+│   ├── tasks/          ← export/backup markdown-файлы задач по id (on demand, not source of truth)
 │   │   ├── TASK-001.md
 │   │   └── TASK-002.md
 │   └── 08_daily_journal/

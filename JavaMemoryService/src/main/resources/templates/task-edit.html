@@ -26,33 +26,16 @@
         <!-- Description with markdown editor -->
         <div class="mb-3">
             <label class="form-label fw-semibold">Описание</label>
-            <ul class="nav nav-tabs mb-1" id="md-tabs">
-                <li class="nav-item">
-                    <button type="button" class="nav-link active" id="tab-edit"
-                            onclick="showTab('edit')">markdown</button>
-                </li>
-                <li class="nav-item">
-                    <button type="button" class="nav-link" id="tab-preview"
-                            onclick="showTab('preview')">preview</button>
-                </li>
-            </ul>
-            <div id="pane-edit">
-                <textarea id="md-input" name="description" class="form-control"
-                          rows="10" style="font-family:monospace"
-                          th:text="${description}"></textarea>
-                <!-- Links preview (CR-MEM-009) -->
-                <div id="task-editor-links" class="task-editor-links mt-2 d-none">
-                    <div class="task-editor-links-label">Ссылки из описания:</div>
-                    <ul id="task-editor-links-list"></ul>
-                </div>
-            </div>
-            <div id="pane-preview" class="border rounded p-3 d-none" style="min-height:200px">
-                <div id="md-preview-content"></div>
+            <textarea id="md-input" name="description" class="form-control"
+                      rows="25" style="font-family:monospace"
+                      th:text="${description}"></textarea>
+            <!-- Links preview (CR-MEM-009) -->
+            <div id="task-editor-links" class="task-editor-links mt-2 d-none">
+                <div class="task-editor-links-label">Ссылки из описания:</div>
+                <ul id="task-editor-links-list"></ul>
             </div>
             <div class="mt-1">
-                <span class="badge bg-light text-muted border small">
-                    📄 <span th:text="${filePath}"></span>
-                </span>
+                <a class="btn btn-sm btn-outline-secondary" th:href="${exportUrl}">Export MD</a>
             </div>
         </div>
 
@@ -106,44 +89,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Markdown tab switcher
-function showTab(tab) {
-    const editPane = document.getElementById('pane-edit');
-    const previewPane = document.getElementById('pane-preview');
-    const tabEdit = document.getElementById('tab-edit');
-    const tabPreview = document.getElementById('tab-preview');
-    if (tab === 'edit') {
-        editPane.classList.remove('d-none');
-        previewPane.classList.add('d-none');
-        tabEdit.classList.add('active');
-        tabPreview.classList.remove('active');
-    } else {
-        editPane.classList.add('d-none');
-        previewPane.classList.remove('d-none');
-        tabEdit.classList.remove('active');
-        tabPreview.classList.add('active');
-        const raw = document.getElementById('md-input').value;
-        document.getElementById('md-preview-content').innerHTML = simpleMarkdown(raw);
-    }
-}
-
-// Minimal markdown renderer (headings, bold, italic, lists, code, links, newlines)
-function simpleMarkdown(md) {
-    return md
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/(https?:\/\/[^\s<>"']+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
-        .replace(/^#{3} (.+)$/gm, '<h5>$1</h5>')
-        .replace(/^#{2} (.+)$/gm, '<h4>$1</h4>')
-        .replace(/^# (.+)$/gm, '<h3>$1</h3>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/^- (.+)$/gm, '<li>$1</li>')
-        .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>');
-}
-
 // Links preview: extract URLs from textarea, render as clickable links
 function updateLinksPreview() {
     const text = document.getElementById('md-input').value;

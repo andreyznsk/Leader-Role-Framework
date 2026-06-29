@@ -1,6 +1,8 @@
 package ru.andreyz.memoryservice.search.provider;
 
 import org.springframework.stereotype.Component;
+import ru.andreyz.memoryservice.domain.TaskDescription;
+import ru.andreyz.memoryservice.repository.TaskDescriptionRepository;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import ru.andreyz.memoryservice.repository.TaskRepository;
@@ -21,24 +23,37 @@ public class TaskSearchProvider implements SearchProvider {
 
     private static final String TASK_SEARCH_SQL = """
             SELECT id, title, description, status, priority, due_date, source, updated_at,
-                   ts_rank_cd(search_vector, (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))) AS rank
-            FROM tasks
-            WHERE status <> 'DELETED'
-              AND search_vector @@ (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))
-            ORDER BY rank DESC, updated_at DESC
+                   content_md, task_rank, description_rank
+            FROM (
+                SELECT t.id, t.title, t.description, t.status, t.priority, t.due_date, t.source, t.updated_at,
+                       d.content_md,
+                       ts_rank_cd(t.search_vector, (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))) AS task_rank,
+                       ts_rank_cd(d.search_vector, (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))) AS description_rank
+                FROM tasks t
+                LEFT JOIN task_descriptions d ON d.task_id = t.id
+                WHERE t.status <> 'DELETED'
+                  AND (
+                        t.search_vector @@ (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))
+                        OR d.search_vector @@ (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))
+                  )
+            ) sub
+            ORDER BY ((COALESCE(task_rank, 0) * 0.50) + (COALESCE(description_rank, 0) * 0.35)) DESC, updated_at DESC
             LIMIT :limit
             """;
 
     private final TaskRepository taskRepository;
+    private final TaskDescriptionRepository taskDescriptionRepository;
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final PostgresSearchRuntime postgresSearchRuntime;
     private final SearchQueryParser searchQueryParser;
 
     public TaskSearchProvider(TaskRepository taskRepository,
+                              TaskDescriptionRepository taskDescriptionRepository,
                               NamedParameterJdbcTemplate jdbcTemplate,
                               PostgresSearchRuntime postgresSearchRuntime,
                               SearchQueryParser searchQueryParser) {
         this.taskRepository = taskRepository;
+        this.taskDescriptionRepository = taskDescriptionRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.postgresSearchRuntime = postgresSearchRuntime;
         this.searchQueryParser = searchQueryParser;
@@ -58,15 +73,18 @@ public class TaskSearchProvider implements SearchProvider {
                             .addValue("query", parsed.normalizedQuery().isBlank() ? parsed.originalQuery() : parsed.normalizedQuery())
                             .addValue("limit", limit),
                     (rs, rowNum) -> {
+                        String contentMd = rs.getString("content_md");
                         List<String> matchedFields = SearchSupport.matchedFields(parsed.keywords(), orderedFields(
                                 rs.getString("title"),
                                 rs.getString("description"),
+                                contentMd,
                                 rs.getString("status"),
                                 rs.getString("priority"),
                                 rs.getString("source")
                         ));
                         double finalScore = SearchSupport.clamp(
-                                (rs.getDouble("rank") * 0.45)
+                                (rs.getDouble("task_rank") * 0.45)
+                                        + (rs.getDouble("description_rank") * 0.30)
                                         + statusBoost(rs.getString("status"))
                                         + priorityBoost(rs.getString("priority"))
                                         + dueDateBoost(rs.getDate("due_date") == null ? null : rs.getDate("due_date").toLocalDate())
@@ -74,7 +92,7 @@ public class TaskSearchProvider implements SearchProvider {
                         return new SearchResultItem(
                                 SearchLayer.TASK,
                                 rs.getString("title"),
-                                SearchSupport.firstNonBlank(rs.getString("description"), rs.getString("status")),
+                                buildSnippet(parsed.keywords(), contentMd, rs.getString("description"), rs.getString("status")),
                                 "/ui/today",
                                 String.valueOf(rs.getLong("id")),
                                 "TASK",
@@ -86,19 +104,26 @@ public class TaskSearchProvider implements SearchProvider {
         }
 
         var results = new ArrayList<SearchResultItem>();
-        taskRepository.findCurrentTasks().forEach(task -> {
-            double score = fallbackScore(parsed.keywords(), task.title(), task.description(), task.status(), task.priority());
+        var tasks = taskRepository.findCurrentTasks();
+        Map<Long, TaskDescription> descriptionsByTaskId = taskDescriptionRepository.findByTaskIdIn(
+                tasks.stream().map(task -> task.id()).toList()
+        ).stream().collect(java.util.stream.Collectors.toMap(TaskDescription::taskId, java.util.function.Function.identity()));
+        tasks.forEach(task -> {
+            String contentMd = descriptionsByTaskId.containsKey(task.id())
+                    ? descriptionsByTaskId.get(task.id()).contentMd()
+                    : null;
+            double score = fallbackScore(parsed.keywords(), task.title(), task.description(), contentMd, task.status(), task.priority());
             if (score > 0) {
                 results.add(new SearchResultItem(
                         SearchLayer.TASK,
                         task.title(),
-                        task.description(),
+                        buildSnippet(parsed.keywords(), contentMd, task.description(), task.status()),
                         "/ui/today",
                         String.valueOf(task.id()),
                         "TASK",
                         score,
                         task.updatedAt(),
-                        SearchSupport.matchedFields(parsed.keywords(), orderedFields(task.title(), task.description(), task.status(), task.priority(), task.source()))
+                        SearchSupport.matchedFields(parsed.keywords(), orderedFields(task.title(), task.description(), contentMd, task.status(), task.priority(), task.source()))
                 ));
             }
         });
@@ -115,13 +140,14 @@ public class TaskSearchProvider implements SearchProvider {
         return 0.0;
     }
 
-    private double fallbackScore(List<String> keywords, String title, String body, String status, String priority) {
+    private double fallbackScore(List<String> keywords, String title, String body, String contentMd, String status, String priority) {
         if (keywords.isEmpty()) {
             return 0.0;
         }
         double score = 0.0;
         if (SearchSupport.containsAnyKeyword(title, keywords)) score += 0.55;
         if (SearchSupport.containsAnyKeyword(body, keywords)) score += 0.20;
+        if (SearchSupport.containsAnyKeyword(contentMd, keywords)) score += 0.30;
         score += statusBoost(status);
         score += priorityBoost(priority);
         return SearchSupport.clamp(score);
@@ -159,13 +185,36 @@ public class TaskSearchProvider implements SearchProvider {
         return 0.0;
     }
 
-    private static Map<String, String> orderedFields(String title, String description, String status, String priority, String source) {
+    private static Map<String, String> orderedFields(String title, String description, String contentMd, String status, String priority, String source) {
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("title", title);
         fields.put("description", description);
+        fields.put("contentMd", contentMd);
         fields.put("status", status);
         fields.put("priority", priority);
         fields.put("source", source);
         return fields;
+    }
+
+    private static String buildSnippet(List<String> keywords, String contentMd, String description, String status) {
+        String preferred = snippetFromContent(keywords, SearchSupport.firstNonBlank(contentMd, description));
+        return SearchSupport.firstNonBlank(preferred, description, status);
+    }
+
+    private static String snippetFromContent(List<String> keywords, String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String compact = value.replaceAll("\\s+", " ").trim();
+        String normalized = compact.toLowerCase();
+        for (String keyword : keywords) {
+            int idx = normalized.indexOf(keyword.toLowerCase());
+            if (idx >= 0) {
+                int start = Math.max(0, idx - 48);
+                int end = Math.min(compact.length(), idx + keyword.length() + 96);
+                return compact.substring(start, end);
+            }
+        }
+        return compact.length() <= 160 ? compact : compact.substring(0, 157) + "...";
     }
 }

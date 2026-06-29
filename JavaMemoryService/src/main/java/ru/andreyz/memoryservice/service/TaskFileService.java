@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 
@@ -58,6 +59,24 @@ public class TaskFileService {
 
     public String filePath(long id) {
         return tasksDir.resolve(fileName(id)).toString();
+    }
+
+    public List<Path> listExistingTaskFiles() {
+        try (var paths = Files.list(tasksDir)) {
+            return paths
+                    .filter(Files::isRegularFile)
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    public String readFile(Path path) {
+        try {
+            return Files.readString(path);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private Path taskFile(long id) {

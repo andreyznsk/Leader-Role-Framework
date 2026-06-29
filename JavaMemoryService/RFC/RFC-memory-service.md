@@ -605,8 +605,9 @@ PATCH /api/tasks/{id}/status             body: { "status": "TODO|IN_PROGRESS|BLO
 POST /api/tasks/{id}/done
 POST /api/tasks/{id}/move                body: { "toDate": "2026-06-09" }
 POST /api/tasks/{id}/reorder             body: { "direction": "up"|"down" } | { "position": N }
-POST   /api/tasks/{id}/delete            # мягкое удаление (статус → DELETED) + удалить workspace/tasks/TASK-{id}.md если файл существует
-DELETE /api/tasks/{id}                   # мягкое удаление (статус → DELETED) + удалить workspace/tasks/TASK-{id}.md, REST-алиас
+POST   /api/tasks/{id}/delete            # мягкое удаление (статус → DELETED)
+DELETE /api/tasks/{id}                   # мягкое удаление (статус → DELETED), REST-алиас
+POST /api/search                         # Global Search по operational layers + RAG layer
 
 # Knowledge Gateway proxy (без прямого JDBC в schema rag)
 POST /api/knowledge/search
@@ -616,9 +617,10 @@ PUT  /api/knowledge/documents/{id}
 POST /api/knowledge/documents/{id}/reindex
 GET  /api/notices                       # legacy alias/filter type=NOTICE
 
-# Описания задач (файловая шина workspace/tasks/)
-GET  /api/tasks/{id}/description         # 200 text/plain | 204 если файл отсутствует
-PUT  /api/tasks/{id}/description         body: text/plain → записать в файл
+# Описания задач (source of truth = PostgreSQL memory.task_descriptions)
+GET  /api/tasks/{id}/description         # JSON TaskDescriptionResponse или text/plain по Accept
+PUT  /api/tasks/{id}/description         # JSON {contentMd} или text/plain; обновляет PostgreSQL, не пишет файл
+GET  /api/tasks/{id}/description/export-md
 
 # Очередь подтверждения (PENDING)
 GET  /api/tasks/pending                  # все задачи со статусом PENDING
@@ -709,7 +711,7 @@ Base: `http://localhost:8082/ui`
 - задача открывается по клику на название
 - дедлайн показывается отдельной колонкой `DL`
 - кнопка `Завтра` сдвигает дедлайн на `+1 день` относительно текущего дедлайна
-- удаление происходит через modal-подтверждение и удаляет также markdown-файл описания
+- удаление происходит через modal-подтверждение; export-файлы не являются source of truth и не участвуют в delete flow
 
 Управление задачами в строке:
 
@@ -719,25 +721,25 @@ Base: `http://localhost:8082/ui`
 | Иконка флага | циклически менять приоритет | `PUT /api/tasks/{id}` |
 | Название задачи | открыть форму редактирования | `GET /ui/tasks/{id}/edit` |
 | Кнопка `Завтра` | сдвинуть дедлайн на +1 день | `PUT /api/tasks/{id}` |
-| Иконка удаления | открыть modal подтверждения и удалить задачу + md-файл | `DELETE /api/tasks/{id}` |
+| Иконка удаления | открыть modal подтверждения и удалить задачу | `DELETE /api/tasks/{id}` |
 
-Добавление задачи: зелёная кнопка `Добавить / задачу` расположена рядом с `Применить` и `Сбросить`, открывает modal-форму с полями `title`, `description`, `priority`, `status`, `dueDate`. После `POST /api/tasks` описание дополнительно пишется в `workspace/tasks/TASK-{id}.md` через `PUT /api/tasks/{id}/description`.
+Добавление задачи: зелёная кнопка `Добавить / задачу` расположена рядом с `Применить` и `Сбросить`, открывает modal-форму с полями `title`, `description`, `priority`, `status`, `dueDate`. Расширенное markdown-описание сохраняется в `memory.task_descriptions`; файловая выгрузка делается только через explicit export.
 
 **`/ui/tasks/{id}/edit`** — Форма редактирования задачи
 
 | Поле | Тип | Источник данных |
 |------|-----|----------------|
 | `title` | text input | `tasks.title` (PostgreSQL) |
-| `description` | Markdown textarea | `workspace/tasks/TASK-{id}.md` (файловая шина) |
+| `description` | Markdown textarea | `memory.task_descriptions.content_md` |
 | `priority` | select | `tasks.priority` |
 | `due_date` | date input | `tasks.due_date` |
 | `status` | radio-пилюли | `tasks.status` |
 | `source` | readonly badge | `tasks.source` + `tasks.email_id` |
 
 Markdown-редактор — две вкладки: `markdown` (raw, monospace) и `preview` (HTML-рендер через JS, без библиотек).
-Под textarea — бейдж с путём к файлу: `📄 workspace/tasks/TASK-003.md`.
+Под textarea — кнопка `Export MD`, которая скачивает `TASK-{id}.md`, сгенерированный из БД.
 
-Удаление на странице edit — двойное подтверждение: первый клик меняет текст на "точно удалить?" (3 сек), второй — `DELETE /api/tasks/{id}` + удаление файла описания.
+Удаление на странице edit — двойное подтверждение: первый клик меняет текст на "точно удалить?" (3 сек), второй — `DELETE /api/tasks/{id}`.
 
 **`/ui/incidents`** — Активные инциденты
 - Список с severity badge (P1/P2/P3)
@@ -820,8 +822,8 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 | `markTaskDone` | Задача → DONE | "Отметь задачу X как выполненную" |
 | `moveTask` | Перенести задачу на дату | "Перенеси задачу X на завтра" |
 | `updateTaskStatus` | Изменить статус задачи | Любое изменение статуса |
-| `getTaskDescription` | Читать Markdown-описание задачи из файловой шины | "Покажи детали задачи X" |
-| `setTaskDescription` | Записать Markdown-описание задачи в файловую шину | "Обнови детали задачи X" |
+| `getTaskDescription` | Читать Markdown-описание задачи из PostgreSQL | "Покажи детали задачи X" |
+| `setTaskDescription` | Записать Markdown-описание задачи в PostgreSQL | "Обнови детали задачи X" |
 | `createIncident` | Зафиксировать инцидент | После подтверждения пользователем |
 | `resolveIncident` | Закрыть инцидент с root cause | После подтверждения пользователем |
 | `addRisk` | Добавить риск | После подтверждения пользователем |
@@ -829,7 +831,7 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 | `addPeopleNote` | Записать заметку о человеке | Наблюдение по итогам встречи и т.д. |
 | `searchPeople` | Найти человека по имени | "Что я знаю про Иванова?" |
 
-`getTaskDescription` реализован поверх `GET /api/tasks/{id}/description`; файл хранится в `workspace/tasks/TASK-{id}.md`.
+`getTaskDescription` реализован поверх `GET /api/tasks/{id}/description`; source of truth — `memory.task_descriptions`, а markdown-файл создаётся только через export endpoint.
 
 ### Правило подтверждения (ОБЯЗАТЕЛЬНО в CLAUDE.md агента)
 
@@ -1217,7 +1219,7 @@ JavaMemoryService/
     │   │   ├── service/
     │   │   │   ├── ContextService.java
     │   │   │   ├── TaskService.java
-    │   │   │   ├── TaskFileService.java            # read/write workspace/tasks/TASK-{id}.md
+    │   │   │   ├── TaskFileService.java            # legacy import + on-demand export helpers for workspace/tasks/
     │   │   │   ├── IncidentService.java
     │   │   │   ├── RiskService.java
     │   │   │   ├── PeopleService.java
@@ -1400,8 +1402,8 @@ JavaMemoryService/
 
 **CR-MEM-003 (UI Task Manager):**
 12. `V3__add_task_sort_order.sql` — миграция поля сортировки
-13. `TaskFileService` + `workspace/tasks/` инициализация
-14. `TaskDescriptionController` (GET/PUT `/api/tasks/{id}/description`)
+13. `TaskFileService` + `workspace/tasks/` используется только для legacy import и export backup-файлов
+14. `TaskDescriptionController` (GET/PUT `/api/tasks/{id}/description`, `GET /api/tasks/{id}/description/export-md`)
 15. Reorder endpoint в `TaskController` + `ReorderTaskRequest`
 16. `TaskEditController` + `task-edit.html` (форма с MD-редактором)
 17. Обновить `today.html`: sort_order, drag handle, стрелки, иконки карандаш/корзина, inline add

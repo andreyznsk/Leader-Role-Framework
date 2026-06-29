@@ -6,7 +6,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
-import ru.andreyz.memoryservice.service.TaskFileService;
+import ru.andreyz.memoryservice.service.TaskDescriptionService;
 import ru.andreyz.memoryservice.service.TaskService;
 
 import java.time.LocalDate;
@@ -16,20 +16,20 @@ import java.time.LocalDate;
 public class TaskEditController {
 
     private final TaskService taskService;
-    private final TaskFileService taskFileService;
+    private final TaskDescriptionService taskDescriptionService;
 
-    public TaskEditController(TaskService taskService, TaskFileService taskFileService) {
+    public TaskEditController(TaskService taskService, TaskDescriptionService taskDescriptionService) {
         this.taskService = taskService;
-        this.taskFileService = taskFileService;
+        this.taskDescriptionService = taskDescriptionService;
     }
 
     @GetMapping("/{id}/edit")
     public String editForm(@PathVariable Long id, Model model) {
         Task task = taskService.findById(id);
-        String description = taskFileService.read(id).orElse("");
+        String description = taskDescriptionService.getContent(id);
         model.addAttribute("task", task);
         model.addAttribute("description", description);
-        model.addAttribute("filePath", taskFileService.filePath(id));
+        model.addAttribute("exportUrl", "/api/tasks/%d/description/export-md".formatted(id));
         return "task-edit";
     }
 
@@ -41,7 +41,7 @@ public class TaskEditController {
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
                            @RequestParam(required = false, defaultValue = "") String description) {
         taskService.edit(id, new EditTaskRequest(title, null, priority, status, dueDate));
-        taskFileService.write(id, description);
+        taskDescriptionService.update(id, description);
         return "redirect:/ui/today";
     }
 }
