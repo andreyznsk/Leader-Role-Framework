@@ -12,6 +12,7 @@ import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.MailProcessingRoute;
+import ru.andreyz.mailagent.model.PendingTaskRequest;
 import ru.andreyz.mailagent.model.ProcessedEmail;
 import ru.andreyz.mailagent.service.MailControlAuditStore;
 import ru.andreyz.mailagent.service.MailProcessingStateService;
@@ -24,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -123,6 +125,55 @@ class ActionExecutorTest {
         assertTrue(Files.exists(planFile));
         String content = Files.readString(planFile);
         assertTrue(content.contains("Review PR #42"));
+    }
+
+    @Test
+    void requestSendsAgentSummaryAndRawEmailToPendingTask() throws Exception {
+        Path inbox = tempDir.resolve("inbox");
+        Files.createDirectories(inbox);
+        String emailId = "test-request-description-001";
+        Files.writeString(inbox.resolve(emailId + ".json"), "{}");
+
+        AgentResponse response = new AgentResponse(
+            AgentResponseType.REQUEST, emailId,
+            "Нужно проверить обновление пайплайна и дать ответ.",
+            "- [ ] [HIGH] Проверить обновление пайплайна — от ivanov@test.com",
+            "Проверить обновление пайплайна",
+            "HIGH",
+            "ivanov@test.com",
+            null,
+            null,
+            null,
+            null
+        );
+
+        Email email = email(
+            emailId,
+            "Pipeline update",
+            "ivanov@test.com",
+            "Коллеги,\nнужно проверить новый pipeline до пятницы.\nСпасибо."
+        );
+
+        executor.execute(email, response);
+
+        ArgumentCaptor<PendingTaskRequest> requestCaptor = ArgumentCaptor.forClass(PendingTaskRequest.class);
+        verify(memoryServiceClient).createPendingTask(requestCaptor.capture());
+        assertEquals(
+            """
+            Нужно проверить обновление пайплайна и дать ответ.
+
+            ---
+
+            ## Сырой текст письма
+            Тема: Pipeline update
+            От: ivanov@test.com
+
+            Коллеги,
+            нужно проверить новый pipeline до пятницы.
+            Спасибо.
+            """.strip(),
+            requestCaptor.getValue().description()
+        );
     }
 
     @Test
@@ -254,6 +305,25 @@ class ActionExecutorTest {
         assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
         verify(mailClient).markAsRead(emailId, "INBOX");
+    }
+
+    @Test
+    void markAsReadDryRunLeavesNoticeUnread() throws Exception {
+        runtimeConfigService.apply(Map.of("markAsReadEnabled", "false"));
+        Path inbox = tempDir.resolve("inbox");
+        Files.createDirectories(inbox);
+        String emailId = "test-notice-dry-run-001";
+        Files.writeString(inbox.resolve(emailId + ".json"), "{}");
+
+        AgentResponse response = new AgentResponse(
+            AgentResponseType.NOTICE, emailId,
+            "Новая release-практика команды", null, null, null, null, null, null, null, null
+        );
+
+        executor.execute(email(emailId), response);
+
+        verify(mailClient, never()).markAsRead(anyString(), anyString());
+        assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
     }
 
     private Email email(String emailId) {

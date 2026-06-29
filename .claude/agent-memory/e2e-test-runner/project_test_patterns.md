@@ -74,6 +74,24 @@ Workaround: использовать `python3 json.loads(strict=False)` вмес
 
 **Статус сценария:** Steps 10, 14 используют обёртку `{"settings":{...}}` — это правильный формат (сценарий уже исправлен).
 
+## IT-16 — Global Search (CR-MEM-009)
+
+**2026-06-28 первый прогон (8 шагов):** Все 8 шагов PASS. Пересборка потребовалась (исходники обновились после JAR от 2026-06-26).
+**2026-06-28 второй прогон (8 шагов):** Все 8 шагов PASS. Пересборка не потребовалась.
+
+- Step 1: POST /api/tasks → HTTP 201, title+description поддерживают unicode ("отпуск"), task id=169
+- Step 2: POST /api/search QUICK+TASK → score=0.85, результаты найдены сразу (без индексации)
+- Step 3: Мульти-слойный поиск NOTICE/TASK/PEOPLE/RISK/INCIDENT/KNOWLEDGE → HTTP 200, пустые слои не дают ошибок
+- Step 4: Пустой query → HTTP 400 (валидация работает)
+- Step 5: GET /api/search/layers → 8 слоёв: NOTICE/TASK/PEOPLE/RISK/INCIDENT/KNOWLEDGE available=true; MAIL/CALENDAR available=false
+- Step 6: GET /ui/search → HTTP 200
+- Step 7: GET /ui/search?q=отпуск → HTTP 200 с "Search LeaderOS" и "отпуск" в теле (4 вхождения)
+- Step 8: MAIL layer → HTTP 200, layers=[] в ответе (MAIL отфильтрован), results=[]
+
+**Cleanup:** DELETE /api/tasks/169 → HTTP 204. Одна задача (один curl с `-w "\n%{http_code}"` + `head -n -1`).
+
+**Дефект сценария Step 7:** Команда в сценарии передаёт Кириллицу напрямую в URL (`?q=отпуск`) — curl не кодирует их автоматически и сервис возвращает HTTP 400. Правильный вызов: `curl -G --data-urlencode "q=отпуск" ...` или URL-encode вручную. Это дефект сценария, не сервиса.
+
 ## Ollama порты
 
 - Локальная Ollama: localhost:11434 (рабочая)

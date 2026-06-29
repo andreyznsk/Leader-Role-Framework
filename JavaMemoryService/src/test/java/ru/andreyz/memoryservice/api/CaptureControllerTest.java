@@ -106,7 +106,7 @@ class CaptureControllerTest {
 
         mockMvc.perform(get("/api/capture/today"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.rawText == 'field check note')].status").value("PENDING"))
+                .andExpect(jsonPath("$[?(@.rawText == 'field check note')].status").value("NEW"))
                 .andExpect(jsonPath("$[?(@.rawText == 'field check note')].source").value("web"));
     }
 

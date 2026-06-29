@@ -15,6 +15,7 @@ public enum UsageEventType {
 
     CAPTURE_CREATED,
     CAPTURE_PROCESSED,
+    CAPTURE_FAILED,
 
     NOTE_CREATED,
     RISK_CREATED,

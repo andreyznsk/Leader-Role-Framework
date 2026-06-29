@@ -28,7 +28,7 @@
     <div class="card">
         <div class="card-body p-0">
             <div th:if="${#lists.isEmpty(notes)}" class="text-muted p-3">Заметок нет</div>
-            <div th:each="note : ${notes}" class="border-bottom p-3">
+            <div th:each="note : ${notes}" class="border-bottom p-3" th:id="'note-' + ${note.id}">
                 <div class="d-flex justify-content-between gap-3 mb-1">
                     <span class="badge bg-secondary" th:text="${note.source}">capture</span>
                     <span class="small text-muted"
@@ -53,6 +53,11 @@
                                 th:data-task-description="${note.text != null and !note.text.isBlank() ? note.text : 'Задача из заметки #' + note.id}">
                             &rarr; В задачу
                         </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                data-bs-toggle="modal"
+                                th:attr="data-bs-target='#edit-note-' + ${note.id}">
+                            Edit
+                        </button>
                         <button type="button" class="btn btn-sm btn-outline-danger"
                                 title="Удалить"
                                 th:attr="data-note-id=${note.id},data-note-label=${#strings.abbreviate(note.title, 80)}"
@@ -67,6 +72,39 @@
                     <div class="small text-muted" style="white-space: pre-wrap" th:text="${note.text}"></div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<div th:each="note : ${notes}" class="modal fade" th:id="'edit-note-' + ${note.id}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit: <span th:text="${note.title}"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" th:action="@{/ui/notes/{id}/edit(id=${note.id})}"
+                  th:attr="data-api-url=@{/api/notes/{id}(id=${note.id})},data-api-method='PUT',data-api-success='reload'">
+                <input type="hidden" name="_method" value="PUT">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Заголовок *</label>
+                        <input type="text" name="title" class="form-control" maxlength="200" required th:value="${note.title}"/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание</label>
+                        <textarea name="text" class="form-control" rows="5" th:text="${note.text}"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tags</label>
+                        <input type="text" name="tags" class="form-control" th:value="${note.tags}"/>
+                    </div>
+                    <input type="hidden" name="source" th:value="${note.source}"/>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -168,6 +206,15 @@
 
 <script>
 (function () {
+    const searchParams = new URLSearchParams(window.location.search);
+    const editId = searchParams.get('edit');
+    if (editId) {
+        const modalElement = document.getElementById('edit-note-' + editId);
+        if (modalElement) {
+            bootstrap.Modal.getOrCreateInstance(modalElement).show();
+        }
+    }
+
     const addNoteModalEl = document.getElementById('addNoteModal');
     const addNoteModal = bootstrap.Modal.getOrCreateInstance(addNoteModalEl);
     const addNoteForm = document.getElementById('addNoteForm');

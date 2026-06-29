@@ -24,5 +24,8 @@ public interface CaptureRepository extends CrudRepository<Capture, Long> {
     @Query("SELECT * FROM captures ORDER BY captured_at DESC LIMIT 20")
     List<Capture> findRecent();
 
+    @Query("SELECT * FROM captures ORDER BY captured_at DESC LIMIT 200")
+    List<Capture> findAllOrdered();
+
     Optional<Capture> findBySourceAndSourceId(String source, String sourceId);
 }

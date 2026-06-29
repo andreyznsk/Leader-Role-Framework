@@ -1,67 +1,437 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
-<head th:replace="~{fragments/layout :: head('Capture Inbox')}"></head>
+<head th:replace="~{fragments/layout :: head('CaptureBot')}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 
-<div class="container py-3">
+<div class="container-fluid py-3 px-4">
+
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-            <h4 class="mb-1">Capture Inbox</h4>
-            <div class="text-muted small">Raw captures и результаты маршрутизации Operational Memory</div>
+            <h4 class="mb-1">CaptureBot</h4>
+            <div class="text-muted small">Inbox raw-заметок — быстрый захват, вечерняя классификация</div>
         </div>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="processCapturesButton">Process Now</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="processCapturesButton">
+            Process Now
+        </button>
     </div>
 
+    <!-- Status filter buttons -->
+    <div class="mb-2 d-flex gap-2 flex-wrap align-items-center">
+        <div class="btn-group" role="group" id="statusFilterGroup">
+            <button type="button" class="btn btn-sm btn-outline-primary status-btn active" data-status="">All</button>
+            <button type="button" class="btn btn-sm btn-outline-primary status-btn" data-status="NEW">New</button>
+            <button type="button" class="btn btn-sm btn-outline-primary status-btn" data-status="PROCESSING">Processing</button>
+            <button type="button" class="btn btn-sm btn-outline-primary status-btn" data-status="PROCESSED">Processed</button>
+            <button type="button" class="btn btn-sm btn-outline-primary status-btn" data-status="ERROR">Error</button>
+            <button type="button" class="btn btn-sm btn-outline-primary status-btn" data-status="ARCHIVED">Archived</button>
+        </div>
+    </div>
+
+    <!-- Additional filters row -->
+    <div class="mb-3 d-flex gap-2 flex-wrap align-items-center">
+        <input type="date" id="filterDate" class="form-control form-control-sm" style="width:160px" placeholder="Date"/>
+        <select id="filterSource" class="form-select form-select-sm" style="width:130px">
+            <option value="">All sources</option>
+            <option value="ui">ui</option>
+            <option value="agent">agent</option>
+            <option value="api">api</option>
+            <option value="mail">mail</option>
+            <option value="email">email</option>
+            <option value="cli">cli</option>
+            <option value="manual">manual</option>
+        </select>
+        <select id="filterRoute" class="form-select form-select-sm" style="width:140px">
+            <option value="">All routes</option>
+            <option value="TASK">TASK</option>
+            <option value="RISK">RISK</option>
+            <option value="NOTE">NOTE</option>
+            <option value="QUESTION">QUESTION</option>
+            <option value="KNOWLEDGE">KNOWLEDGE</option>
+            <option value="PERSON_NOTE">PERSON_NOTE</option>
+            <option value="JOURNAL">JOURNAL</option>
+            <option value="NOTICE">NOTICE</option>
+        </select>
+        <input type="text" id="filterSearch" class="form-control form-control-sm" style="width:220px" placeholder="Search text..."/>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="applyFiltersButton">Filter</button>
+        <button type="button" class="btn btn-sm btn-link text-muted p-0" id="resetFiltersButton">Reset</button>
+    </div>
+
+    <!-- Split layout: Quick Capture (left) + History (right) -->
     <div class="row g-3">
-        <div class="col-lg-7">
+
+        <!-- Quick Capture -->
+        <div class="col-lg-4 col-xl-3">
+            <div class="card h-100">
+                <div class="card-header">Quick Capture</div>
+                <div class="card-body d-flex flex-column gap-3">
+                    <textarea id="captureText" class="form-control flex-grow-1"
+                              rows="8" placeholder="Запиши мысль, наблюдение, риск или задачу..."></textarea>
+                    <div>
+                        <label class="form-label small text-muted mb-1">Source</label>
+                        <select id="captureSource" class="form-select form-select-sm">
+                            <option value="ui" selected>ui</option>
+                            <option value="agent">agent</option>
+                            <option value="api">api</option>
+                        </select>
+                    </div>
+                    <div id="captureError" class="text-danger small d-none"></div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-success flex-grow-1" id="saveCaptureButton">
+                            Save
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="clearCaptureButton">
+                            Clear
+                        </button>
+                    </div>
+                    <div id="captureSuccess" class="text-success small d-none">✓ Записал в capture inbox</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Capture History -->
+        <div class="col-lg-8 col-xl-9">
             <div class="card">
-                <div class="card-header">Today</div>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Capture History</span>
+                    <span id="historyCount" class="badge bg-secondary">0</span>
+                </div>
                 <div class="card-body p-0">
-                    <div th:if="${#lists.isEmpty(todayCaptures)}" class="text-muted p-3">Сегодня capture-записей нет</div>
-                    <div th:each="capture : ${todayCaptures}" class="border-bottom p-3">
-                        <div class="d-flex justify-content-between align-items-start gap-3">
-                            <div>
-                                <div class="small text-muted" th:text="${capture.source}">manual</div>
-                                <div class="mt-1" th:text="${capture.rawText}">text</div>
-                            </div>
-                            <span class="badge bg-secondary" th:text="${capture.status}">PENDING</span>
-                        </div>
-                        <div class="small text-muted mt-2"
-                             th:text="${capture.classified != null ? 'classified: ' + capture.classified + ', routed: ' + capture.routedTo : 'awaiting classification'}">
-                            route
-                        </div>
+                    <div id="historyLoading" class="text-muted p-3 text-center">Loading...</div>
+                    <div id="historyEmpty" class="text-muted p-3 d-none">Captures not found</div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0" id="historyTable" style="display:none">
+                            <thead>
+                            <tr>
+                                <th style="width:110px">Status</th>
+                                <th style="width:140px">Created</th>
+                                <th style="width:80px">Source</th>
+                                <th>Text</th>
+                                <th style="width:110px">Route</th>
+                                <th style="width:130px">Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody id="historyBody"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-5">
-            <div class="card">
-                <div class="card-header">Recent</div>
-                <div class="card-body p-0">
-                    <div th:if="${#lists.isEmpty(recentCaptures)}" class="text-muted p-3">История пуста</div>
-                    <div th:each="capture : ${recentCaptures}" class="border-bottom p-3">
-                        <div class="small text-muted" th:text="${capture.source}">manual</div>
-                        <div class="mt-1" th:text="${#strings.abbreviate(capture.rawText, 140)}">text</div>
-                        <div class="small text-muted mt-2"
-                             th:text="${capture.status + (capture.routedTo != null ? ' -> ' + capture.routedTo : '')}">
-                            state
-                        </div>
-                    </div>
+    </div>
+</div>
+
+<!-- View Capture Modal -->
+<div class="modal fade" id="viewCaptureModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Capture Detail</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 d-flex gap-2 align-items-center">
+                    <span id="viewStatus" class="badge"></span>
+                    <span id="viewSource" class="badge bg-secondary"></span>
+                    <span id="viewRoute" class="badge bg-info text-dark d-none"></span>
                 </div>
+                <div class="mb-3">
+                    <div class="text-muted small mb-1">Raw text</div>
+                    <div id="viewText" style="white-space: pre-wrap; font-family: var(--bs-font-monospace)"></div>
+                </div>
+                <div id="viewResultRow" class="mb-3 d-none">
+                    <div class="text-muted small mb-1">Result</div>
+                    <div id="viewResult" class="small text-muted"></div>
+                </div>
+                <div id="viewErrorRow" class="mb-3 d-none">
+                    <div class="text-muted small mb-1">Error</div>
+                    <div id="viewError" class="small text-danger"></div>
+                </div>
+                <div id="viewFileRow" class="mb-3 d-none">
+                    <div class="text-muted small mb-1">Backup file</div>
+                    <div id="viewFile" class="small text-muted font-monospace"></div>
+                </div>
+                <div class="small text-muted" id="viewDates"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
+
 <script>
 (function () {
-    const button = document.getElementById('processCapturesButton');
-    if (!button) return;
-    button.addEventListener('click', function () {
-        window.LeaderUiApi.request('/api/capture/process-now', {method: 'POST'})
-            .then(function (result) { window.LeaderUiApi.handleSuccess('reload', result); });
+    const STATUS_COLORS = {
+        NEW: 'bg-primary',
+        PROCESSING: 'bg-warning text-dark',
+        PROCESSED: 'bg-success',
+        ERROR: 'bg-danger',
+        ARCHIVED: 'bg-secondary',
+    };
+
+    let currentStatus = '';
+    let currentDate = '';
+    let currentSource = '';
+    let currentRoute = '';
+    let currentQ = '';
+
+    // --- Status filter buttons ---
+    document.querySelectorAll('.status-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentStatus = btn.dataset.status;
+            loadHistory();
+        });
     });
+
+    document.getElementById('applyFiltersButton').addEventListener('click', function () {
+        currentDate = document.getElementById('filterDate').value;
+        currentSource = document.getElementById('filterSource').value;
+        currentRoute = document.getElementById('filterRoute').value;
+        currentQ = document.getElementById('filterSearch').value;
+        loadHistory();
+    });
+
+    document.getElementById('filterSearch').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('applyFiltersButton').click();
+    });
+
+    document.getElementById('resetFiltersButton').addEventListener('click', function () {
+        currentDate = '';
+        currentSource = '';
+        currentRoute = '';
+        currentQ = '';
+        document.getElementById('filterDate').value = '';
+        document.getElementById('filterSource').value = '';
+        document.getElementById('filterRoute').value = '';
+        document.getElementById('filterSearch').value = '';
+        loadHistory();
+    });
+
+    // --- Quick Capture ---
+    document.getElementById('saveCaptureButton').addEventListener('click', function () {
+        const text = document.getElementById('captureText').value.trim();
+        const source = document.getElementById('captureSource').value;
+        const errorEl = document.getElementById('captureError');
+        const successEl = document.getElementById('captureSuccess');
+
+        errorEl.classList.add('d-none');
+        successEl.classList.add('d-none');
+
+        if (!text) {
+            errorEl.textContent = 'Введи текст заметки';
+            errorEl.classList.remove('d-none');
+            return;
+        }
+
+        window.LeaderUiApi.request('/api/captures', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: text, source: source})
+        }).then(function (result) {
+            document.getElementById('captureText').value = '';
+            successEl.classList.remove('d-none');
+            setTimeout(function () { successEl.classList.add('d-none'); }, 3000);
+            loadHistory();
+        }).catch(function (err) {
+            errorEl.textContent = 'Ошибка: ' + err.message;
+            errorEl.classList.remove('d-none');
+        });
+    });
+
+    document.getElementById('clearCaptureButton').addEventListener('click', function () {
+        document.getElementById('captureText').value = '';
+        document.getElementById('captureError').classList.add('d-none');
+        document.getElementById('captureSuccess').classList.add('d-none');
+    });
+
+    // --- Process Now ---
+    document.getElementById('processCapturesButton').addEventListener('click', function () {
+        window.LeaderUiApi.request('/api/capture/process-now', {method: 'POST'})
+            .then(function (result) {
+                loadHistory();
+            });
+    });
+
+    // --- History table ---
+    function buildApiUrl() {
+        const params = new URLSearchParams();
+        if (currentStatus) params.set('status', currentStatus);
+        if (currentDate) params.set('date', currentDate);
+        if (currentSource) params.set('source', currentSource);
+        if (currentRoute) params.set('route', currentRoute);
+        if (currentQ) params.set('q', currentQ);
+        const qs = params.toString();
+        return '/api/captures' + (qs ? '?' + qs : '');
+    }
+
+    function loadHistory() {
+        const loading = document.getElementById('historyLoading');
+        const empty = document.getElementById('historyEmpty');
+        const table = document.getElementById('historyTable');
+        const body = document.getElementById('historyBody');
+        const count = document.getElementById('historyCount');
+
+        loading.classList.remove('d-none');
+        empty.classList.add('d-none');
+        table.style.display = 'none';
+
+        window.LeaderUiApi.request(buildApiUrl())
+            .then(function (result) {
+                loading.classList.add('d-none');
+                const captures = result.data;
+                count.textContent = captures.length;
+
+                if (!captures || captures.length === 0) {
+                    empty.classList.remove('d-none');
+                    return;
+                }
+
+                body.innerHTML = '';
+                captures.forEach(function (c) {
+                    body.appendChild(buildRow(c));
+                });
+                table.style.display = '';
+            })
+            .catch(function (err) {
+                loading.classList.add('d-none');
+                empty.textContent = 'Ошибка загрузки: ' + err.message;
+                empty.classList.remove('d-none');
+            });
+    }
+
+    function buildRow(c) {
+        const tr = document.createElement('tr');
+        const statusColor = STATUS_COLORS[c.status] || 'bg-secondary';
+        const textPreview = (c.rawText || '').substring(0, 120);
+        const route = c.classified || c.route || '';
+        const routedTo = c.routedTo || c.targetRef || '';
+        const createdAt = c.capturedAt ? formatDate(c.capturedAt) : '';
+        const canReprocess = c.status === 'ERROR' || c.status === 'PROCESSED';
+        const canArchive = c.status !== 'ARCHIVED';
+        const canProcess = c.status === 'NEW' || c.status === 'ERROR';
+
+        tr.innerHTML =
+            '<td><span class="badge ' + statusColor + '">' + escHtml(c.status) + '</span></td>' +
+            '<td class="small text-muted">' + escHtml(createdAt) + '</td>' +
+            '<td class="small">' + escHtml(c.source || '') + '</td>' +
+            '<td class="small">' +
+                '<span class="d-block" style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+                    escHtml(textPreview) +
+                '</span>' +
+                (c.errorMessage ? '<span class="text-danger small">' + escHtml(c.errorMessage.substring(0, 80)) + '</span>' : '') +
+            '</td>' +
+            '<td class="small">' +
+                (route ? '<span class="badge bg-info text-dark">' + escHtml(route) + '</span>' : '') +
+                (routedTo ? '<div class="text-muted" style="font-size:0.75em">' + escHtml(routedTo) + '</div>' : '') +
+            '</td>' +
+            '<td>' +
+                '<div class="d-flex gap-1 flex-wrap">' +
+                    '<button class="btn btn-outline-secondary btn-xs py-0 px-1" style="font-size:0.75em" onclick="viewCapture(' + c.id + ')">View</button>' +
+                    (canProcess ? '<button class="btn btn-outline-primary btn-xs py-0 px-1" style="font-size:0.75em" onclick="processCapture(' + c.id + ')">Process</button>' : '') +
+                    (canReprocess ? '<button class="btn btn-outline-warning btn-xs py-0 px-1" style="font-size:0.75em" onclick="reprocessCapture(' + c.id + ')">Reprocess</button>' : '') +
+                    (canArchive ? '<button class="btn btn-outline-secondary btn-xs py-0 px-1" style="font-size:0.75em" onclick="archiveCapture(' + c.id + ')">Archive</button>' : '') +
+                '</div>' +
+            '</td>';
+        return tr;
+    }
+
+    function formatDate(isoStr) {
+        if (!isoStr) return '';
+        try {
+            const d = new Date(isoStr);
+            return d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+        } catch (e) {
+            return isoStr;
+        }
+    }
+
+    function escHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // --- Row actions ---
+    window.viewCapture = function (id) {
+        window.LeaderUiApi.request('/api/captures/' + id).then(function (result) {
+            const c = result.data;
+            const statusColor = STATUS_COLORS[c.status] || 'bg-secondary';
+            document.getElementById('viewStatus').className = 'badge ' + statusColor;
+            document.getElementById('viewStatus').textContent = c.status;
+            document.getElementById('viewSource').textContent = c.source || '';
+            const routeEl = document.getElementById('viewRoute');
+            const route = c.classified || c.route || '';
+            if (route) {
+                routeEl.textContent = route;
+                routeEl.classList.remove('d-none');
+            } else {
+                routeEl.classList.add('d-none');
+            }
+            document.getElementById('viewText').textContent = c.rawText || '';
+            const resultRow = document.getElementById('viewResultRow');
+            const routedTo = c.routedTo || c.targetRef || '';
+            if (routedTo) {
+                document.getElementById('viewResult').textContent = routedTo;
+                resultRow.classList.remove('d-none');
+            } else {
+                resultRow.classList.add('d-none');
+            }
+            const errorRow = document.getElementById('viewErrorRow');
+            if (c.errorMessage) {
+                document.getElementById('viewError').textContent = c.errorMessage;
+                errorRow.classList.remove('d-none');
+            } else {
+                errorRow.classList.add('d-none');
+            }
+            const fileRow = document.getElementById('viewFileRow');
+            if (c.filePath) {
+                document.getElementById('viewFile').textContent = c.filePath;
+                fileRow.classList.remove('d-none');
+            } else {
+                fileRow.classList.add('d-none');
+            }
+            const dates = ['Created: ' + formatDate(c.capturedAt)];
+            if (c.processedAt) dates.push('Processed: ' + formatDate(c.processedAt));
+            document.getElementById('viewDates').textContent = dates.join('  •  ');
+
+            new bootstrap.Modal(document.getElementById('viewCaptureModal')).show();
+        });
+    };
+
+    window.processCapture = function (id) {
+        window.LeaderUiApi.request('/api/captures/' + id + '/process', {method: 'POST'})
+            .then(function () { loadHistory(); })
+            .catch(function (err) { alert('Process failed: ' + err.message); });
+    };
+
+    window.reprocessCapture = function (id) {
+        window.LeaderUiApi.request('/api/captures/' + id + '/reprocess', {method: 'POST'})
+            .then(function () { loadHistory(); })
+            .catch(function (err) { alert('Reprocess failed: ' + err.message); });
+    };
+
+    window.archiveCapture = function (id) {
+        window.LeaderUiApi.request('/api/captures/' + id + '/archive', {method: 'POST'})
+            .then(function () { loadHistory(); })
+            .catch(function (err) { alert('Archive failed: ' + err.message); });
+    };
+
+    // Apply initial status from server-side attribute if set
+    const initialStatus = '[[${activeStatus}]]';
+    if (initialStatus && initialStatus !== '[[${activeStatus}]]') {
+        currentStatus = initialStatus;
+        document.querySelectorAll('.status-btn').forEach(function (btn) {
+            btn.classList.toggle('active', btn.dataset.status === initialStatus);
+        });
+    }
+
+    loadHistory();
 })();
 </script>
 </body>

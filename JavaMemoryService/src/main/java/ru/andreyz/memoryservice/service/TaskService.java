@@ -19,16 +19,16 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final DailyPlanRepository planRepository;
     private final UsageEventService usageEventService;
-    private final TaskFileService taskFileService;
+    private final TaskDescriptionService taskDescriptionService;
 
     public TaskService(TaskRepository taskRepository,
                        DailyPlanRepository planRepository,
                        UsageEventService usageEventService,
-                       TaskFileService taskFileService) {
+                       TaskDescriptionService taskDescriptionService) {
         this.taskRepository = taskRepository;
         this.planRepository = planRepository;
         this.usageEventService = usageEventService;
-        this.taskFileService = taskFileService;
+        this.taskDescriptionService = taskDescriptionService;
     }
 
     public Task createConfirmed(LocalDate date, String title, String priority,
@@ -46,6 +46,7 @@ public class TaskService {
                 dueDate != null ? dueDate : date, source != null ? source : "MANUAL", emailId,
                 sortOrder, Instant.now(), Instant.now());
         Task saved = taskRepository.save(task);
+        taskDescriptionService.initializeFromTaskField(saved);
         recordTaskCreated(saved, usageSource(source), false);
         return saved;
     }
@@ -76,6 +77,7 @@ public class TaskService {
                 dueDate, "EMAIL", emailId,
                 0, Instant.now(), Instant.now());
         Task saved = taskRepository.save(task);
+        taskDescriptionService.initializeFromTaskField(saved);
         boolean mailTask = "mail-agent".equals(usageSource);
         if (mailTask) {
             usageEventService.record(new UsageEventCommand(
@@ -111,20 +113,24 @@ public class TaskService {
 
     public void deleteTask(Long id) {
         updateStatus(id, "DELETED");
-        taskFileService.delete(id);
     }
 
     public Task edit(Long id, EditTaskRequest req) {
         Task task = findById(id);
         Task updated = new Task(task.id(), task.planId(),
                 req.title() != null ? req.title() : task.title(),
-                req.description() != null ? req.description() : task.description(),
+                task.description(),
                 req.status() != null ? req.status() : task.status(),
                 req.priority() != null ? req.priority() : task.priority(),
                 req.dueDate() != null ? req.dueDate() : task.dueDate(),
                 task.source(), task.emailId(),
                 task.sortOrder(), task.createdAt(), Instant.now());
-        return taskRepository.save(updated);
+        Task saved = taskRepository.save(updated);
+        if (req.description() != null) {
+            taskDescriptionService.update(id, req.description());
+            return findById(id);
+        }
+        return saved;
     }
 
     public Task markDone(Long id) {

@@ -55,7 +55,7 @@ public class ActionExecutor {
     public void execute(Email email, AgentResponse response) throws Exception {
         MailRuntimeConfig runtime = runtimeConfigService.snapshot();
         ProcessedEmail state = processingStateService.start(email, response.type().name());
-        Object payload = buildPayload(response, runtime);
+        Object payload = buildPayload(email, response, runtime);
         executeChain(state, email, response.type(), initialRoute(response.type()), payload);
     }
 
@@ -186,9 +186,7 @@ public class ActionExecutor {
                 yield new StepResult(MailProcessingRoute.MARK_AS_READ, payload, null, null);
             }
             case MARK_AS_READ -> {
-                if (payload.markAsRead()) {
-                    mailClient.markAsRead(email.id(), email.folder());
-                }
+                markAsReadIfEnabled(email, payload.markAsRead(), "NOTICE");
                 yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
             }
             default -> throw new IllegalStateException("Unsupported NOTICE route: " + route);
@@ -211,7 +209,7 @@ public class ActionExecutor {
                 yield new StepResult(MailProcessingRoute.MARK_AS_READ, payload, null, null);
             }
             case MARK_AS_READ -> {
-                mailClient.markAsRead(email.id(), email.folder());
+                markAsReadIfEnabled(email, true, "NOTE");
                 yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
             }
             default -> throw new IllegalStateException("Unsupported NOTE route: " + route);
@@ -230,23 +228,34 @@ public class ActionExecutor {
                 yield new StepResult(next, payload, null, null);
             }
             case MARK_AS_READ -> {
-                if (payload.markAsRead()) {
-                    mailClient.markAsRead(email.id(), email.folder());
-                }
+                markAsReadIfEnabled(email, payload.markAsRead(), "NOISE");
                 yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
             }
             default -> throw new IllegalStateException("Unsupported mail side-effect route: " + route);
         };
     }
 
-    private Object buildPayload(AgentResponse response, MailRuntimeConfig runtime) {
+    private void markAsReadIfEnabled(Email email, boolean requested, String reason) throws Exception {
+        if (!requested) {
+            return;
+        }
+        MailRuntimeConfig runtime = runtimeConfigService.snapshot();
+        if (!runtime.markAsReadEnabled()) {
+            log.info("Email {} in folder [{}] could be marked as read for {} but markAsReadEnabled=false; leaving unread",
+                email.id(), email.folder(), reason);
+            return;
+        }
+        mailClient.markAsRead(email.id(), email.folder());
+    }
+
+    private Object buildPayload(Email email, AgentResponse response, MailRuntimeConfig runtime) {
         return switch (response.type()) {
             case REQUEST -> new RequestActionPayload(
                 response.taskLine(),
                 pathProperties.getPlan(),
                 new PendingTaskRequest(
                     response.taskTitle(),
-                    response.note(),
+                    buildPendingTaskDescription(email, response),
                     response.emailId(),
                     response.sender(),
                     response.priority()
@@ -291,6 +300,40 @@ public class ActionExecutor {
                 false
             );
         };
+    }
+
+    private String buildPendingTaskDescription(Email email, AgentResponse response) {
+        String agentSummary = normalizeMultiline(response.note());
+        String rawEmail = buildRawEmailBlock(email);
+        if (agentSummary == null) {
+            return rawEmail;
+        }
+        return agentSummary + "\n\n---\n\n" + rawEmail;
+    }
+
+    private String buildRawEmailBlock(Email email) {
+        StringBuilder builder = new StringBuilder("## Сырой текст письма");
+        if (hasText(email.subject())) {
+            builder.append("\nТема: ").append(email.subject().trim());
+        }
+        if (hasText(email.from())) {
+            builder.append("\nОт: ").append(email.from().trim());
+        }
+        if (hasText(email.body())) {
+            builder.append("\n\n").append(normalizeMultiline(email.body()));
+        }
+        return builder.toString();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private String normalizeMultiline(String value) {
+        if (!hasText(value)) {
+            return null;
+        }
+        return value.strip();
     }
 
     private Object payloadFor(AgentResponseType responseType, String payloadJson) {

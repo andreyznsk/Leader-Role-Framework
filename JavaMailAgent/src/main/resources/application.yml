@@ -20,6 +20,7 @@ mail:
   protocol: maildev
   poll-interval-seconds: 60
   fetch-limit: 20
+  mark-as-read-enabled: true
   test-connection:
     timeout-seconds: 15
     max-folders-to-scan: 500

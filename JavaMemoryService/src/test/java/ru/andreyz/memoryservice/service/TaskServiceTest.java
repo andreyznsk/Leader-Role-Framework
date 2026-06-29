@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import ru.andreyz.memoryservice.domain.Task;
+import ru.andreyz.memoryservice.dto.EditTaskRequest;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -17,6 +18,9 @@ class TaskServiceTest {
 
     @Autowired
     private TaskService taskService;
+
+    @Autowired
+    private TaskDescriptionService taskDescriptionService;
 
     @Test
     void createPending_hasCorrectStatus() {
@@ -78,5 +82,23 @@ class TaskServiceTest {
         Task reopened = taskService.toggleDone(done.id());
 
         assertThat(reopened.status()).isEqualTo("TODO");
+    }
+
+    @Test
+    void edit_withDescriptionUpdatesDatabaseBackwardsCompatibly() {
+        Task task = taskService.createConfirmed(LocalDate.now(), "Task with legacy edit", "NORMAL", null, "MANUAL", null);
+
+        Task updated = taskService.edit(task.id(), new EditTaskRequest(
+                "Task with legacy edit",
+                "## Context\nblocked by qa approval",
+                "HIGH",
+                "IN_PROGRESS",
+                LocalDate.now().plusDays(1)
+        ));
+
+        assertThat(updated.priority()).isEqualTo("HIGH");
+        assertThat(updated.status()).isEqualTo("IN_PROGRESS");
+        assertThat(taskDescriptionService.getContent(task.id())).isEqualTo("## Context\nblocked by qa approval");
+        assertThat(taskService.findById(task.id()).description()).contains("blocked by qa approval");
     }
 }

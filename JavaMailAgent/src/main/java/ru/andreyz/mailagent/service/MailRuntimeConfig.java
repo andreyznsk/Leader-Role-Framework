@@ -18,6 +18,7 @@ public record MailRuntimeConfig(
         int pollIntervalSeconds,
         List<String> foldersInclude,
         List<String> foldersExclude,
+        boolean markAsReadEnabled,
         boolean markNoiseAsRead,
         boolean moveProcessedMail,
         String processedFolder,

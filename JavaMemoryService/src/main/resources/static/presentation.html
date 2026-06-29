@@ -38,7 +38,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .eyebrow.e3::before,.eyebrow.e3::after{background:var(--accent3)}
 .eyebrow.e4{color:var(--accent4)}
 .eyebrow.e4::before,.eyebrow.e4::after{background:var(--accent4)}
-.title{font-family:var(--mono);font-size:clamp(24px,3.6vw,46px);font-weight:700;line-height:1.15;margin-bottom:10px;text-align:center}
+.title{font-family:var(--mono);font-size:clamp(16px,3.6vw,30px);font-weight:700;line-height:1.15;margin-bottom:10px;text-align:left}
 .subtitle{font-size:15px;color:var(--text2);margin-bottom:18px;line-height:1.55;text-align:center}
 .body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px;min-height:0;overflow:hidden}
 
@@ -76,13 +76,13 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 @media(max-width:760px){.g3{grid-template-columns:1fr 1fr}}
 
 /* PAIN */
-.bignum{font-family:var(--mono);font-size:clamp(32px,4.5vw,50px);font-weight:700;color:var(--accent3);line-height:1;margin-bottom:6px;text-align:center}
-.numlbl{font-size:13px;color:var(--text2);line-height:1.4;text-align:center}
-.numsub{font-size:11px;color:var(--text3);margin-top:4px;font-family:var(--mono);text-align:center}
+.bignum{font-family:var(--mono);font-size:clamp(100px,4.5vw,60px);font-weight:1000;color:var(--accent3);line-height:1;margin-bottom:6px;text-align:center}
+.numlbl{font-size:32px;color:var(--text2);line-height:1.4;text-align:center}
+.numsub{font-size:16px;color:var(--text3);margin-top:4px;font-family:var(--mono);text-align:center}
 
 /* CONCEPT */
-.concept-wrap{flex:1;display:flex;gap:14px;min-height:0}
-.concept-col{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.concept-wrap{flex:1;display:flex;gap:14px;min-height:0;align-items:stretch}
+.concept-col{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px;height:100%}
 .concept-col.hi{border-color:var(--accent)}
 .concept-col.hi2{border-color:var(--accent2)}
 .col-title{font-family:var(--mono);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;padding-bottom:10px;border-bottom:1px solid var(--border);text-align:center}
@@ -123,12 +123,12 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 
 /* SCENARIO */
 .sc-wrap{flex:1;display:flex;flex-direction:column;gap:14px;min-height:0;align-items:center;justify-content:center}
-.sc-left{width:min(1040px,100%);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.sc-right{width:min(1100px,100%);min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;flex:1;min-height:0}
+.sc-left{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.sc-right{width:100%;min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:visible}
 @media(max-width:900px){.sc-left{grid-template-columns:1fr}}
-.pain-block{background:var(--bg2);border:1px solid var(--accent3);border-radius:10px;padding:14px 16px}
-.pain-title{font-family:var(--mono);font-size:10px;color:var(--accent3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
-.pain-text{font-size:13px;color:var(--text2);line-height:1.5}
+.pain-block{background:var(--bg2);border:1px solid var(--accent3);border-radius:10px;padding:14px 16px;justify-content:center}
+.pain-title{font-family:var(--mono);font-size:24px;color:var(--accent3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.pain-text{font-size:20px;color:var(--text2);line-height:1.5}
 .trigger-block{background:var(--bg2);border:1px solid var(--accent2);border-radius:10px;padding:14px 16px}
 .trigger-title{font-family:var(--mono);font-size:10px;color:var(--accent2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
 .trigger-text{font-family:var(--mono);font-size:12px;color:var(--text);line-height:1.5}
@@ -136,7 +136,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .result-title{font-family:var(--mono);font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
 .result-text{font-size:13px;color:var(--text2);line-height:1.5}
 .sc-diagram-title{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;text-align:center}
-.sc-mwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sc-mwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:visible}
 .sc-mwrap .mermaid svg{max-height:calc((100vh - 310px) / var(--diagram-scale))}
 
 /* ROADMAP */
@@ -175,13 +175,125 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .slide-tribe .scl{font-size:14px}
 .slide-tribe .final{font-size:18px}
 
-/* SLIDE 3 — +20% text */
-.slide-concept .eyebrow{font-size:14.4px}
-.slide-concept .title{font-size:clamp(28.8px,4.32vw,55.2px)}
-.slide-concept .col-title{font-size:14.4px}
-.slide-concept .ci-title{font-size:14.4px}
-.slide-concept .ci-desc{font-size:17.3px}
-.slide-concept .analogy{font-size:20.2px}
+/* SLIDE 3 — +15% text */
+.slide-concept .body{justify-content:flex-start;gap:0}
+.slide-concept .concept-wrap{flex:0 0 auto;align-items:stretch}
+.slide-concept .concept-col{padding:18px;gap:10px;height:auto}
+.slide-concept .concept-item{gap:10px}
+.slide-concept .eyebrow{font-size:18.3px}
+.slide-concept .title{font-size:clamp(36.4px,5.47vw,69.9px)}
+.slide-concept .col-title{font-size:18.3px}
+.slide-concept .ci-icon{font-size:22.8px}
+.slide-concept .ci-title{font-size:18.3px}
+.slide-concept .ci-desc{font-size:21.9px}
+.slide-concept .analogy{font-size:25.5px}
+
+/* AGENT AI LAYER */
+.slide-ai{font-size:24px}
+.slide-ai .eyebrow{font-size:24px}
+.slide-ai .title{font-size:clamp(24px,4.14vw,34.5px)}
+.slide-ai .subtitle{font-size:24px}
+.slide-ai .body{justify-content:center}
+.slide-ai .sc-diagram-title{font-size:30px}
+.slide-ai .mermaid svg{font-size:70px}
+.ai-layout{
+  flex:1;
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);
+  gap:14px;
+  align-items:stretch;
+}
+.ai-left,.ai-right{
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+}
+.ai-left{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:18px;
+}
+.ai-left .sc-diagram-title{margin-bottom:12px}
+.ai-left .mermaid svg{
+  max-width:min(100%,calc(88vw / var(--diagram-scale)));
+  max-height:calc((100vh - 300px) / var(--diagram-scale));
+}
+.ai-right{gap:12px}
+.ai-points{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+@media(max-width:900px){
+  .ai-layout{grid-template-columns:1fr}
+}
+
+/* SLIDE 9 - SEARCH */
+.slide-search .eyebrow{font-size:14.4px}
+.slide-search .title{font-size:clamp(19.2px,4.32vw,36px)}
+.slide-search .pain-title,
+.slide-search .trigger-title,
+.slide-search .result-title,
+.slide-search .sc-diagram-title{font-size:12px}
+.slide-search .pain-text,
+.slide-search .result-text{font-size:15.6px}
+.slide-search .trigger-text{font-size:14.4px}
+.slide-search .mermaid svg{font-size:120%}
+
+/* SLIDE 2 - PAIN */
+.slide-pain{gap:16px}
+.slide-pain .title{margin-bottom:0}
+.slide-pain .body{justify-content:flex-start;gap:16px}
+.slide-pain .pain-hero{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:12px;
+  align-items:center;
+}
+.slide-pain .pain-copy{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:8px;
+}
+.slide-pain .pain-meme{
+  min-height:0;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  flex:0 0 auto;
+}
+.slide-pain .pain-meme img{
+  max-width:70%;
+  max-height:70%;
+  object-fit:contain;
+}
+@media(max-width:900px){
+  .slide-pain .pain-hero{grid-template-columns:1fr}
+}
+
+/* SLIDE 13 - DEV FLOW */
+.slide-devflow .body{justify-content:flex-start}
+.slide-devflow .devflow-photo{
+  height:30vh;
+  min-height:180px;
+  max-height:30vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-bottom:12px;
+}
+.slide-devflow .devflow-photo img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  border-radius:8px;
+}
+.slide-devflow .analogy{
+  margin-bottom:12px;
+}
 
 /* TITLE */
 .pulsedot{width:9px;height:9px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;flex-shrink:0}
@@ -213,20 +325,24 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 </div>
 
 <!-- 2. БОЛЬ -->
-<div class="slide" data-t="~1:00">
+<div class="slide slide-pain" data-t="~1:00">
   <div class="eyebrow e3">Часть 1 — Боль</div>
-  <div class="title">Реальность техлида<br>в большой команде</div>
+  <div class="pain-hero">
+    <div class="pain-meme">
+      <img src="teemLeadPain.png" alt="Мем про боли тимлида">
+    </div>
+    <div class="pain-copy">
+      <div class="title">Каждый день тимлид обрабатывает сотни входящих сигналов:</div>
+      <div class="title">почта, встречи, сберчат, jira, документы, звонки.</div>
+      <div class="title">Важные задачи легко теряются среди информационного шума</div>
+    </div>
+  </div>
   <div class="body">
     <div class="g2">
       <div class="card"><div class="bignum">3–5</div><div class="numlbl">часов в неделю на рутину</div><div class="numsub">почта · планирование · поиск</div></div>
       <div class="card"><div class="bignum">~30%</div><div class="numlbl">рабочего времени — не инженерия</div><div class="numsub">встречи · согласования</div></div>
-      <div class="card"><div class="bignum">2–3</div><div class="numlbl">месяца онбординга тимлида</div><div class="numsub">до уверенной работы</div></div>
+      <div class="card"><div class="bignum">∞</div><div class="numlbl">источников информации</div><div class="numsub">почта, встречи, сберчат, jira, документы, звонки</div></div>
       <div class="card"><div class="bignum">0</div><div class="numlbl">инструментов автоматизации</div><div class="numsub">каждый изобретает велосипед</div></div>
-    </div>
-    <div class="card hi" style="text-align:center">
-      <div style="font-family:var(--mono);font-size:clamp(12px,1.6vw,16px);color:var(--text2);margin-bottom:8px"><b style="color:var(--accent)">20 тимлидов</b> × <b style="color:var(--accent)">4 ч/нед</b> × <b style="color:var(--accent)">48 недель</b></div>
-      <div style="font-family:var(--mono);font-size:clamp(28px,4vw,44px);font-weight:700;color:var(--accent);line-height:1">3 840 часов/год</div>
-      <div style="font-size:12px;color:var(--text3);margin-top:4px">~2 FTE инженеров работающих вхолостую</div>
     </div>
   </div>
 </div>
@@ -252,114 +368,117 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
         <div class="concept-item"><div class="ci-icon">🤖</div><div><div class="ci-title">AI-Agent</div><div class="ci-desc">Всегда в контексте — читает workspace, управляет через MCP tools</div></div></div>
       </div>
     </div>
-    <div class="analogy">Разработчик не пишет код в блокноте. <b>Техлид не должен управлять командой в чатах и Excel.</b></div>
   </div>
 </div>
 
-<!-- 4. АРХИТЕКТУРА -->
+<!-- 4. ТЕХНОЛОГИЧЕСКАЯ АРХИТЕКТУРА -->
 <div class="slide slide-arch" data-t="~3:30">
-  <div class="eyebrow e2">Архитектура</div>
-  <div class="title">Production-grade. <span style="color:var(--text3)">Не игрушка.</span></div>
+  <div class="eyebrow e2">Technology Architecture</div>
+  <div class="title">Как построен <span style="color:var(--accent2)">LeaderOS</span></div>
+  <div class="subtitle">Три Spring Boot сервиса + общий AI-слой + управляемые интеграции.</div>
   <div class="body">
     <div class="arch-layout">
-      <div class="arch-main">
-        <div class="mwrap" style="width:100%">
-        <div class="mermaid">
-flowchart TB
-  subgraph CORP["🏢 Корпоративная среда"]
-    EWS["Exchange EWS"]
-    CONF["Confluence"]
-    JIRA["Jira"]
-    K8S["Kubernetes"]
-    BB["Bitbucket"]
-  end
-  subgraph LOS["⬡ LeaderOS"]
-    subgraph MAIL["Mail Agent :8080"]
-      MA_S["Scheduler 60сек"]:::agent
-      MA_DB[("PG: mailagent")]:::db
-    end
-    subgraph MEM["Memory Service :8082"]
-      MEM_C["Capture Bot 18:00"]:::agent
-      MEM_MCP["MCP Tools"]:::mcp
-      MEM_DB[("PG: memory")]:::db
-    end
-    subgraph RAG["RAG Service :8081"]
-      RAG_S["Scheduler 60сек"]
-      RAG_DB[("PG: rag")]:::db
-      OS[("OpenSearch")]:::db
-    end
-  end
-  subgraph AI["🤖 AI слой"]
-    CLAUDE["agent --print\nAI-Agent batch"]:::agent
-    CLAUDE_I["AI-Agent\nИнтерактивный"]:::mcp
-    OLLAMA["Ollama\nmxbai-embed-large"]
-  end
-  CORP -->|"MCP"| MEM_MCP
-  EWS -->|"EWS/IMAP"| MA_S
-  MA_S -->|"agent --print"| CLAUDE
-  CLAUDE -->|"REQUEST"| MEM_MCP
-  MEM_C -->|"agent --print"| CLAUDE
-  CLAUDE_I -->|"MCP tools"| MEM_MCP
-  CLAUDE_I -->|"rag_search"| RAG_S
-  RAG_S --> OLLAMA
-  RAG_S --> OS
-  classDef agent fill:#2D1B1B,stroke:#F78166,color:#F78166
-  classDef mcp fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
-  classDef db fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
-        </div>
-      </div>
-      </div>
-      <div class="arch-side">
-        <div class="card" style="border-color:#F78166;background:rgba(247,129,102,.06);padding:12px 14px;text-align:center">
-          <div style="font-family:var(--mono);font-size:10px;color:#F78166;margin-bottom:4px">🔴 BATCH АВТО</div>
-          <div style="font-size:11px;color:var(--text2)">Mail Agent каждые 60 сек</div>
-        </div>
-        <div class="card" style="border-color:#D2A8FF;background:rgba(210,168,255,.06);padding:12px 14px;text-align:center">
-          <div style="font-family:var(--mono);font-size:10px;color:#D2A8FF;margin-bottom:4px">🟣 BATCH АВТО</div>
-          <div style="font-size:11px;color:var(--text2)">Capture Bot в 18:00</div>
-        </div>
-        <div class="card" style="border-color:#00D4AA;background:rgba(0,212,170,.06);padding:12px 14px;text-align:center">
-          <div style="font-family:var(--mono);font-size:10px;color:#00D4AA;margin-bottom:4px">🟢 ИНТЕРАКТИВ</div>
-          <div style="font-size:11px;color:var(--text2)">AI-Agent + MCP</div>
-        </div>
-        <div class="card" style="padding:12px 14px;text-align:center">
-          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Стек</div>
-          <div style="font-size:11px;color:var(--text2);line-height:1.9;text-align:center">
-          Java 21 · Spring Boot 3<br>Spring AI · MCP tools<br>PostgreSQL · Flyway<br>OpenSearch · RAG<br>Kubernetes-ready
-          </div>
-        </div>
+      <div class="arch-main" style="flex:1;min-height:0;width:100%">
+        <img src="page_4.png" alt="LeaderOS Technology Architecture" style="width:100%;height:100%;object-fit:contain;border-radius:8px">
       </div>
     </div>
   </div>
 </div>
 
-<!-- 5. СЦЕНАРИЙ 1 -->
-<div class="slide" data-t="~5:00">
+<!-- 5. AGENT AI LAYER -->
+<div class="slide slide-ai" data-t="~5:30">
+  <div class="eyebrow e3">Agent AI Layer</div>
+  <div class="title">LeaderOS не зависит<br>от <span style="color:var(--accent3)">конкретного AI-агента</span></div>
+  <div class="subtitle">Единый Prompt Contract и единый Java API отделяют бизнес-логику от AI Runtime.</div>
+  <div class="body">
+    <div class="ai-layout">
+      <div class="ai-left">
+        <div class="sc-diagram-title">Prompt Contract + AgentClient</div>
+        <div class="sc-mwrap"><div class="mermaid">
+flowchart TB
+  AGENT["AGENT.md"]
+
+  CLAUDE["CLAUDE.md"]
+  CODEX["CODEX.md"]
+  GIGA["GIGACODE.md"]
+
+  CLAUDE -.-> AGENT
+  CODEX -.-> AGENT
+  GIGA -.-> AGENT
+
+  AGENT --> CLIENT["common::AgentClient"]
+
+  MAIL["Mail Agent"]
+  MEMORY["Memory Service"]
+  RAG["RAG Service"]
+
+  MAIL --> CLIENT
+  MEMORY --> CLIENT
+  RAG --> CLIENT
+
+  CLIENT --> CLAUDE_RT["Claude"]
+  CLIENT --> CODEX_RT["Codex"]
+  CLIENT --> GIGA_RT["GigaChat"]
+  CLIENT --> GIGA_CODE_RT["GigaCode"]
+  CLIENT --> OLLAMA_RT["Ollama"]
+  CLIENT --> MOCK_RT["Mock"]
+
+  style AGENT fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
+  style CLIENT fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style MAIL fill:#21262D,stroke:#30363D,color:#E6EDF3
+  style MEMORY fill:#21262D,stroke:#30363D,color:#E6EDF3
+  style RAG fill:#21262D,stroke:#30363D,color:#E6EDF3
+  style CLAUDE_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style CODEX_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style GIGA_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style GIGA_CODE_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style OLLAMA_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style MOCK_RT fill:#2D1B1B,stroke:#F78166,color:#F78166
+        </div></div>
+      </div>
+      <div class="ai-right">
+        <div class="card hi2" style="text-align:center;padding:18px">
+          <div style="font-family:var(--mono);font-size:14.95px;color:var(--accent2);margin-bottom:8px">Главная идея</div>
+          <div style="font-size:19.55px;line-height:1.55;color:var(--text)">AI является <b style="color:var(--accent)">сменным компонентом</b> системы. Для перехода на нового provider достаточно заменить реализацию клиента.</div>
+        </div>
+        <div class="ai-points">
+          <div class="card" style="padding:14px 16px;border-color:#4A9EFF;background:rgba(74,158,255,.05)"><b style="color:#4A9EFF;font-family:var(--mono)">Prompt Contract</b><br><span style="font-size:13.8px;color:var(--text2)">Один файл <span style="font-family:var(--mono);color:var(--text)">AGENT.md</span> и симлинки для Claude, Codex и GigaCode.</span></div>
+          <div class="card" style="padding:14px 16px;border-color:#00D4AA;background:rgba(0,212,170,.05)"><b style="color:#00D4AA;font-family:var(--mono)">Java API</b><br><span style="font-size:13.8px;color:var(--text2)">Mail Agent, Memory Service и RAG Service работают только через <span style="font-family:var(--mono);color:var(--text)">AgentClient</span>.</span></div>
+          <div class="card" style="padding:14px 16px;border-color:#F78166;background:rgba(247,129,102,.05)"><b style="color:#F78166;font-family:var(--mono)">Runtime Swap</b><br><span style="font-size:13.8px;color:var(--text2)">Подключаем Claude, Codex, GigaChat, Ollama или Mock без переписывания сервисов.</span></div>
+        </div>
+        <div class="analogy" style="font-size:17.25px">Меняется <b>AI Runtime</b> — архитектура <b>LeaderOS</b> остаётся неизменной.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6. СЦЕНАРИЙ 1 -->
+<div class="slide" data-t="~6:30">
   <div class="eyebrow e3">Сценарий 1</div>
-  <div class="title">📧 Письмо → Задача · Знания</div>
+  <div class="title">📧 Письмо → Задача · Заметка · Знания</div>
   <div class="body">
     <div class="sc-wrap">
-      <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Письма теряются в потоке. Важные запросы не фиксируются. Полезные знания из писем никуда не сохраняются.</div></div>
-        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">Шедулер каждые 60 сек сканирует почту</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">5 маршрутов: задача, заметка, знание в RAG, черновик или шум — каждое письмо попадает куда надо.</div></div>
-      </div>
       <div class="sc-right">
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
 flowchart TD
   A(["📬 Exchange EWS"]) --> B["Mail Agent\nScheduler"]
-  B -->|"agent --print"| C{"AI-Agent\n5 маршрутов"}
+  B -->|"agent --print"| C{"AI-Agent\n6 маршрутов"}
   C -->|"REQUEST"| D["Memory Service\n/api/tasks/pending"]
   C -->|"CAPTURE"| G["Memory Service\n/api/capture"]
+  C -->|"NOTE"| N["Memory Service\n/api/notes"]
   C -->|"NOTICE"| H["rag-inbox/\nдокумент знаний"]
   C -->|"DRAFT"| F(["💾 drafts/"])
   C -->|"NOISE"| E(["✓ прочитано"])
   D --> I(["⏳ PENDING задача\n→ подтверждение в UI"])
+  G --> J(["📥 raw capture"])
+  N --> K(["📝 Operational Notes"])
   H -->|"RAG Scheduler"| L(["📚 OpenSearch\nвекторная база"])
   style C fill:#2D1B1B,stroke:#F78166,color:#F78166
   style D fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
   style G fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style N fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style K fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
   style H fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
   style L fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
         </div></div>
@@ -368,21 +487,16 @@ flowchart TD
   </div>
 </div>
 
-<!-- 6. СЦЕНАРИЙ 2 -->
-<div class="slide" data-t="~6:30">
+<!-- 7. СЦЕНАРИЙ 2 -->
+<div class="slide" data-t="~7:30">
   <div class="eyebrow e4">Сценарий 2</div>
   <div class="title">📝 Capture Bot → Классификация</div>
   <div class="body">
     <div class="sc-wrap">
-      <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Мысли теряются в течение дня. Некогда классифицировать — надо просто записать и двигаться.</div></div>
-        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">"запомни: Иванов хочет перейти в другую команду"</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">Ни одна мысль не теряется. Всё разложено по местам вечером автоматически.</div></div>
-      </div>
       <div class="sc-right">
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
-flowchart TD
+flowchart LR
   A(["💬 Заметка тимлида"]) --> B["POST /api/capture\nMemory Service"]
   B --> C["capture-inbox/\nбез интерпретации"]
   C -->|"Шедулер 18:00"| D{"AI-Agent\nклассификация"}
@@ -399,48 +513,60 @@ flowchart TD
   </div>
 </div>
 
-<!-- 7. СЦЕНАРИЙ 3 -->
-<div class="slide" data-t="~7:30">
+<!-- 8. СЦЕНАРИЙ 3 -->
+<div class="slide slide-search" data-t="~8:30">
   <div class="eyebrow e2">Сценарий 3</div>
-  <div class="title">🔍 Поиск по документации</div>
+  <div class="title">🔍 Global Search · Поиск по всему LeaderOS</div>
   <div class="body">
     <div class="sc-wrap">
-      <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Поиск в Confluence занимает 20-30 минут. Документация устаревшая. Никто не знает где что лежит.</div></div>
-        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">"как у нас проходит релиз?"</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">Ответ за 3 секунды с указанием источника. Поиск на русском языке.</div></div>
-      </div>
       <div class="sc-right">
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
-flowchart TD
-  A(["❓ Вопрос тимлида"]) --> B["AI-Agent\nинтерактивный"]
-  B -->|"MCP rag_search"| C["RAG Service :8081"]
-  C -->|"embeddings"| D["Ollama\nmxbai-embed-large"]
-  D --> C
-  C -->|"kNN поиск"| E[("OpenSearch\nвекторное хранилище")]
-  E -->|"top-3 чанка"| C
-  C -->|"релевантные фрагменты"| B
-  B --> F(["💬 Ответ с источниками\nза ~3 секунды"])
-  style B fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
-  style D fill:#2D2A1B,stroke:#4A9EFF,color:#4A9EFF
+flowchart LR
+  A(["❓ Вопрос техлида"]) --> B["/ui/search\nGlobal Search UI"]
+  B -->|"Пресеты · чекбоксы слоёв"| C["POST /api/search\nquery · layers · mode"]
+  C --> D{"GlobalSearchService"}
+
+  subgraph LAYERS["🔍 6 Search Providers"]
+    direction LR
+    P1["📌 Notice"]
+    P2["✅ Tasks"]
+    P3["👤 People"]
+    P4["⚠️ Risks"]
+    P5["🔴 Incidents"]
+    P6["📚 Knowledge → RAG"]
+  end
+
+  D --> LAYERS
+  LAYERS --> M["Merge · Sort by score · Group by layer"]
+
+  M -->|"QUICK"| R(["📋 Результаты по слоям\nза ~1 сек"])
+  M -->|"DEEP"| AI["SearchPromptBuilder\n+ AgentClient"]
+  AI --> S(["💬 AI Summary\n+ источники"])
+
+  style D fill:#2D1B1B,stroke:#F78166,color:#F78166
+  style LAYERS fill:#0D1117,stroke:#4A9EFF,color:#E6EDF3
+  style P1 fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style P2 fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style P3 fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style P4 fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style P5 fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
+  style P6 fill:#1B1B2D,stroke:#4A9EFF,color:#4A9EFF
+  style AI fill:#2D2A1B,stroke:#D2A8FF,color:#D2A8FF
+  style S fill:#2D2A1B,stroke:#D2A8FF,color:#D2A8FF
+  style R fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
         </div></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- 8. СЦЕНАРИЙ 4 -->
-<div class="slide" data-t="~8:30">
+<!-- 9. СЦЕНАРИЙ 4 -->
+<div class="slide" data-t="~9:30">
   <div class="eyebrow">Сценарий 4</div>
-  <div class="title">🌅 Утренний контекст дня</div>
+  <div class="title">🌅 ИДЕЯ! Утренний Бриф</div>
   <div class="body">
     <div class="sc-wrap">
-      <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Каждое утро 15-20 минут на восстановление контекста — что горит, что ждёт, кто что делает.</div></div>
-        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">Начало рабочего дня — открываю LeaderOS</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">За 30 секунд полный контекст: что горит, что ждёт, кто что делает.</div></div>
-      </div>
       <div class="sc-right">
         <div class="sc-diagram-title">Flow диаграмма</div>
         <div class="sc-mwrap"><div class="mermaid">
@@ -461,38 +587,8 @@ flowchart TD
   </div>
 </div>
 
-<!-- 9. СЦЕНАРИЙ 5 -->
-<div class="slide" data-t="~9:30">
-  <div class="eyebrow e3">Сценарий 5</div>
-  <div class="title">🚨 Фиксация инцидента</div>
-  <div class="body">
-    <div class="sc-wrap">
-      <div class="sc-left">
-        <div class="pain-block"><div class="pain-title">😤 Боль</div><div class="pain-text">Инциденты фиксируются хаотично. Нет истории. Одни и те же проблемы повторяются.</div></div>
-        <div class="trigger-block"><div class="trigger-title">⚡ Триггер</div><div class="trigger-text">"зафикси P1: платежи не проходят"</div></div>
-        <div class="result-block"><div class="result-title">✅ Результат</div><div class="result-text">История инцидентов, постмортемы, паттерны проблем — всё в одном месте.</div></div>
-      </div>
-      <div class="sc-right">
-        <div class="sc-diagram-title">Flow диаграмма</div>
-        <div class="sc-mwrap"><div class="mermaid">
-flowchart TD
-  A(["🚨 Сообщение тимлида"]) --> B["AI-Agent\nпоказывает карточку"]
-  B -->|"подтвердить"| C["MCP createIncident\nP1 · OPEN"]
-  C --> D["Memory Service\nИнцидент зафиксирован"]
-  D --> E["OPEN → INVESTIGATING"]
-  E -->|"решено"| F["MCP resolveIncident\nroot_cause + action_items"]
-  F --> G(["✅ RESOLVED\nПостмортем сохранён"])
-  D -->|"виден в"| H(["📊 Утренний брифинг"])
-  style B fill:#1B2D2A,stroke:#00D4AA,color:#00D4AA
-  style G fill:#1B2D1B,stroke:#00D4AA,color:#00D4AA
-        </div></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 10. ROADMAP -->
-<div class="slide slide-roadmap" data-t="~10:30">
+<!-- 11. ROADMAP -->
+<div class="slide slide-roadmap" data-t="~11:30">
   <div class="eyebrow e2">Развитие проекта</div>
   <div class="title">Что есть. Что будет.</div>
   <div class="body">
@@ -505,7 +601,6 @@ flowchart TD
         <div class="ri"><span>🗺️</span>Arch Analyst агент</div>
         <div class="ri"><span>🔗</span>MCP: Jira, Confluence, k8s</div>
         <div class="ri"><span>📝</span>Capture Bot</div>
-        <div class="ri"><span>🧪</span>E2E: 44 PASS / 0 FAIL</div>
         <div class="ri"><span>🧩</span>Common LLM модуль<br><span style="font-size:10px;color:var(--text3);padding-left:18px">GigaChat · YandexGPT · Claude</span></div>
       </div>
       <div class="card" style="display:flex;flex-direction:column;gap:8px">
@@ -530,11 +625,28 @@ flowchart TD
   </div>
 </div>
 
-<!-- 11. DEV FLOW -->
-<div class="slide" data-t="~11:30">
+  <!-- 12. МАСШТАБИРОВАНИЕ -->
+  <div class="slide" data-t="~10:30">
+    <div class="eyebrow e2">Следующий этап</div>
+    <div class="title">Масштабирование системы</div>
+    <div class="body">
+      <div class="arch-layout">
+        <div class="arch-main" style="flex:1;min-height:0;width:100%">
+          <img src="Feature_korp.png" alt="Масштабирование системы" style="width:100%;height:100%;object-fit:contain;border-radius:8px">
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 13. DEV FLOW -->
+<div class="slide slide-devflow" data-t="~12:30">
   <div class="eyebrow e2">Как мы разрабатываем</div>
   <div class="title">Идея → CR → Agent → <span style="color:var(--accent2)">Code</span></div>
   <div class="body">
+    <div class="devflow-photo">
+      <img src="photo_2026-06-29_00-31-21.jpg" alt="Фото процесса разработки">
+    </div>
     <div class="mwrap">
       <div class="mermaid">
 flowchart LR
@@ -558,8 +670,8 @@ flowchart LR
   </div>
 </div>
 
-<!-- 12. DOC STRUCTURE -->
-<div class="slide" data-t="~12:30">
+<!-- 14. DOC STRUCTURE -->
+<div class="slide" data-t="~13:30">
   <div class="eyebrow e4">Организация документации</div>
   <div class="title">RFC на модуль.<br><span style="color:var(--text3);font-size:.7em">ARCHITECTURE.md — одна мастер-спека для всех агентов.</span></div>
   <div class="body">
@@ -614,8 +726,8 @@ flowchart TB
   </div>
 </div>
 
-<!-- 13. ФИНАЛ -->
-<div class="slide" data-t="~13:00">
+<!-- 15. ФИНАЛ -->
+<div class="slide" data-t="~14:30">
   <div class="body" style="justify-content:center;align-items:center;text-align:center">
     <div style="font-family:var(--mono);font-size:clamp(32px,5vw,64px);font-weight:700;color:var(--accent);line-height:1.1;margin-bottom:20px">Спасибо за внимание</div>
     <div style="font-size:clamp(18px,2.4vw,28px);color:var(--text2);margin-bottom:40px">Ваши вопросы?</div>
@@ -636,7 +748,7 @@ flowchart TB
 <div class="nav" id="navbar">
   <button class="nbtn" onclick="nav(-1)">←</button>
   <div class="dots" id="dots"></div>
-  <span class="ncnt" id="cnt">1/12</span>
+  <span class="ncnt" id="cnt">1/15</span>
   <span class="ntim" id="tm"></span>
   <button class="nbtn" onclick="nav(1)">→</button>
 </div>

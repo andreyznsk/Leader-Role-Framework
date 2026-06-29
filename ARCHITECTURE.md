@@ -191,8 +191,10 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `POST` | `/api/capture/process-now` | Ручной запуск классификации capture-файлов |
 | `POST` | `/api/knowledge/search` | Memory-owned прокси к JavaRagService `/api/search` + usage events |
 | `GET/PUT/POST` | `/api/knowledge/documents/**` | Browser-facing proxy управления RAG-документами |
+| `POST` | `/api/search` | Global Search: PostgreSQL FTS по operational layers + RAG search для `KNOWLEDGE` |
 | `GET` | `/api/stats/usage?period=7d` | Usage Statistics: агрегаты по usage events |
 | `GET/POST` | `/api/notes` | Лента заметок (`POST` → `201 Created`; поля: `title` обязательный, `text` опциональный, `tags`, `source`) |
+| `PUT` | `/api/notes/{id}` | Обновить заметку (title/text/tags/source) |
 | `DELETE` | `/api/notes/{id}` | Удалить заметку: `204 No Content` / `404 Not Found` (hard delete, CR-MEM-011) |
 | `GET/POST/PUT/DELETE` | `/api/incidents`, `/api/risks`, `/api/people` | CRUD/soft delete рабочих сущностей |
 | `GET` | `/ui/today` | Web UI: план дня |
@@ -201,6 +203,14 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `GET` | `/ui/knowledge` | Web UI: Knowledge Gateway для RAG lifecycle |
 | `GET` | `/ui/stats` | Web UI: статистика использования и saved time |
 | `GET` | `/ui/settings` | Web UI: Control Plane — настройки плагинов (descriptor-driven UI) |
+
+**Global Search navigation contract:** клик по результату поиска должен открывать edit-flow конкретной сущности, а не только страницу списка.
+- `TASK` → `/ui/tasks/{id}/edit`
+- `NOTE` → `/ui/notes?edit={id}#note-{id}` с auto-open edit modal
+- `PERSON` → `/ui/people?edit={id}#person-{id}` с auto-open edit modal
+- `RISK` → `/ui/risks?edit={id}#risk-{id}` с auto-open edit modal
+- `INCIDENT` → `/ui/incidents?edit={id}#incident-{id}` с auto-open edit modal
+- `KNOWLEDGE` → `/ui/knowledge?id={id}` с открытием документа в editor pane
 
 **Control Plane Proxy (CR-MEM-009, CR-MEM-010, ✅ Implemented):**
 
@@ -354,7 +364,7 @@ Leader-Role-Framework/
 │       └── YYYY-MM-DD/
 │           └── HH-MM-SS.md
 ├── workspace/
-│   ├── tasks/          ← файлы задач по id
+│   ├── tasks/          ← export/backup markdown-файлы задач по id (on demand, not source of truth)
 │   │   ├── TASK-001.md
 │   │   └── TASK-002.md
 │   └── 08_daily_journal/

@@ -32,6 +32,46 @@ test.describe('Today UI', () => {
     }
   });
 
+  test('task editor supports save and save-and-close flows', async ({ page, request }) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const createResponse = await request.post('/api/tasks', {
+      data: {
+        title: 'Playwright edit save modes',
+        description: 'Initial description',
+        date: today,
+        priority: 'NORMAL',
+        source: 'MANUAL'
+      }
+    });
+
+    expect(createResponse.ok()).toBeTruthy();
+    const task = await createResponse.json();
+
+    try {
+      await page.goto(`/ui/tasks/${task.id}/edit`);
+
+      const description = page.locator('#md-input');
+      await description.fill('Draft state');
+      await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
+
+      await expect(page).toHaveURL(new RegExp(`/ui/tasks/${task.id}/edit$`));
+      await expect(page.locator('#save-status')).toContainText('Задача сохранена');
+      await expect(description).toHaveValue('Draft state');
+
+      await description.fill('Final state');
+      await page.getByRole('button', { name: 'Сохранить и закрыть' }).click();
+
+      await expect(page).toHaveURL(/\/ui\/today$/);
+
+      const descriptionResponse = await request.get(`/api/tasks/${task.id}/description`);
+      expect(descriptionResponse.ok()).toBeTruthy();
+      const payload = await descriptionResponse.json();
+      expect(payload.contentMd).toBe('Final state');
+    } finally {
+      await request.delete(`/api/tasks/${task.id}`);
+    }
+  });
+
   test('shifts deadline by one day with the "Завтра" button', async ({ page, request }) => {
     const createResponse = await request.post('/api/tasks', {
       data: {

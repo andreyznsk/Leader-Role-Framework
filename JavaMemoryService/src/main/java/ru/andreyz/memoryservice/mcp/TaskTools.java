@@ -4,7 +4,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 import ru.andreyz.memoryservice.domain.Task;
-import ru.andreyz.memoryservice.service.TaskFileService;
+import ru.andreyz.memoryservice.service.TaskDescriptionService;
 import ru.andreyz.memoryservice.service.TaskService;
 
 import java.time.LocalDate;
@@ -14,11 +14,11 @@ import java.util.List;
 public class TaskTools {
 
     private final TaskService taskService;
-    private final TaskFileService taskFileService;
+    private final TaskDescriptionService taskDescriptionService;
 
-    public TaskTools(TaskService taskService, TaskFileService taskFileService) {
+    public TaskTools(TaskService taskService, TaskDescriptionService taskDescriptionService) {
         this.taskService = taskService;
-        this.taskFileService = taskFileService;
+        this.taskDescriptionService = taskDescriptionService;
     }
 
     @Tool(description = "Get tasks for a specific date. Optionally filter by status.")
@@ -60,15 +60,15 @@ public class TaskTools {
         return taskService.updateStatus(id, status);
     }
 
-    @Tool(description = "Get the markdown description of a task from the file bus (workspace/tasks/TASK-{id}.md). Returns empty string if no file exists.")
+    @Tool(description = "Get the markdown description of a task from the database. Returns empty string if no description exists.")
     public String getTaskDescription(@ToolParam(description = "Task ID") Long id) {
-        return taskFileService.read(id).orElse("");
+        return taskDescriptionService.getContent(id);
     }
 
-    @Tool(description = "Write or update the markdown description of a task in the file bus.")
+    @Tool(description = "Write or update the markdown description of a task in the database.")
     public void setTaskDescription(
             @ToolParam(description = "Task ID") Long id,
             @ToolParam(description = "Markdown content") String content) {
-        taskFileService.write(id, content);
+        taskDescriptionService.update(id, content);
     }
 }

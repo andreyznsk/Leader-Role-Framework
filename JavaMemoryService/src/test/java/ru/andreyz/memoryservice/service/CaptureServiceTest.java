@@ -28,11 +28,11 @@ class CaptureServiceTest {
     private String inboxDirStr;
 
     @Test
-    void save_assignsIdAndPendingStatus() {
+    void save_assignsIdAndNewStatus() {
         Capture capture = captureService.save(new CaptureRequest("test note", "cli"));
 
         assertThat(capture.id()).isNotNull();
-        assertThat(capture.status()).isEqualTo("PENDING");
+        assertThat(capture.status()).isEqualTo("NEW");
         assertThat(capture.rawText()).isEqualTo("test note");
         assertThat(capture.source()).isEqualTo("cli");
     }
@@ -103,7 +103,7 @@ class CaptureServiceTest {
         Capture saved = captureService.save(new CaptureRequest("will be processed", "cli"));
         captureService.markProcessed(saved.id(), "TASK", "tasks/pending");
 
-        List<Capture> pending = captureService.findTodayPending();
+        List<Capture> pending = captureService.findTodayNew();
 
         assertThat(pending).noneMatch(c -> c.id().equals(saved.id()));
     }

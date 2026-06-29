@@ -33,6 +33,7 @@ class PromptBuilderTest {
             List.of(),
             true,
             true,
+            true,
             "processed",
             "drafts",
             "From={{from}}\nSubject={{subject}}\nBody={{body}}\nId={{emailId}}",
