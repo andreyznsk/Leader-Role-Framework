@@ -1,6 +1,8 @@
 # Claude Code local settings (personal, not shared)
 .claude/settings.local.json
+.claude/worktrees
 .gigacode
+
 # MCP tokens - NEVER commit this file with real tokens
 # Copy .mcp.json to .mcp.local.json and put tokens there
 # Then reference .mcp.local.json in .gitignore
