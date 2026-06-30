@@ -126,7 +126,7 @@ add_glob architecture \
   JavaMailAgent/RFC/*.md \
   JavaRagService/RFC/*.md \
   common/RFC/*.md \
-  cr/**/*.md \
+  docs/cr/**/*.md \
   JavaMemoryService/cr/**/*.md \
   JavaMailAgent/cr/**/*.md \
   JavaRagService/cr/**/*.md

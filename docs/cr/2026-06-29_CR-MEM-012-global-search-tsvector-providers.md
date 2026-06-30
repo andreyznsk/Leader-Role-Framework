@@ -1,7 +1,7 @@
 # 2026-06-29_CR-MEM-012: Global Search tsvector для operational providers
 
 **Дата:** 2026-06-29  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MEM  
 **Зависимости:** JavaMemoryService, PostgreSQL, существующий Global Search, JavaRagService  
 **Не затрагивать:** JavaRagService semantic/vector RAG search
@@ -649,3 +649,15 @@ SearchResultMerger
 - Новый E2E сценарий `12_global_search_tsvector.md` проходит.
 - Поиск по запросу `что зависло по релизу платежей` находит релевантные tasks/risks/incidents без точного совпадения строки.
 - В документации зафиксировано, что operational search использует PostgreSQL FTS, а knowledge search использует RAG.
+
+---
+
+## Фактическая реализация
+
+**Реализовано:** 2026-06-29 (коммиты `3d1ae97`, `092e33b`, `5087812`, `c5e7e99`)  
+Подтверждено наличие:
+- `GlobalSearchService.java` — параллельный запуск providers
+- `TaskSearchProvider.java` — поиск по `memory.tasks.search_vector`
+- `GlobalSearchServiceTest.java`, `TaskSearchProviderTest.java` — тесты
+
+⚠️ Примечание: файл имеет номер CR-MEM-012, который также используется в `2026-06-28_CR-MEM-012-capturebot-ui.md`. Коллизия номеров требует отдельного шага перенумерации.

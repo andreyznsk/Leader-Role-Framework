@@ -381,9 +381,8 @@ Leader-Role-Framework/
 ├── JavaRagService/
 │   └── rag-inbox/
 │       └── captures/   ← KNOWLEDGE captures для индексации
-└── cr/                 ← CR для ARCHITECTURE.md и CLAUDE.md
-    ├── CR-ARCH-001-master-update.md
-    └── CR-CLAUDE-001-handoff.md
+└── docs/
+    └── cr/             ← единая папка для всех ARCH/CROSS-SERVICE CR
 ```
 
 ---
@@ -518,14 +517,8 @@ Browser/Agent ──/ui/settings──→  JavaMemoryService ──proxies──
 
 ```
 Leader-Role-Framework/
-├── cr/
-│   └── CR-ARCH-001-master-update.md
 └── docs/
-    └── cr/
-        ├── CR-MAIL-004-plugin-control-api.md      (Implemented, 2026-06-23)
-        ├── CR-MEM-009-plugin-settings-store.md    (Implemented, 2026-06-23)
-        ├── CR-MEM-010-universal-plugin-control-ui.md (Implemented, 2026-06-23)
-        └── CR-RAG-001-plugin-control-api.md       (Implemented, 2026-06-23)
+    └── cr/             ← единая папка для всех ARCH/CROSS-SERVICE/BUGFIX CR
 
 JavaMemoryService/
 └── cr/
@@ -550,7 +543,7 @@ JavaMailAgent/
 ```
 1. Новая идея / фича
         ↓
-2. Создать CR-{PREFIX}-{NNN}.md в cr/ нужного сервиса
+2. Создать CR-{PREFIX}-{NNN}.md в docs/cr/ (cross-service) или {Service}/cr/ (service-specific)
         ↓
 3. Агент читает CR → вносит изменения в RFC (главную спеку)
         ↓
