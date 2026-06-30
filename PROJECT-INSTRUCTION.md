@@ -23,9 +23,6 @@ LeaderOS — персональный AI-powered Tech Lead Framework.
 GitHub repository:
 https://github.com/andreyznsk/Leader-Role-Framework.git
 
-Default branch:
-feature/mailAg-001
-
 CR directory:
 docs/cr/
 
@@ -33,15 +30,18 @@ Issue labels:
 enhancement
 memory-service
 ui
+bug
+ARCH
 
-Tools:
-GitHub connector
-ChatGPT Codex Connector
-Permissions
-Read access to checks, commit statuses, and metadata
-Read and write access to actions, code, issues, pull requests, and workflows
-Repository access Selected 1 repository.
-andreyznsk/Leader-Role-Framework
+
+## Connectors
+
+GitHub Connector доступен в каждом чате проекта и считается рабочим по умолчанию.
+
+Правила:
+- ChatGPT/Codex должен использовать GitHub Connector как основной способ работы с GitHub.
+- Не нужно дополнительно уточнять у пользователя, доступен ли GitHub Connector, если не возникла явная ошибка доступа.
+- Если GitHub Connector временно недоступен или возвращает ошибку, агент должен сообщить об этом отдельно.
 
 Google Календарь
 
@@ -100,13 +100,9 @@ Chat Conversation
 
 GitHub используется как рабочая staging-зона для будущих изменений.
 
-Основная ветка для взаимодействия ChatGPT и локального агента:
-
-```text
-feature/mailAg-001
-```
-
 ChatGPT не должен писать артефакты напрямую в master без явного указания пользователя.
+
+Под каждую задачу создается отдельная ветка по шаблону feature/{PREFIX}-{NNN}-{YYYY-MM-DD}
 
 ---
 
