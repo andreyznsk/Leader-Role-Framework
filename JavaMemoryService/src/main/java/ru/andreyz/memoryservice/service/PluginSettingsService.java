@@ -18,7 +18,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class PluginSettingsService {
 
@@ -305,6 +307,7 @@ public class PluginSettingsService {
         try {
             return Integer.parseInt(String.valueOf(value));
         } catch (NumberFormatException e) {
+            log.error("", e);
             return fallback;
         }
     }

@@ -23,9 +23,6 @@ LeaderOS — персональный AI-powered Tech Lead Framework.
 GitHub repository:
 https://github.com/andreyznsk/Leader-Role-Framework.git
 
-Default branch:
-feature/mailAg-001
-
 CR directory:
 docs/cr/
 
@@ -33,27 +30,22 @@ Issue labels:
 enhancement
 memory-service
 ui
+bug
+ARCH
 
-Tools:
-GitHub - Actions: ALL
-ChatGPT Codex Connector
-Installed 5 months ago  Developed by openai  https://www.chatgpt.com
-Bring ChatGPT and Codex to your GitHub repositories.
-Permissions
-Read access to checks, commit statuses, and metadata
-Read and write access to actions, code, issues, pull requests, and workflows
-Repository access
-Only select repositories
-Select at least one repository. Also includes public repositories (read-only).
-Selected 1 repository.
-andreyznsk/Leader-Role-Framework
 
+## Connectors
+
+GitHub Connector доступен в каждом чате проекта и считается рабочим по умолчанию.
+
+Правила:
+- ChatGPT/Codex должен использовать GitHub Connector как основной способ работы с GitHub.
+- Не нужно дополнительно уточнять у пользователя, доступен ли GitHub Connector, если не возникла явная ошибка доступа.
+- Если GitHub Connector временно недоступен или возвращает ошибку, агент должен сообщить об этом отдельно.
 
 Google Календарь
 
 Google Диск
-
-
 
 ---
 
@@ -108,13 +100,9 @@ Chat Conversation
 
 GitHub используется как рабочая staging-зона для будущих изменений.
 
-Основная ветка для взаимодействия ChatGPT и локального агента:
-
-```text
-feature/mailAg-001
-```
-
 ChatGPT не должен писать артефакты напрямую в master без явного указания пользователя.
+
+Под каждую задачу создается отдельная ветка по шаблону feature/{PREFIX}-{NNN}-{YYYY-MM-DD}
 
 ---
 
@@ -142,6 +130,8 @@ docs/
 ---
 
 # Change Request Workflow
+
+ввести единый CR-реестр (таблица в Drive или `docs/cr/REGISTRY.md`)
 
 Все изменения начинаются с CR.
 
@@ -179,6 +169,9 @@ docs/
 ## Зависимости
 
 ## Как тестировать
+
+## После подтверждения пользователя перевести этот CR в Статус: DONE. и обновить реестр таблица `docs/cr/REGISTRY.md`
+
 ```
 
 ---

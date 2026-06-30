@@ -1,7 +1,5 @@
 package ru.andreyz.memoryservice;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -10,12 +8,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @SpringBootApplication
 @EnableScheduling
 public class MemoryServiceApplication implements ApplicationRunner {
 
-    private static final Logger log = LoggerFactory.getLogger(MemoryServiceApplication.class);
 
     @Autowired
     private Environment env;

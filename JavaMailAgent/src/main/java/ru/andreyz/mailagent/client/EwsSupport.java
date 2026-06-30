@@ -6,13 +6,12 @@ import microsoft.exchange.webservices.data.core.exception.service.local.ServiceL
 import microsoft.exchange.webservices.data.core.request.HttpClientWebRequest;
 import microsoft.exchange.webservices.data.core.request.HttpWebRequest;
 import microsoft.exchange.webservices.data.credential.WebCredentials;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.MailAuthType;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Utility for creating EWS {@link ExchangeService} instances.
@@ -29,6 +28,7 @@ import java.net.URISyntaxException;
  * Also auto-fixes the EWS URL: if no {@code /EWS/Exchange.asmx} suffix is present
  * it is appended, matching the behaviour of Python's exchangelib.
  */
+@Slf4j
 public final class EwsSupport {
 
     private static final String EWS_PATH = "/EWS/Exchange.asmx";
@@ -36,7 +36,6 @@ public final class EwsSupport {
     private EwsSupport() {
     }
 
-    private static final Logger log = LoggerFactory.getLogger(EwsSupport.class);
 
     public static ExchangeService createService(MailConfig.MailProperties mailProperties,
                                                 MailConfig.EwsProperties ewsProperties) {

@@ -12,9 +12,12 @@ import ru.andreyz.ragservice.search.SearchResult;
 
 import java.io.IOException;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 public class RagRestController {
+
 
     private final FileIndexer fileIndexer;
     private final RagMcpTools ragMcpTools;
@@ -37,6 +40,7 @@ public class RagRestController {
         try {
             return ResponseEntity.ok(fileIndexer.indexFile(req.file_path()));
         } catch (IOException e) {
+            log.error("", e);
             return ResponseEntity.badRequest()
                     .body(new FileIndexer.IndexResult(0, "error: " + e.getMessage(), req.file_path()));
         }

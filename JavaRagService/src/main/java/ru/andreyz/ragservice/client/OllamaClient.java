@@ -2,8 +2,6 @@ package ru.andreyz.ragservice.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ru.andreyz.ragservice.control.RagRuntimeConfigService;
@@ -13,11 +11,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class OllamaClient {
 
-    private static final Logger log = LoggerFactory.getLogger(OllamaClient.class);
 
     private final String ollamaUrl;
     private final RagRuntimeConfigService runtimeConfigService;

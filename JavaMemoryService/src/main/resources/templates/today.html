@@ -4,7 +4,8 @@
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 
-<div class="container los-page-content">
+<div class="container-fluid py-3 px-4 los-page-content">
+    <div id="today-page-alerts" class="mb-3"></div>
 
     <!-- Summary stats -->
     <div class="row g-3 mb-4">
@@ -114,7 +115,7 @@
 
     <!-- Current tasks -->
     <div class="row g-3 align-items-start">
-    <div class="col-lg-8">
+    <div class="col-lg today-main-column">
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0" style="font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:.08em">
@@ -133,8 +134,8 @@
         </div>
         <div class="card-body border-bottom">
             <form method="get" th:action="@{/ui/today}" class="row g-2 align-items-end" id="today-filters-form">
-                <input type="hidden" name="sortBy" th:value="${sortBy}"/>
-                <input type="hidden" name="sortDir" th:value="${sortDir}"/>
+                <input type="hidden" name="sortBy" th:value="${requestedSortBy}"/>
+                <input type="hidden" name="sortDir" th:value="${requestedSortDir}"/>
                 <input type="hidden" name="dueDate" th:value="${dueDateFilter != null ? #temporals.format(dueDateFilter, 'yyyy-MM-dd') : ''}"/>
                 <input type="hidden" name="dueDateFrom" th:value="${dueDateFromFilter != null ? #temporals.format(dueDateFromFilter, 'yyyy-MM-dd') : ''}"/>
                 <input type="hidden" name="dueDateTo" th:value="${dueDateToFilter != null ? #temporals.format(dueDateToFilter, 'yyyy-MM-dd') : ''}"/>
@@ -150,7 +151,7 @@
                                     title="Сортировать по приоритету вверх"
                                     onclick="submitSort('priority', 'asc')">↑</button>
                             <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
-                                    th:classappend="${sortBy == 'priority' and sortDir == 'desc'} ? ' active'"
+                                    th:classappend="${(sortBy == 'priority' and sortDir == 'desc') or defaultSortActive} ? ' active'"
                                     title="Сортировать по приоритету вниз"
                                     onclick="submitSort('priority', 'desc')">↓</button>
                         </span>
@@ -168,7 +169,7 @@
                                 <span>Статус</span>
                                 <span class="d-inline-flex gap-1">
                                     <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
-                                            th:classappend="${sortBy == 'status' and sortDir == 'asc'} ? ' active'"
+                                            th:classappend="${(sortBy == 'status' and sortDir == 'asc') or defaultSortActive} ? ' active'"
                                             title="Сортировать по статусу вверх"
                                             onclick="submitSort('status', 'asc')">↑</button>
                                     <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
@@ -231,7 +232,19 @@
                     <span class="task-deadline me-2 flex-shrink-0"
                           th:classappend="${task.dueDate != null and task.dueDate.isBefore(today)} ? ' task-deadline-overdue' : ''">
                         <span class="text-muted small">DL</span>
-                        <span th:text="${task.dueDate != null ? #temporals.format(task.dueDate, 'dd.MM.yyyy') : '—'}">—</span>
+                        <button type="button"
+                                class="task-deadline-button"
+                                th:attr="data-id=${task.id},data-date=${task.dueDate != null ? #temporals.format(task.dueDate, 'yyyy-MM-dd') : #temporals.format(today, 'yyyy-MM-dd')}"
+                                onclick="openTaskDatePicker(this)">
+                            <span th:text="${task.dueDate != null ? #temporals.format(task.dueDate, 'dd.MM.yyyy') : '—'}">—</span>
+                        </button>
+                        <input type="date"
+                               class="task-date-picker"
+                               tabindex="-1"
+                               aria-hidden="true"
+                               th:attr="data-id=${task.id}"
+                               th:value="${task.dueDate != null ? #temporals.format(task.dueDate, 'yyyy-MM-dd') : #temporals.format(today, 'yyyy-MM-dd')}"
+                               onchange="handleTaskDateChange(this)"/>
                     </span>
 
                     <!-- Status badge -->
@@ -265,11 +278,19 @@
         </div>
     </div>
     </div>
-    <div class="col-lg-4">
+    <div class="col-lg-auto today-sidebar-column">
         <div class="mb-3">
             <button type="button" class="btn btn-sm btn-success w-100 los-add-task-btn"
                     data-bs-toggle="modal" data-bs-target="#addTaskModal">
                 Добавить новую задачу
+            </button>
+        </div>
+        <div class="mb-3">
+            <button type="button"
+                    class="btn btn-sm btn-outline-warning w-100"
+                    id="move-overdue-button"
+                    onclick="moveOverdueTasksToToday()">
+                Перенести просроченные на сегодня
             </button>
         </div>
         <div class="card" id="cal-sidebar">
@@ -555,6 +576,7 @@ let taskSearchPickerModalInstance = null;
 let taskSearchPickerContext = null;
 let taskSearchPickerDebounceTimer = null;
 let taskSearchPickerRequestSeq = 0;
+const TODAY_FLASH_KEY = 'today-ui-flash-message';
 
 function escapeHtml(value) {
     return String(value || '')
@@ -567,6 +589,33 @@ function escapeHtml(value) {
 
 function normalizeSearchText(value) {
     return (value || '').replace(/\s+/g, ' ').trim();
+}
+
+function showTodayMessage(type, message) {
+    const container = document.getElementById('today-page-alerts');
+    if (!container || !message) return;
+    const level = type === 'error' ? 'danger' : (type === 'warning' ? 'warning' : 'success');
+    container.innerHTML = '<div class="alert alert-' + level + ' alert-dismissible fade show mb-0" role="alert">'
+        + escapeHtml(message)
+        + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>'
+        + '</div>';
+}
+
+function setTodayFlashMessage(type, message) {
+    if (!message) return;
+    window.sessionStorage.setItem(TODAY_FLASH_KEY, JSON.stringify({type: type, message: message}));
+}
+
+function consumeTodayFlashMessage() {
+    const raw = window.sessionStorage.getItem(TODAY_FLASH_KEY);
+    if (!raw) return;
+    window.sessionStorage.removeItem(TODAY_FLASH_KEY);
+    try {
+        const payload = JSON.parse(raw);
+        showTodayMessage(payload.type, payload.message);
+    } catch (error) {
+        console.warn('Failed to read today flash message', error);
+    }
 }
 
 function updateTaskSearchPickerSelected(taskId, label) {
@@ -735,6 +784,76 @@ function moveTaskToTomorrow(id, baseDate) {
     }).then(() => reloadTodayKeepingFilters());
 }
 
+function openTaskDatePicker(button) {
+    const picker = button?.parentElement?.querySelector('.task-date-picker');
+    if (!picker || button.dataset.saving === 'true') return;
+    picker.value = button.dataset.date || picker.value;
+    if (typeof picker.showPicker === 'function') {
+        picker.showPicker();
+    } else {
+        picker.focus();
+        picker.click();
+    }
+}
+
+async function handleTaskDateChange(input) {
+    const button = input?.parentElement?.querySelector('.task-deadline-button');
+    const nextDate = input?.value;
+    const taskId = input?.dataset?.id;
+    if (!button || !nextDate || !taskId) return;
+    if (button.dataset.date === nextDate) return;
+
+    button.dataset.saving = 'true';
+    button.disabled = true;
+    input.disabled = true;
+
+    try {
+        await window.LeaderUiApi.request('/api/tasks/' + taskId + '/date', {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({date: nextDate})
+        });
+        setTodayFlashMessage('success', 'Дата задачи обновлена');
+        reloadTodayKeepingFilters();
+    } catch (error) {
+        input.value = button.dataset.date || input.value;
+        button.disabled = false;
+        input.disabled = false;
+        delete button.dataset.saving;
+        showTodayMessage('error', 'Не удалось обновить дату задачи');
+    }
+}
+
+async function moveOverdueTasksToToday() {
+    if (!window.confirm('Перенести все просроченные незавершённые задачи на сегодня?')) {
+        return;
+    }
+
+    const button = document.getElementById('move-overdue-button');
+    if (button) {
+        button.disabled = true;
+    }
+
+    try {
+        const result = await window.LeaderUiApi.request('/api/tasks/move-overdue-to-today', {
+            method: 'POST'
+        });
+        const moved = Number(result?.data?.moved || 0);
+        if (moved > 0) {
+            setTodayFlashMessage('success', 'Перенесено задач: ' + moved);
+            reloadTodayKeepingFilters();
+            return;
+        }
+        showTodayMessage('warning', 'Просроченных задач нет');
+    } catch (error) {
+        showTodayMessage('error', 'Не удалось перенести просроченные задачи');
+    } finally {
+        if (button) {
+            button.disabled = false;
+        }
+    }
+}
+
 function nextTaskStatus(status) {
     switch (status) {
         case 'TODO':
@@ -843,6 +962,8 @@ function togglePendingDescription(button) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    consumeTodayFlashMessage();
+
     document.querySelectorAll('[data-pending-description]').forEach(function (description) {
         const shouldCollapse = description.scrollHeight > description.clientHeight + 1;
         if (!shouldCollapse) return;

@@ -1,7 +1,5 @@
 package ru.andreyz.memoryservice.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.domain.Capture;
@@ -25,11 +23,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class CaptureService {
 
-    private static final Logger log = LoggerFactory.getLogger(CaptureService.class);
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH-mm-ss");
     private static final DateTimeFormatter FRONT_MATTER_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -188,6 +187,7 @@ public class CaptureService {
                     .toList();
         } catch (IOException e) {
             log.warn("Failed to list capture inbox {}: {}", dayDir, e.getMessage());
+            log.error("", e);
             return List.of();
         }
     }
@@ -219,6 +219,7 @@ public class CaptureService {
             return java.util.Optional.of(new CaptureFile(path.getFileName().toString(), text.stripTrailing()));
         } catch (IOException e) {
             log.warn("Failed to read capture file {}: {}", path, e.getMessage());
+            log.error("", e);
             return java.util.Optional.empty();
         }
     }
@@ -243,6 +244,7 @@ public class CaptureService {
             return file;
         } catch (IOException e) {
             log.warn("Failed to write capture {} to inbox: {}", capture.id(), e.getMessage());
+            log.error("", e);
             return inboxDir;
         }
     }

@@ -2,8 +2,6 @@ package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.common.agent.AgentClient;
 import ru.andreyz.common.agent.AgentException;
@@ -13,19 +11,17 @@ import ru.andreyz.memoryservice.dto.ClassifiedCapture;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class CaptureClassifierAgent {
 
-    private static final Logger log = LoggerFactory.getLogger(CaptureClassifierAgent.class);
 
     private final AgentClient agentClient;
     private final ObjectMapper objectMapper;
-
-    public CaptureClassifierAgent(AgentClient agentClient, ObjectMapper objectMapper) {
-        this.agentClient = agentClient;
-        this.objectMapper = objectMapper;
-    }
 
     public List<ClassifiedCapture> classify(List<Capture> captures) {
         String prompt = buildPrompt(captures);
@@ -122,6 +118,7 @@ public class CaptureClassifierAgent {
             String json = objectMapper.writeValueAsString(value);
             return json.substring(1, json.length() - 1);
         } catch (IOException e) {
+            log.error("", e);
             return value.replace("\\", "\\\\").replace("\"", "\\\"");
         }
     }

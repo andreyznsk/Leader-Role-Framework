@@ -1,7 +1,5 @@
 package ru.andreyz.memoryservice.agentworkspace;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -10,23 +8,21 @@ import ru.andreyz.common.agent.AgentClient;
 import ru.andreyz.common.agent.AgentException;
 
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
+@Slf4j
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/agent")
 public class AgentChatController {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentChatController.class);
 
     private final AgentClient agentClient;
     private final JdbcTemplate jdbc;
 
     @Value("${agent.provider:mock}")
     private String configuredProvider;
-
-    public AgentChatController(AgentClient agentClient, JdbcTemplate jdbc) {
-        this.agentClient = agentClient;
-        this.jdbc = jdbc;
-    }
 
     @PostMapping("/chat/run")
     public ResponseEntity<AgentChatRunResponse> run(@RequestBody AgentChatRunRequest req) {
@@ -45,6 +41,7 @@ public class AgentChatController {
         } catch (AgentException e) {
             long duration = System.currentTimeMillis() - start;
             log.warn("Agent chat run failed: {}", e.getMessage());
+            log.error("", e);
             audit("CHAT", provider, req.prompt(), "ERROR", duration, e.getMessage());
             return ResponseEntity.ok(AgentChatRunResponse.error(provider, duration, e.getMessage()));
         }
@@ -59,6 +56,7 @@ public class AgentChatController {
                 UUID.randomUUID(), mode, provider, prompt, status, durationMs, error);
         } catch (Exception ex) {
             log.warn("Failed to audit agent run: {}", ex.getMessage());
+            log.error("", ex);
         }
     }
 }

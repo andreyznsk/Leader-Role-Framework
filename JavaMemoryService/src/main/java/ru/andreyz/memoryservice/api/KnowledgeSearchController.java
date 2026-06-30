@@ -14,10 +14,13 @@ import ru.andreyz.memoryservice.service.UsageEventService;
 
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/knowledge")
 public class KnowledgeSearchController {
+
 
     private final RestClient restClient;
     private final UsageEventService usageEventService;
@@ -49,6 +52,7 @@ public class KnowledgeSearchController {
             recordSearchEvents(request.query(), topK, safeResults.size(), durationMs, "SUCCESS");
             return ResponseEntity.ok(safeResults);
         } catch (Exception e) {
+            log.error("", e);
             long durationMs = System.currentTimeMillis() - started;
             usageEventService.record(new UsageEventCommand(
                     UsageEventType.KNOWLEDGE_SEARCH,

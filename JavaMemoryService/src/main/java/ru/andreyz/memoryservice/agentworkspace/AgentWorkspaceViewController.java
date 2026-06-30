@@ -8,9 +8,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import ru.andreyz.memoryservice.search.*;
 
 import java.util.*;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Controller
 public class AgentWorkspaceViewController {
+
 
     private final GlobalSearchService searchService;
 
@@ -52,12 +55,24 @@ public class AgentWorkspaceViewController {
 
             if (q != null && !q.isBlank()) {
                 List<SearchLayer> requestLayers = selectedLayerNames.stream()
-                        .map(name -> { try { return SearchLayer.valueOf(name); } catch (Exception e) { return null; } })
+                        .map(name -> {
+                            try {
+                                return SearchLayer.valueOf(name);
+                            } catch (Exception e) {
+                                log.error("", e);
+                                return null;
+                            }
+                        })
                         .filter(Objects::nonNull)
                         .toList();
 
                 SearchMode searchMode;
-                try { searchMode = SearchMode.valueOf(mode.toUpperCase()); } catch (Exception e) { searchMode = SearchMode.QUICK; }
+                try {
+                    searchMode = SearchMode.valueOf(mode.toUpperCase());
+                } catch (Exception e) {
+                    log.error("", e);
+                    searchMode = SearchMode.QUICK;
+                }
 
                 SearchResponse response = searchService.search(new SearchRequest(q, requestLayers, searchMode, 20));
                 model.addAttribute("searchResponse", response);

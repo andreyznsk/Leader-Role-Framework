@@ -19,9 +19,12 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class RagMcpTools {
+
 
     private final FileIndexer fileIndexer;
     private final RagSearchService searchService;
@@ -40,6 +43,7 @@ public class RagMcpTools {
         try {
             return fileIndexer.indexFile(filePath);
         } catch (IOException e) {
+            log.error("", e);
             return new IndexResult(0, "error: " + e.getMessage(), filePath);
         }
     }
@@ -60,6 +64,7 @@ public class RagMcpTools {
                     .filter(p -> p.toString().endsWith(suffix))
                     .toList();
         } catch (IOException e) {
+            log.error("", e);
             return new DirectoryIndexResult(0, 0, 0, 0, "scan error: " + e.getMessage());
         }
 
@@ -82,6 +87,7 @@ public class RagMcpTools {
                 else if ("invalid".equals(r.status())) invalid++;
                 else indexed++;
             } catch (Exception e) {
+                log.error("", e);
                 failed++;
             }
         }

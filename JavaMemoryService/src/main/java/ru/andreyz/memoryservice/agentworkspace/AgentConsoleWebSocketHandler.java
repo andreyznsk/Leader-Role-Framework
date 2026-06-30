@@ -3,8 +3,6 @@ package ru.andreyz.memoryservice.agentworkspace;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
@@ -17,11 +15,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class AgentConsoleWebSocketHandler extends TextWebSocketHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentConsoleWebSocketHandler.class);
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final Set<String> SHELL_BLACKLIST = Set.of("bash", "sh", "zsh", "fish", "cmd", "powershell", "pwsh");
 
@@ -30,10 +31,6 @@ public class AgentConsoleWebSocketHandler extends TextWebSocketHandler {
 
     private final ObjectMapper mapper;
     private final Map<String, AgentSession> sessions = new ConcurrentHashMap<>();
-
-    public AgentConsoleWebSocketHandler(ObjectMapper mapper) {
-        this.mapper = mapper;
-    }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -106,9 +103,11 @@ public class AgentConsoleWebSocketHandler extends TextWebSocketHandler {
                     }
                 } catch (Exception e) {
                     log.debug("Process wait interrupted: {}", e.getMessage());
+                    log.error("", e);
                 }
             });
         } catch (IOException e) {
+            log.error("", e);
             sendJson(agentSession.wsSession, "ERROR", "message", "Failed to start: " + e.getMessage());
         }
     }
@@ -138,6 +137,7 @@ public class AgentConsoleWebSocketHandler extends TextWebSocketHandler {
                 }
             } catch (Exception e) {
                 log.debug("Stream {} ended: {}", type, e.getMessage());
+                log.error("", e);
             }
         });
     }
@@ -155,6 +155,7 @@ public class AgentConsoleWebSocketHandler extends TextWebSocketHandler {
             session.sendMessage(new TextMessage(mapper.writeValueAsString(node)));
         } catch (Exception e) {
             log.debug("Failed to send WS message: {}", e.getMessage());
+            log.error("", e);
         }
     }
 

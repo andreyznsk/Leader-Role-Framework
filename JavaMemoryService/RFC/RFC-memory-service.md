@@ -634,9 +634,11 @@ POST /api/plans
 GET  /api/tasks?date=2026-06-08&status=TODO
 POST /api/tasks                          # создать подтверждённую задачу; поддерживает title, description, priority, status, dueDate, date, source
 PUT  /api/tasks/{id}
+PATCH /api/tasks/{id}/date               body: { "date": "2026-06-09" }   # быстрый inline update даты/дедлайна
 PATCH /api/tasks/{id}/status             body: { "status": "TODO|IN_PROGRESS|BLOCKED|DONE" }
 POST /api/tasks/{id}/done
 POST /api/tasks/{id}/move                body: { "toDate": "2026-06-09" }
+POST /api/tasks/move-overdue-to-today    # batch-перенос активных просроченных задач на today
 POST /api/tasks/{id}/reorder             body: { "direction": "up"|"down" } | { "position": N }
 POST /api/tasks/{id}/archive             # архивирование (статус → ARCHIVED)
 POST /api/tasks/{id}/delete              # legacy alias: архивирование (статус → ARCHIVED)
@@ -943,6 +945,7 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 
 `getTaskDescription` реализован поверх `GET /api/tasks/{id}/description`; source of truth — `memory.task_descriptions`, а markdown-файл создаётся только через export endpoint.
 Task timeline доступен через `GET /api/tasks/{id}/timeline`; любые значимые изменения задачи создают immutable event в `task_events`.
+Today UI также поддерживает inline-смену даты задачи через `PATCH /api/tasks/{id}/date` и batch-операцию `POST /api/tasks/move-overdue-to-today`.
 
 ### Правило подтверждения (ОБЯЗАТЕЛЬНО в CLAUDE.md агента)
 

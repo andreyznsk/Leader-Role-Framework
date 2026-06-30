@@ -1,7 +1,9 @@
-# 2026-06-29_CR-MEM-012: Agent Workspace UI
+# 2026-06-29_CR-MEM-016: Agent Workspace UI
+
+_Переименован из CR-MEM-012 для устранения коллизии номеров, 2026-06-30._
 
 **Дата:** 2026-06-29  
-**Статус:** Approved  
+**Статус:** Implemented  
 **Сервис:** MEM  
 **Компонент:** JavaMemoryService / UI / Agent Runtime Bridge  
 **Связанный Issue:** будет создан после коммита CR

@@ -1,7 +1,5 @@
 package ru.andreyz.ragservice.indexer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.andreyz.ragservice.client.OllamaClient;
 import ru.andreyz.ragservice.client.OpenSearchClient;
@@ -23,11 +21,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class FileIndexer {
 
-    private static final Logger log = LoggerFactory.getLogger(FileIndexer.class);
 
     private final ChunkSplitter splitter;
     private final OllamaClient ollama;
@@ -35,18 +36,6 @@ public class FileIndexer {
     private final IndexedDocumentRepository repository;
     private final DocumentValidator validator;
     private final RagRuntimeConfigService runtimeConfigService;
-
-    public FileIndexer(ChunkSplitter splitter, OllamaClient ollama,
-                       OpenSearchClient openSearch, IndexedDocumentRepository repository,
-                       DocumentValidator validator,
-                       RagRuntimeConfigService runtimeConfigService) {
-        this.splitter = splitter;
-        this.ollama = ollama;
-        this.openSearch = openSearch;
-        this.repository = repository;
-        this.validator = validator;
-        this.runtimeConfigService = runtimeConfigService;
-    }
 
     public IndexResult indexFile(String filePath) throws IOException {
         RagRuntimeConfig runtime = runtimeConfigService.snapshot();
@@ -133,6 +122,7 @@ public class FileIndexer {
         try {
             return DocType.valueOf(typeRaw.trim().toUpperCase().replace("-", "_"));
         } catch (IllegalArgumentException e) {
+            log.error("", e);
             return null;
         }
     }

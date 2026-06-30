@@ -1,7 +1,5 @@
 package ru.andreyz.ragservice.indexer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import ru.andreyz.ragservice.control.RagRuntimeConfig;
@@ -17,24 +15,19 @@ import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class IndexScheduler {
 
-    private static final Logger log = LoggerFactory.getLogger(IndexScheduler.class);
 
     private final FileIndexer fileIndexer;
     private final IndexedDocumentRepository repository;
     private final RagRuntimeConfigService runtimeConfigService;
     private LocalDateTime lastScanFinishedAt;
-
-    public IndexScheduler(FileIndexer fileIndexer,
-                          IndexedDocumentRepository repository,
-                          RagRuntimeConfigService runtimeConfigService) {
-        this.fileIndexer = fileIndexer;
-        this.repository = repository;
-        this.runtimeConfigService = runtimeConfigService;
-    }
 
     @Scheduled(fixedDelay = 5000)
     public void scanAndIndex() {
@@ -57,6 +50,7 @@ public class IndexScheduler {
                     .toList();
         } catch (IOException e) {
             log.error("Failed to scan rag-inbox: {}", e.getMessage());
+            log.error("", e);
             runtimeConfigService.registerScanResult("Scan failed: " + e.getMessage());
             return;
         }
@@ -90,6 +84,7 @@ public class IndexScheduler {
                 }
             } catch (Exception e) {
                 log.error("Failed to process {}: {}", filePath, e.getMessage());
+                log.error("", e);
                 failed++;
             }
         }

@@ -9,8 +9,11 @@ import ru.andreyz.memoryservice.dto.CreatePendingTaskRequest;
 import ru.andreyz.memoryservice.dto.CreateTaskRequest;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
 import ru.andreyz.memoryservice.dto.LinkPendingTaskRequest;
+import ru.andreyz.memoryservice.dto.MoveOverdueToTodayResponse;
 import ru.andreyz.memoryservice.dto.MoveTaskRequest;
 import ru.andreyz.memoryservice.dto.ReorderTaskRequest;
+import ru.andreyz.memoryservice.dto.UpdateTaskDateRequest;
+import ru.andreyz.memoryservice.dto.UpdateTaskDateResponse;
 import ru.andreyz.memoryservice.dto.UpdateTaskStatusRequest;
 import ru.andreyz.memoryservice.service.TaskService;
 
@@ -64,6 +67,21 @@ public class TaskController {
     @PostMapping("/{id}/move")
     public ResponseEntity<Task> moveTask(@PathVariable Long id, @RequestBody MoveTaskRequest req) {
         return ResponseEntity.ok(taskService.moveToDate(id, req.toDate()));
+    }
+
+    @PatchMapping("/{id}/date")
+    public ResponseEntity<UpdateTaskDateResponse> updateTaskDate(@PathVariable Long id,
+                                                                 @RequestBody UpdateTaskDateRequest req) {
+        if (req == null || req.date() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        Task updated = taskService.updateTaskDate(id, req.date());
+        return ResponseEntity.ok(new UpdateTaskDateResponse(updated.id(), req.date(), updated.dueDate()));
+    }
+
+    @PostMapping("/move-overdue-to-today")
+    public ResponseEntity<MoveOverdueToTodayResponse> moveOverdueToToday() {
+        return ResponseEntity.ok(new MoveOverdueToTodayResponse(taskService.moveOverdueToToday(), LocalDate.now()));
     }
 
     @PostMapping("/{id}/confirm")

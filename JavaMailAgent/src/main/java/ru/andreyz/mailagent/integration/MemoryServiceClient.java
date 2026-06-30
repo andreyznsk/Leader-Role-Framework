@@ -1,8 +1,6 @@
 package ru.andreyz.mailagent.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.config.MailConfig;
@@ -18,11 +16,12 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class MemoryServiceClient {
 
-    private static final Logger log = LoggerFactory.getLogger(MemoryServiceClient.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
     private static final List<Duration> RETRY_DELAYS = List.of(
         Duration.ofSeconds(2),
@@ -123,6 +122,7 @@ public class MemoryServiceClient {
             HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
             return response.statusCode() == 200;
         } catch (Exception e) {
+            log.error("", e);
             return false;
         }
     }
@@ -160,6 +160,7 @@ public class MemoryServiceClient {
                 log.warn("memory-service call {} failed on attempt {}/{}: {}. Retrying in {}s",
                     path, attempt + 1, RETRY_DELAYS.size() + 1, exception.getMessage(), delay.toSeconds());
                 log.warn("httpRequest: {}", httpRequest);
+                log.error("", exception);
                 retrySleeper.sleep(delay);
             }
         }

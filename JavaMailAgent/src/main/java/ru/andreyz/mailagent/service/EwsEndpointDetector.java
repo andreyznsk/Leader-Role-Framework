@@ -1,7 +1,5 @@
 package ru.andreyz.mailagent.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.model.MailConnectionErrorType;
 import ru.andreyz.mailagent.model.MailEndpointDetectRequest;
@@ -16,11 +14,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Locale;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class EwsEndpointDetector {
 
-    private static final Logger log = LoggerFactory.getLogger(EwsEndpointDetector.class);
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)
@@ -37,6 +36,7 @@ public class EwsEndpointDetector {
         try {
             uri = URI.create(endpoint);
         } catch (IllegalArgumentException e) {
+            log.error("", e);
             return MailEndpointDetectResult.failed("ews", false, false, false, null,
                     MailConnectionErrorType.INVALID_ENDPOINT, "EWS endpoint is invalid", rootMessage(e), endpoint);
         }
@@ -78,6 +78,7 @@ public class EwsEndpointDetector {
                     endpoint
             );
         } catch (Exception e) {
+            log.error("", e);
             MailConnectionErrorType errorType = mapError(e);
             return MailEndpointDetectResult.failed(
                     "ews",
@@ -106,6 +107,7 @@ public class EwsEndpointDetector {
             }
             return response;
         } catch (Exception e) {
+            log.error("", e);
             return sendGet(uri);
         }
     }

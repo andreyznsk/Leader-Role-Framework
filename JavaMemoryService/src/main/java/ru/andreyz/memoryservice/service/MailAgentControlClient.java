@@ -1,8 +1,6 @@
 package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ru.andreyz.memoryservice.dto.MailAgentEndpointDetectRequestDto;
@@ -16,11 +14,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class MailAgentControlClient {
 
-    private static final Logger log = LoggerFactory.getLogger(MailAgentControlClient.class);
 
     private final HttpClient httpClient = HttpClient.newBuilder().build();
     private final ObjectMapper objectMapper;
@@ -49,6 +48,7 @@ public class MailAgentControlClient {
             }
         } catch (Exception e) {
             log.warn("Failed to notify MailAgent about enabled state change: {}", fallbackMessage(e));
+            log.error("", e);
         }
     }
 
@@ -67,6 +67,7 @@ public class MailAgentControlClient {
             }
             return objectMapper.readValue(response.body(), MailAgentConnectionTestResultDto.class);
         } catch (Exception e) {
+            log.error("", e);
             return new MailAgentConnectionTestResultDto(false, "FAILED", null, null, null, null, false,
                     null, null, null, null, null, null, fallbackMessage(e), "UNKNOWN", fallbackMessage(e), baseUrl, baseUrl);
         }
@@ -84,6 +85,7 @@ public class MailAgentControlClient {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             return objectMapper.readValue(response.body(), MailAgentEndpointDetectResultDto.class);
         } catch (Exception e) {
+            log.error("", e);
             return new MailAgentEndpointDetectResultDto(false, "FAILED", null, false, false, false,
                     null, "NTLM", fallbackMessage(e), "UNKNOWN", fallbackMessage(e), baseUrl);
         }

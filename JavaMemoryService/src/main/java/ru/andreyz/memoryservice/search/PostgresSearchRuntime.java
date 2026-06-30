@@ -4,9 +4,12 @@ import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class PostgresSearchRuntime {
+
 
     private final DataSource dataSource;
     private volatile Boolean postgres;
@@ -27,7 +30,8 @@ public class PostgresSearchRuntime {
             try (Connection connection = dataSource.getConnection()) {
                 String productName = connection.getMetaData().getDatabaseProductName();
                 postgres = productName != null && productName.toLowerCase().contains("postgresql");
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                log.error("", e);
                 postgres = false;
             }
             return postgres;

@@ -1,7 +1,5 @@
 package ru.andreyz.mailagent.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.ControlAuditEntry;
@@ -19,11 +17,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class MailRuntimeConfigService {
 
-    private static final Logger log = LoggerFactory.getLogger(MailRuntimeConfigService.class);
 
     public static final String SECRET_MASK = "*****";
     private static final List<String> PROTOCOL_OPTIONS = List.of("maildev", "imap", "ews");
@@ -308,6 +307,7 @@ public class MailRuntimeConfigService {
         try {
             return MailAuthType.fromValue(value, fallback);
         } catch (IllegalArgumentException e) {
+            log.error("", e);
             throw new IllegalArgumentException("Unsupported authType: " + value);
         }
     }
@@ -354,6 +354,7 @@ public class MailRuntimeConfigService {
             }
             return parsed;
         } catch (NumberFormatException e) {
+            log.error("", e);
             throw new IllegalArgumentException("Invalid number for " + key + ": " + value);
         }
     }

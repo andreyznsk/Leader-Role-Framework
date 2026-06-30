@@ -12,9 +12,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Controller
 public class StatusController {
+
 
     private final MailConfig.PathProperties pathProperties;
     private final MemoryServiceClient memoryServiceClient;
@@ -46,6 +49,7 @@ public class StatusController {
         try (Stream<Path> files = Files.list(path)) {
             return files.filter(Files::isRegularFile).count();
         } catch (IOException e) {
+            log.error("", e);
             return 0;
         }
     }
@@ -58,6 +62,7 @@ public class StatusController {
             int start = Math.max(0, all.size() - lines);
             return all.subList(start, all.size());
         } catch (IOException e) {
+            log.error("", e);
             return List.of("Error reading log: " + e.getMessage());
         }
     }

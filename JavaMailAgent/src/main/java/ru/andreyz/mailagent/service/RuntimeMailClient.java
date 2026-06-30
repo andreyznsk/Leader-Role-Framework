@@ -13,9 +13,12 @@ import ru.andreyz.mailagent.model.MailConnectionErrorType;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class RuntimeMailClient implements MailClient {
+
 
     private final ObjectMapper objectMapper;
     private final MailRuntimeConfigService runtimeConfigService;
@@ -55,6 +58,7 @@ public class RuntimeMailClient implements MailClient {
         try {
             return delegateChecked().testConnection();
         } catch (Exception e) {
+            log.error("", e);
             return MailConnectionTestResult.failed(
                     runtimeConfigService.snapshot().protocol(),
                     runtimeConfigService.snapshot().authType().name(),

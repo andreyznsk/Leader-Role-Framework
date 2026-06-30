@@ -10,14 +10,18 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class DocumentValidator {
+
 
     public ValidationResult validate(Path filePath) {
         try {
             return validate(Files.readString(filePath));
         } catch (IOException e) {
+            log.error("", e);
             return ValidationResult.error("Не удалось прочитать файл: " + e.getMessage());
         }
     }
@@ -39,6 +43,7 @@ public class DocumentValidator {
         try {
             docType = DocType.valueOf(typeRaw.toUpperCase().replace("-", "_"));
         } catch (IllegalArgumentException e) {
+            log.error("", e);
             return ValidationResult.error("Неизвестный тип документа: '" + typeRaw + "'. " +
                     "Допустимые: " + Arrays.toString(DocType.values()));
         }

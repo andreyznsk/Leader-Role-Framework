@@ -19,10 +19,13 @@ import ru.andreyz.memoryservice.service.PluginSettingsService;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Controller
 @RequestMapping("/ui")
 public class SettingsViewController {
+
 
     private final PluginSettingsService pluginSettingsService;
     private final ControlPluginService controlPluginService;
@@ -59,6 +62,7 @@ public class SettingsViewController {
             redirectAttributes.addAttribute("plugin", code);
             redirectAttributes.addAttribute("saved", code);
         } catch (RuntimeException e) {
+            log.error("", e);
             redirectAttributes.addAttribute("plugin", code);
             redirectAttributes.addAttribute("failed", code);
             redirectAttributes.addAttribute("message", e.getMessage());
