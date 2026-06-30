@@ -22,7 +22,7 @@
 | CR-MEM-015        | [2026-06-29_CR-MEM-015-global-search-tsvector-providers.md](2026-06-29_CR-MEM-015-global-search-tsvector-providers.md) | Implemented | 2026-06-29 |
 | CR-MEM-016        | [2026-06-29_CR-MEM-016-agent-workspace-ui.md](2026-06-29_CR-MEM-016-agent-workspace-ui.md) | Implemented | 2026-06-29 |
 | CR-MEM-017        | [2026-06-29_CR-MEM-017-task-timeline-audit.md](2026-06-29_CR-MEM-017-task-timeline-audit.md) | Implemented | 2026-06-29 |
-| CR-MEM-018        | [2026-06-30_CR-MEM-018-move-overdue-tasks-to-today.md](2026-06-30_CR-MEM-018-move-overdue-tasks-to-today.md) | Draft | 2026-06-30 |
+| CR-MEM-018        | [2026-06-30_CR-MEM-018-move-overdue-tasks-to-today.md](2026-06-30_CR-MEM-018-move-overdue-tasks-to-today.md) | DONE | 2026-06-30 |
 | CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md) | Draft | —          |
 
 ---
@@ -67,5 +67,5 @@
 
 ---
 
-_Следующий свободный номер в MEM серии: **CR-MEM-018**_  
+_Следующий свободный номер в MEM серии: **CR-MEM-019**_  
 _Последнее обновление реестра: 2026-06-30_

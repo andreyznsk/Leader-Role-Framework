@@ -111,4 +111,74 @@ class TaskControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("TODO"));
     }
+
+    @Test
+    void patchDate_updatesTaskDateAndDueDate() throws Exception {
+        String initialDate = LocalDate.now().minusDays(3).toString();
+        String targetDate = LocalDate.now().plusDays(1).toString();
+
+        String created = mockMvc.perform(post("/api/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Patch date task","date":"%s","priority":"NORMAL","source":"MANUAL"}
+                                """.formatted(initialDate)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String taskId = created.replaceAll(".*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(patch("/api/tasks/{id}/date", taskId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"date":"%s"}
+                                """.formatted(targetDate)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(Long.parseLong(taskId)))
+                .andExpect(jsonPath("$.date").value(targetDate))
+                .andExpect(jsonPath("$.dueDate").value(targetDate));
+    }
+
+    @Test
+    void moveOverdueToToday_movesOnlyActiveOverdueTasks() throws Exception {
+        String overdueTodoDate = LocalDate.now().minusDays(10).toString();
+        String overdueDoneDate = LocalDate.now().minusDays(9).toString();
+
+        String overdueTodo = mockMvc.perform(post("/api/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"API overdue todo","date":"%s","priority":"HIGH","source":"MANUAL"}
+                                """.formatted(overdueTodoDate)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String overdueTodoId = overdueTodo.replaceAll(".*\"id\":(\\d+).*", "$1");
+
+        String overdueDone = mockMvc.perform(post("/api/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"API overdue done","date":"%s","priority":"NORMAL","source":"MANUAL"}
+                                """.formatted(overdueDoneDate)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String overdueDoneId = overdueDone.replaceAll(".*\"id\":(\\d+).*", "$1");
+        mockMvc.perform(post("/api/tasks/{id}/done", overdueDoneId))
+                .andExpect(status().isOk());
+
+        String today = LocalDate.now().toString();
+
+        mockMvc.perform(post("/api/tasks/move-overdue-to-today"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.moved").isNumber())
+                .andExpect(jsonPath("$.today").value(today));
+
+        mockMvc.perform(get("/api/tasks").param("date", today))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == %s && @.dueDate == '%s')]".formatted(overdueTodoId, today)).exists())
+                .andExpect(jsonPath("$[?(@.id == %s)]".formatted(overdueDoneId)).doesNotExist());
+    }
 }
