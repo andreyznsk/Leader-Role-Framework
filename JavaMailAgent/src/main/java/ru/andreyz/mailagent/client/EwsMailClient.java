@@ -519,6 +519,13 @@ public class EwsMailClient implements MailClient {
             }
             String value = result.toString();
             return value.isBlank() ? null : value;
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            if (e.getCause() instanceof microsoft.exchange.webservices.data.core.exception.service.local.ServiceObjectPropertyException) {
+                log.debug("EWS property not loaded via findItems, skipping: method={}", methodName);
+            } else {
+                log.error("", e);
+            }
+            return null;
         } catch (Exception e) {
             log.error("", e);
             return null;
@@ -547,7 +554,11 @@ public class EwsMailClient implements MailClient {
                 ItemSchema.DateTimeReceived,
                 ItemSchema.ConversationId,
                 EmailMessageSchema.From,
-                EmailMessageSchema.IsRead);
+                EmailMessageSchema.IsRead,
+                EmailMessageSchema.InternetMessageId,
+                EmailMessageSchema.ToRecipients,
+                EmailMessageSchema.CcRecipients,
+                EmailMessageSchema.BccRecipients);
         return propertySet;
     }
 
