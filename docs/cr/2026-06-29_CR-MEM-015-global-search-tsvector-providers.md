@@ -1,4 +1,6 @@
-# 2026-06-29_CR-MEM-012: Global Search tsvector для operational providers
+# 2026-06-29_CR-MEM-015: Global Search tsvector для operational providers
+
+_Переименован из CR-MEM-012 для устранения коллизии номеров, 2026-06-30._
 
 **Дата:** 2026-06-29  
 **Статус:** Implemented  
