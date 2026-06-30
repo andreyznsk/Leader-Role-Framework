@@ -61,10 +61,12 @@
 |---|---|---|---|
 | CR-BUGFIX-001 | [CR-BUGFIX-001-e2e-regressions-2026-06-12.md](CR-BUGFIX-001-e2e-regressions-2026-06-12.md) | Draft | 2026-06-12 |
 | CR-COMMON-001 | [CR-COMMON-001-migrate-services.md](CR-COMMON-001-migrate-services.md) | Approved | — |
+| CR-COMMON-002 | [2026-06-30_CR-COMMON-002-unified-bootstrap-configuration.md](2026-06-30_CR-COMMON-002-unified-bootstrap-configuration.md) | Draft | 2026-06-30 |
 | CR-RAG-001 | [CR-RAG-001-plugin-control-api.md](CR-RAG-001-plugin-control-api.md) | Implemented | — |
 | CR-RAG-BUGFIX-003 | [CR-RAG-BUGFIX-003-chunks-added-stale-on-skip.md](CR-RAG-BUGFIX-003-chunks-added-stale-on-skip.md) | Draft | — |
 
 ---
 
 _Следующий свободный номер в MEM серии: **CR-MEM-018**_  
+_Следующий свободный номер в COMMON серии: **CR-COMMON-003**_  
 _Последнее обновление реестра: 2026-06-30_
