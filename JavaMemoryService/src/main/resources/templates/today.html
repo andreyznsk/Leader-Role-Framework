@@ -4,7 +4,7 @@
 <body>
 <nav th:replace="~{fragments/layout :: nav}"></nav>
 
-<div class="container los-page-content">
+<div class="container-fluid py-3 px-4 los-page-content">
     <div id="today-page-alerts" class="mb-3"></div>
 
     <!-- Summary stats -->
@@ -115,7 +115,7 @@
 
     <!-- Current tasks -->
     <div class="row g-3 align-items-start">
-    <div class="col-lg-8">
+    <div class="col-lg today-main-column">
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0" style="font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:.08em">
@@ -278,7 +278,7 @@
         </div>
     </div>
     </div>
-    <div class="col-lg-4">
+    <div class="col-lg-auto today-sidebar-column">
         <div class="mb-3">
             <button type="button" class="btn btn-sm btn-success w-100 los-add-task-btn"
                     data-bs-toggle="modal" data-bs-target="#addTaskModal">

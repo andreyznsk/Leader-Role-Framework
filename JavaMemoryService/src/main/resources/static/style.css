@@ -422,6 +422,23 @@ body {
   font-weight: 600;
 }
 
+@media (min-width: 992px) {
+  .today-main-column {
+    min-width: 0;
+  }
+
+  .today-sidebar-column {
+    width: 220px;
+    flex: 0 0 220px;
+    max-width: 220px;
+  }
+
+  .today-sidebar-column > .mb-3,
+  #cal-sidebar {
+    width: 220px;
+  }
+}
+
 .los-collapse-toggle {
   display: inline-flex;
   align-items: center;
