@@ -14,5 +14,10 @@ public record AgentResponse(
     String draftPath,
     String captureText,
     String noteText,
-    String noteTitle
+    String noteTitle,
+    String pendingType,
+    Long suggestedTaskId,
+    Double agentConfidence,
+    String agentReason,
+    String proposedDescriptionAppend
 ) {}

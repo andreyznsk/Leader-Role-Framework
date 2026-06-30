@@ -41,12 +41,21 @@
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <span class="badge bg-secondary me-1" th:if="${task.emailId != null}">EMAIL</span>
+                    <span class="badge bg-info text-dark me-1"
+                          th:if="${task.pendingType != null and task.pendingType != 'NEW_TASK'}"
+                          th:text="${task.pendingType}"></span>
                     <a class="task-title-clickable fw-semibold"
                        th:href="@{/ui/tasks/{id}/edit(id=${task.id})}"
                        th:text="${task.title}"></a>
                     <span class="badge ms-2"
                           th:classappend="${task.priority == 'HIGH' or task.priority == 'CRITICAL'} ? 'bg-danger' : 'bg-secondary'"
                           th:text="${task.priority}"></span>
+                    <div th:if="${task.suggestedTaskId != null}" class="text-muted small mt-1">
+                        Agent считает, что письмо связано с
+                        <a th:href="@{/ui/tasks/{id}/edit(id=${task.suggestedTaskId})}"
+                           th:text="${'TASK-' + task.suggestedTaskId}"></a>
+                    </div>
+                    <div th:if="${task.agentReason != null}" class="text-muted small mt-1" th:text="${task.agentReason}"></div>
                     <div th:if="${task.description}" class="mt-1">
                         <div class="text-muted small los-pending-description"
                              th:attr="data-pending-description=true"
@@ -62,7 +71,35 @@
                 <div class="d-flex gap-1 ms-3 flex-shrink-0">
                     <form method="post" th:action="@{/ui/tasks/{id}/confirm(id=${task.id})}"
                           th:attr="data-api-url=@{/api/tasks/{id}/confirm(id=${task.id})},data-api-method='POST',data-api-success='reload'">
-                        <button class="btn btn-sm btn-success">Принять</button>
+                        <button class="btn btn-sm btn-success"
+                                th:text="${task.pendingType == 'LINK_TO_TASK' or task.pendingType == 'UPDATE_TASK' or task.pendingType == 'REQUEST_CONFIRMATION'} ? 'Создать новую задачу' : 'Принять'">Принять</button>
+                    </form>
+                    <form method="post"
+                          th:if="${task.suggestedTaskId != null}"
+                          th:action="@{/ui/tasks/{id}/link(id=${task.id})}"
+                          th:attr="data-api-url=@{/api/tasks/pending/{id}/link(id=${task.id})},data-api-method='POST',data-api-success='reload'">
+                        <input type="hidden"
+                               name="targetTaskId"
+                               th:id="${'target-task-' + task.id}"
+                               th:value="${task.suggestedTaskId}"/>
+                        <div class="mb-1">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary w-100 text-start"
+                                    th:attr="data-pending-id=${task.id},
+                                             data-target-input-id=${'target-task-' + task.id},
+                                             data-target-label-id=${'target-task-label-' + task.id},
+                                             data-pending-title=${task.title},
+                                             data-current-task-id=${task.suggestedTaskId},
+                                             data-current-task-label=${'TASK-' + task.suggestedTaskId}"
+                                    onclick="openTaskSearchPicker(this)">
+                                <span class="d-block small text-muted">Целевая задача</span>
+                                <span th:id="${'target-task-label-' + task.id}"
+                                      th:text="${'TASK-' + task.suggestedTaskId}">TASK-1</span>
+                            </button>
+                        </div>
+                        <input type="hidden" name="appendSummary" th:value="${task.pendingType == 'UPDATE_TASK' or task.proposedDescriptionAppend != null}"/>
+                        <button class="btn btn-sm btn-primary"
+                                th:text="${task.pendingType == 'UPDATE_TASK'} ? 'Обновить задачу' : 'Связать с задачей'">Связать</button>
                     </form>
                     <a th:href="@{/ui/tasks/{id}/edit(id=${task.id})}"
                        class="btn btn-sm btn-outline-secondary">Изменить</a>
@@ -77,13 +114,22 @@
 
     <!-- Current tasks -->
     <div class="row g-3 align-items-start">
-    <div class="col-lg-9">
+    <div class="col-lg-8">
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0" style="font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:.08em">
                 Текущие задачи
             </h5>
-            <small class="text-muted">🚨&nbsp;CRITICAL &nbsp;🔴&nbsp;HIGH &nbsp;🔵&nbsp;NORMAL &nbsp;⚪&nbsp;LOW</small>
+            <div class="d-flex align-items-center gap-3 flex-wrap justify-content-end">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="hideDoneToggle"
+                           th:checked="${hideDone}"
+                           onchange="document.getElementById('hideDone-value').value=this.checked;document.getElementById('today-filters-form').submit()"/>
+                    <label class="form-check-label" for="hideDoneToggle">No Done</label>
+                </div>
+                <small class="text-muted">🚨&nbsp;CRITICAL &nbsp;🔴&nbsp;HIGH &nbsp;🔵&nbsp;NORMAL &nbsp;⚪&nbsp;LOW</small>
+            </div>
         </div>
         <div class="card-body border-bottom">
             <form method="get" th:action="@{/ui/today}" class="row g-2 align-items-end" id="today-filters-form">
@@ -92,8 +138,11 @@
                 <input type="hidden" name="dueDate" th:value="${dueDateFilter != null ? #temporals.format(dueDateFilter, 'yyyy-MM-dd') : ''}"/>
                 <input type="hidden" name="dueDateFrom" th:value="${dueDateFromFilter != null ? #temporals.format(dueDateFromFilter, 'yyyy-MM-dd') : ''}"/>
                 <input type="hidden" name="dueDateTo" th:value="${dueDateToFilter != null ? #temporals.format(dueDateToFilter, 'yyyy-MM-dd') : ''}"/>
-                <div class="col-sm-6 col-md-4 col-lg-3">
-                    <label for="priorityFilter" class="form-label mb-1 d-flex align-items-center justify-content-between gap-2">
+                <input type="hidden" name="hideDone" id="hideDone-value" th:value="${hideDone}"/>
+                <div class="col-12">
+                    <div class="d-flex flex-wrap align-items-end gap-3">
+                        <div style="min-width: 220px; max-width: 220px;">
+                            <label for="priorityFilter" class="form-label mb-1 d-flex align-items-center justify-content-between gap-2">
                         <span>Приоритет</span>
                         <span class="d-inline-flex gap-1">
                             <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
@@ -105,47 +154,41 @@
                                     title="Сортировать по приоритету вниз"
                                     onclick="submitSort('priority', 'desc')">↓</button>
                         </span>
-                    </label>
-                    <select id="priorityFilter" name="priority" class="form-select form-select-sm">
-                        <option value="">Все</option>
-                        <option th:each="option : ${priorityOptions}"
-                                th:value="${option}"
-                                th:text="${option}"
-                                th:selected="${priorityFilter == option}"></option>
-                    </select>
-                </div>
-                <div class="col-sm-6 col-md-4 col-lg-3">
-                    <label for="statusFilter" class="form-label mb-1 d-flex align-items-center justify-content-between gap-2">
-                        <span>Статус</span>
-                        <span class="d-inline-flex gap-1">
-                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
-                                    th:classappend="${sortBy == 'status' and sortDir == 'asc'} ? ' active'"
-                                    title="Сортировать по статусу вверх"
-                                    onclick="submitSort('status', 'asc')">↑</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
-                                    th:classappend="${sortBy == 'status' and sortDir == 'desc'} ? ' active'"
-                                    title="Сортировать по статусу вниз"
-                                    onclick="submitSort('status', 'desc')">↓</button>
-                        </span>
-                    </label>
-                    <select id="statusFilter" name="status" class="form-select form-select-sm">
-                        <option value="">Все</option>
-                        <option th:each="option : ${statusOptions}"
-                                th:value="${option}"
-                                th:text="${option}"
-                                th:selected="${statusFilter == option}"></option>
-                    </select>
-                </div>
-
-                <div class="col-sm-12 col-md-auto">
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-sm btn-primary">Применить</button>
-                        <a th:href="@{/ui/today}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
-                        <button type="button" class="btn btn-sm btn-success los-add-task-btn"
-                                data-bs-toggle="modal" data-bs-target="#addTaskModal">
-                            <span>Добавить</span>
-                            <span>задачу</span>
-                        </button>
+                            </label>
+                            <select id="priorityFilter" name="priority" class="form-select form-select-sm">
+                                <option value="">Все</option>
+                                <option th:each="option : ${priorityOptions}"
+                                        th:value="${option}"
+                                        th:text="${option}"
+                                        th:selected="${priorityFilter == option}"></option>
+                            </select>
+                        </div>
+                        <div style="min-width: 220px; max-width: 220px;">
+                            <label for="statusFilter" class="form-label mb-1 d-flex align-items-center justify-content-between gap-2">
+                                <span>Статус</span>
+                                <span class="d-inline-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                            th:classappend="${sortBy == 'status' and sortDir == 'asc'} ? ' active'"
+                                            title="Сортировать по статусу вверх"
+                                            onclick="submitSort('status', 'asc')">↑</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                            th:classappend="${sortBy == 'status' and sortDir == 'desc'} ? ' active'"
+                                            title="Сортировать по статусу вниз"
+                                            onclick="submitSort('status', 'desc')">↓</button>
+                                </span>
+                            </label>
+                            <select id="statusFilter" name="status" class="form-select form-select-sm">
+                                <option value="">Все</option>
+                                <option th:each="option : ${statusOptions}"
+                                        th:value="${option}"
+                                        th:text="${option}"
+                                        th:selected="${statusFilter == option}"></option>
+                            </select>
+                        </div>
+                        <div class="d-flex gap-2 align-items-end pb-1">
+                            <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+                            <a th:href="@{/ui/today}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+                        </div>
                     </div>
                 </div>
             </form>
@@ -222,7 +265,13 @@
         </div>
     </div>
     </div>
-    <div class="col-lg-3">
+    <div class="col-lg-4">
+        <div class="mb-3">
+            <button type="button" class="btn btn-sm btn-success w-100 los-add-task-btn"
+                    data-bs-toggle="modal" data-bs-target="#addTaskModal">
+                Добавить новую задачу
+            </button>
+        </div>
         <div class="card" id="cal-sidebar">
             <div class="card-header py-2">
                 <div class="d-flex align-items-center justify-content-between">
@@ -322,6 +371,38 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteTaskButton">Архивировать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="taskSearchPickerModal" tabindex="-1" aria-labelledby="taskSearchPickerLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="taskSearchPickerLabel">Выбор задачи</h5>
+                    <div class="small text-muted" id="taskSearchPickerContext"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="taskSearchPickerInput" class="form-label fw-semibold">Поиск</label>
+                    <input id="taskSearchPickerInput"
+                           type="search"
+                           class="form-control"
+                           placeholder="Название, описание, TASK-ID"/>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted mb-1">Выбрано</div>
+                    <div id="taskSearchPickerSelected" class="fw-semibold">—</div>
+                </div>
+                <div id="taskSearchPickerStatus" class="small text-muted mb-2">Введите запрос</div>
+                <div id="taskSearchPickerResults" class="d-grid gap-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Закрыть</button>
             </div>
         </div>
     </div>
@@ -470,6 +551,163 @@
 <script>
 let deleteTaskModalInstance = null;
 let deleteTaskId = null;
+let taskSearchPickerModalInstance = null;
+let taskSearchPickerContext = null;
+let taskSearchPickerDebounceTimer = null;
+let taskSearchPickerRequestSeq = 0;
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function normalizeSearchText(value) {
+    return (value || '').replace(/\s+/g, ' ').trim();
+}
+
+function updateTaskSearchPickerSelected(taskId, label) {
+    if (!taskSearchPickerContext) return;
+    taskSearchPickerContext.currentTaskId = taskId ? String(taskId) : '';
+    taskSearchPickerContext.currentTaskLabel = label || '—';
+    const selectedNode = document.getElementById('taskSearchPickerSelected');
+    if (selectedNode) {
+        selectedNode.textContent = taskSearchPickerContext.currentTaskLabel;
+    }
+}
+
+function renderTaskSearchPickerResults(results) {
+    const container = document.getElementById('taskSearchPickerResults');
+    const status = document.getElementById('taskSearchPickerStatus');
+    if (!container || !status) return;
+
+    if (!Array.isArray(results) || results.length === 0) {
+        container.innerHTML = '';
+        status.textContent = 'Ничего не найдено';
+        return;
+    }
+
+    status.textContent = 'Выберите задачу из результатов';
+    container.innerHTML = results.map(function (item) {
+        const taskId = item.entityId || '';
+        const title = item.title || ('TASK-' + taskId);
+        const snippet = item.snippet ? '<div class="small text-muted mt-1">' + escapeHtml(item.snippet) + '</div>' : '';
+        const selectedClass = String(taskSearchPickerContext?.currentTaskId || '') === String(taskId) ? ' border-primary' : '';
+        return '<button type="button" class="btn btn-outline-secondary text-start p-3 task-search-picker-result' + selectedClass + '"'
+            + ' data-task-id="' + escapeHtml(taskId) + '"'
+            + ' data-task-label="' + escapeHtml('TASK-' + taskId + ' · ' + title) + '"'
+            + ' onclick="selectTaskSearchPickerResult(this)">'
+            + '<div class="fw-semibold">' + escapeHtml('TASK-' + taskId + ' · ' + title) + '</div>'
+            + snippet
+            + '</button>';
+    }).join('');
+}
+
+async function runTaskSearchPickerSearch(query) {
+    const normalizedQuery = normalizeSearchText(query);
+    const status = document.getElementById('taskSearchPickerStatus');
+    const results = document.getElementById('taskSearchPickerResults');
+    if (!status || !results) return;
+
+    if (!normalizedQuery) {
+        results.innerHTML = '';
+        status.textContent = 'Введите запрос';
+        return;
+    }
+
+    const requestSeq = ++taskSearchPickerRequestSeq;
+    status.textContent = 'Ищем...';
+
+    try {
+        const result = await window.LeaderUiApi.request('/api/search', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                query: normalizedQuery,
+                layers: ['TASK'],
+                mode: 'QUICK',
+                limit: 8
+            })
+        });
+
+        if (requestSeq !== taskSearchPickerRequestSeq) {
+            return;
+        }
+        renderTaskSearchPickerResults(result?.data?.results || []);
+    } catch (error) {
+        if (requestSeq !== taskSearchPickerRequestSeq) {
+            return;
+        }
+        results.innerHTML = '';
+        status.textContent = 'Ошибка поиска';
+    }
+}
+
+function scheduleTaskSearchPickerSearch(query) {
+    if (taskSearchPickerDebounceTimer) {
+        window.clearTimeout(taskSearchPickerDebounceTimer);
+    }
+    taskSearchPickerDebounceTimer = window.setTimeout(function () {
+        runTaskSearchPickerSearch(query);
+    }, 200);
+}
+
+function selectTaskSearchPickerResult(button) {
+    if (!taskSearchPickerContext) return;
+
+    const input = document.getElementById(taskSearchPickerContext.targetInputId);
+    const label = document.getElementById(taskSearchPickerContext.targetLabelId);
+    const taskId = button.dataset.taskId;
+    const taskLabel = button.dataset.taskLabel;
+    if (!input || !label || !taskId || !taskLabel) return;
+
+    input.value = taskId;
+    label.textContent = taskLabel;
+    updateTaskSearchPickerSelected(taskId, taskLabel);
+    if (taskSearchPickerModalInstance) {
+        taskSearchPickerModalInstance.hide();
+    }
+}
+
+function openTaskSearchPicker(button) {
+    const modalEl = document.getElementById('taskSearchPickerModal');
+    const input = document.getElementById('taskSearchPickerInput');
+    const context = document.getElementById('taskSearchPickerContext');
+    if (!modalEl || !input || !context) return;
+
+    const currentInput = document.getElementById(button.dataset.targetInputId);
+    const currentLabel = document.getElementById(button.dataset.targetLabelId);
+
+    taskSearchPickerContext = {
+        targetInputId: button.dataset.targetInputId,
+        targetLabelId: button.dataset.targetLabelId,
+        pendingTitle: button.dataset.pendingTitle || '',
+        currentTaskId: currentInput?.value || button.dataset.currentTaskId || '',
+        currentTaskLabel: currentLabel?.textContent?.trim() || button.dataset.currentTaskLabel || '—'
+    };
+    context.textContent = taskSearchPickerContext.pendingTitle;
+    updateTaskSearchPickerSelected(taskSearchPickerContext.currentTaskId, taskSearchPickerContext.currentTaskLabel);
+
+    const initialQuery = normalizeSearchText(taskSearchPickerContext.pendingTitle);
+    input.value = initialQuery;
+    document.getElementById('taskSearchPickerResults').innerHTML = '';
+    document.getElementById('taskSearchPickerStatus').textContent = initialQuery ? 'Ищем...' : 'Введите запрос';
+
+    taskSearchPickerModalInstance = taskSearchPickerModalInstance || new bootstrap.Modal(modalEl);
+    taskSearchPickerModalInstance.show();
+
+    window.setTimeout(function () {
+        input.focus();
+        input.select();
+    }, 150);
+
+    if (initialQuery) {
+        runTaskSearchPickerSearch(initialQuery);
+    }
+}
 
 function togglePriority(btn) {
     window.LeaderUiApi.request('/api/tasks/' + btn.dataset.id, {
@@ -612,6 +850,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (toggle) {
             toggle.classList.remove('d-none');
         }
+    });
+
+    document.getElementById('taskSearchPickerInput')?.addEventListener('input', function (event) {
+        scheduleTaskSearchPickerSearch(event.currentTarget.value);
     });
 });
 </script>

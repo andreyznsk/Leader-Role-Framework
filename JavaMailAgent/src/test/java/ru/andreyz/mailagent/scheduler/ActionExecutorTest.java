@@ -63,7 +63,9 @@ class ActionExecutorTest {
         MailControlAuditStore auditStore = mock(MailControlAuditStore.class);
         MailPromptTemplateService promptTemplateService = mock(MailPromptTemplateService.class);
         when(promptTemplateService.loadClassificationPrompt()).thenReturn("Prompt");
+        when(promptTemplateService.loadLinkingPrompt()).thenReturn("Link prompt");
         when(promptTemplateService.saveClassificationPrompt(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(promptTemplateService.saveLinkingPrompt(any())).thenAnswer(invocation -> invocation.getArgument(0));
         runtimeConfigService = new MailRuntimeConfigService(mail, paths, imap, ews, folders, auditStore, promptTemplateService);
         processedEmailRepository = mock(ProcessedEmailRepository.class);
         when(processedEmailRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -90,7 +92,8 @@ class ActionExecutorTest {
         Files.writeString(inbox.resolve(emailId + ".json"), "{}");
 
         AgentResponse response = new AgentResponse(
-            AgentResponseType.NOISE, emailId, "CI notification", null, null, null, null, null, null, null, null
+            AgentResponseType.NOISE, emailId, "CI notification", null, null, null, null, null, null, null, null,
+            null, null, null, null, null
         );
 
         executor.execute(email(emailId), response);
@@ -116,7 +119,8 @@ class ActionExecutorTest {
             null,
             null,
             null,
-            null
+            null,
+            null, null, null, null, null
         );
 
         executor.execute(email(emailId), response);
@@ -144,7 +148,8 @@ class ActionExecutorTest {
             null,
             null,
             null,
-            null
+            null,
+            null, null, null, null, null
         );
 
         Email email = email(
@@ -193,7 +198,8 @@ class ActionExecutorTest {
             null,
             null,
             null,
-            null
+            null,
+            null, null, null, null, null
         );
 
         doThrow(new IllegalStateException("memory down"))
@@ -231,7 +237,8 @@ class ActionExecutorTest {
             null, null, null, null, null,
             "К сведению: переезд на новый кластер с 1 июля",
             null,
-            null
+            null,
+            null, null, null, null, null
         );
 
         executor.execute(email(emailId), response);
@@ -250,7 +257,8 @@ class ActionExecutorTest {
 
         AgentResponse response = new AgentResponse(
                 AgentResponseType.NOTICE, emailId,
-                "Новая release-практика команды", null, null, null, null, null, null, null, null
+                "Новая release-практика команды", null, null, null, null, null, null, null, null,
+                null, null, null, null, null
         );
 
         executor.execute(
@@ -291,7 +299,8 @@ class ActionExecutorTest {
             "Стоит сохранить в заметки",
             null, null, null, null, null, null,
             "Посмотреть практики blue-green rollout у соседней команды.",
-            "Blue-green rollout"
+            "Blue-green rollout",
+            null, null, null, null, null
         );
 
         executor.execute(email(emailId), response);
@@ -317,7 +326,8 @@ class ActionExecutorTest {
 
         AgentResponse response = new AgentResponse(
             AgentResponseType.NOTICE, emailId,
-            "Новая release-практика команды", null, null, null, null, null, null, null, null
+            "Новая release-практика команды", null, null, null, null, null, null, null, null,
+            null, null, null, null, null
         );
 
         executor.execute(email(emailId), response);

@@ -52,6 +52,7 @@ public class TodayViewController {
                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDateTo,
                         @RequestParam(required = false) String sortBy,
                         @RequestParam(required = false) String sortDir,
+                        @RequestParam(defaultValue = "true") boolean hideDone,
                         Model model) {
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
@@ -62,6 +63,7 @@ public class TodayViewController {
                 .filter(task -> isFilterMatch(task.priority(), priority))
                 .filter(task -> isFilterMatch(task.status(), status))
                 .filter(task -> matchesDateFilter(task.dueDate(), dueDate, dueDateFrom, dueDateTo))
+                .filter(task -> !hideDone || "DONE".equalsIgnoreCase(normalizeFilter(status)) || !"DONE".equalsIgnoreCase(task.status()))
                 .sorted(taskComparator(sortBy, sortDir))
                 .toList();
 
@@ -80,6 +82,7 @@ public class TodayViewController {
         model.addAttribute("pendingCount", pending.size());
         model.addAttribute("doneTodayCount", doneTodayCount);
         model.addAttribute("openIncidentsCount", openIncidentsCount);
+        model.addAttribute("hideDone", hideDone);
         model.addAttribute("priorityFilter", normalizeFilter(priority));
         model.addAttribute("statusFilter", normalizeFilter(status));
         model.addAttribute("dueDateFilter", dueDate);
@@ -196,6 +199,14 @@ public class TodayViewController {
     @PostMapping("/tasks/{id}/reject")
     public String rejectTask(@PathVariable Long id) {
         taskService.reject(id);
+        return "redirect:/ui/today";
+    }
+
+    @PostMapping("/tasks/{id}/link")
+    public String linkPendingTask(@PathVariable Long id,
+                                  @RequestParam Long targetTaskId,
+                                  @RequestParam(defaultValue = "false") boolean appendSummary) {
+        taskService.linkPendingToTask(id, targetTaskId, appendSummary);
         return "redirect:/ui/today";
     }
 

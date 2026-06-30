@@ -22,6 +22,7 @@ import ru.andreyz.mailagent.model.MailConnectionTestResult;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -141,9 +142,17 @@ public class ImapMailClient implements MailClient {
         long uid = uidFolder.getUID(message);
         String subject = defaultString(message.getSubject(), "(no subject)");
         String from = fromAddress(message);
+        List<String> recipients = recipients(message);
         String body = extractBody(message);
+        String messageId = header(message, "Message-ID");
+        String inReplyTo = header(message, "In-Reply-To");
+        String conversationId = firstNonBlank(
+                header(message, "Thread-Index"),
+                header(message, "References"),
+                header(message, "Thread-Topic")
+        );
         LocalDateTime receivedAt = toLocalDateTime(message.getReceivedDate());
-        return new Email(String.valueOf(uid), subject, from, body, receivedAt, folder);
+        return new Email(String.valueOf(uid), subject, from, recipients, body, messageId, conversationId, inReplyTo, receivedAt, folder);
     }
 
     private String fromAddress(Message message) throws MessagingException {
@@ -156,6 +165,23 @@ public class ImapMailClient implements MailClient {
             return ia.getAddress() != null ? ia.getAddress() : ia.getPersonal();
         }
         return addr.toString();
+    }
+
+    private List<String> recipients(Message message) throws MessagingException {
+        jakarta.mail.Address[] recipients = message.getAllRecipients();
+        if (recipients == null || recipients.length == 0) {
+            return List.of();
+        }
+        return Arrays.stream(recipients)
+                .map(address -> {
+                    if (address instanceof InternetAddress ia) {
+                        return ia.getAddress() != null ? ia.getAddress() : ia.toString();
+                    }
+                    return address.toString();
+                })
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .toList();
     }
 
     private String extractBody(Message message) {
@@ -193,6 +219,30 @@ public class ImapMailClient implements MailClient {
 
     private String defaultString(String value, String fallback) {
         return value != null ? value : fallback;
+    }
+
+    private String header(Message message, String name) {
+        try {
+            String[] values = message.getHeader(name);
+            if (values == null || values.length == 0) {
+                return null;
+            }
+            return Arrays.stream(values)
+                    .filter(value -> value != null && !value.isBlank())
+                    .findFirst()
+                    .orElse(null);
+        } catch (MessagingException e) {
+            return null;
+        }
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private boolean isExcluded(String folderName, Set<String> excluded) {

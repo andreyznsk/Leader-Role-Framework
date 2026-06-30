@@ -125,12 +125,14 @@ public class ActionExecutor {
     private StepResult executeRequestRoute(MailProcessingRoute route, RequestActionPayload payload) throws Exception {
         return switch (route) {
             case PLAN_APPEND -> {
-                Path planFile = Path.of(payload.planPath());
-                if (planFile.getParent() != null) {
-                    Files.createDirectories(planFile.getParent());
+                if (shouldAppendPlan(payload)) {
+                    Path planFile = Path.of(payload.planPath());
+                    if (planFile.getParent() != null) {
+                        Files.createDirectories(planFile.getParent());
+                    }
+                    Files.writeString(planFile, "\n" + payload.taskLine(),
+                        StandardOpenOption.APPEND, StandardOpenOption.CREATE);
                 }
-                Files.writeString(planFile, "\n" + payload.taskLine(),
-                    StandardOpenOption.APPEND, StandardOpenOption.CREATE);
                 yield new StepResult(MailProcessingRoute.MEMORY_PENDING_TASK, payload, null, null);
             }
             case MEMORY_PENDING_TASK -> {
@@ -258,7 +260,15 @@ public class ActionExecutor {
                     buildPendingTaskDescription(email, response),
                     response.emailId(),
                     response.sender(),
-                    response.priority()
+                    response.priority(),
+                    response.pendingType(),
+                    response.suggestedTaskId(),
+                    response.agentConfidence(),
+                    response.agentReason(),
+                    "EMAIL",
+                    email.subject(),
+                    email.from(),
+                    response.proposedDescriptionAppend()
                 ),
                 runtime.processedFolder(),
                 runtime.moveProcessedMail()
@@ -319,6 +329,18 @@ public class ActionExecutor {
         if (hasText(email.from())) {
             builder.append("\nОт: ").append(email.from().trim());
         }
+        if (email.recipients() != null && !email.recipients().isEmpty()) {
+            builder.append("\nКому: ").append(String.join(", ", email.recipients()));
+        }
+        if (hasText(email.messageId())) {
+            builder.append("\nMessage-Id: ").append(email.messageId().trim());
+        }
+        if (hasText(email.conversationId())) {
+            builder.append("\nConversation-Id: ").append(email.conversationId().trim());
+        }
+        if (hasText(email.inReplyTo())) {
+            builder.append("\nIn-Reply-To: ").append(email.inReplyTo().trim());
+        }
         if (hasText(email.body())) {
             builder.append("\n\n").append(normalizeMultiline(email.body()));
         }
@@ -327,6 +349,14 @@ public class ActionExecutor {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private boolean shouldAppendPlan(RequestActionPayload payload) {
+        String pendingType = payload.pendingTaskRequest().pendingType();
+        return pendingType == null
+                || pendingType.isBlank()
+                || "NEW_TASK".equalsIgnoreCase(pendingType)
+                || "REQUEST_CONFIRMATION".equalsIgnoreCase(pendingType);
     }
 
     private String normalizeMultiline(String value) {

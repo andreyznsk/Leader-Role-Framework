@@ -14,9 +14,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class MaildevClient implements MailClient {
 
@@ -105,8 +105,16 @@ public class MaildevClient implements MailClient {
         String id = String.valueOf(raw.get("id"));
         String subject = String.valueOf(raw.getOrDefault("subject", "(no subject)"));
         String from = extractFrom(raw);
+        List<String> recipients = extractRecipients(raw);
         String body = String.valueOf(raw.getOrDefault("text", ""));
-        return new Email(id, subject, from, body, LocalDateTime.now(), folder);
+        String messageId = header(raw, "message-id");
+        String conversationId = firstNonBlank(
+                header(raw, "thread-index"),
+                header(raw, "references"),
+                header(raw, "thread-topic")
+        );
+        String inReplyTo = header(raw, "in-reply-to");
+        return new Email(id, subject, from, recipients, body, messageId, conversationId, inReplyTo, LocalDateTime.now(), folder);
     }
 
     @SuppressWarnings("unchecked")
@@ -120,5 +128,54 @@ public class MaildevClient implements MailClient {
             }
         }
         return "unknown";
+    }
+
+    private List<String> extractRecipients(Map<String, Object> raw) {
+        List<String> recipients = new ArrayList<>();
+        collectAddresses(raw.get("to"), recipients);
+        collectAddresses(raw.get("cc"), recipients);
+        collectAddresses(raw.get("bcc"), recipients);
+        return recipients.stream().distinct().toList();
+    }
+
+    private void collectAddresses(Object source, List<String> recipients) {
+        if (!(source instanceof List<?> values)) {
+            return;
+        }
+        for (Object value : values) {
+            if (value instanceof Map<?, ?> addressMap) {
+                Object address = addressMap.get("address");
+                if (address != null && !address.toString().isBlank()) {
+                    recipients.add(address.toString());
+                }
+            }
+        }
+    }
+
+    private String header(Map<String, Object> raw, String name) {
+        Object headers = raw.get("headers");
+        if (headers instanceof Map<?, ?> headerMap) {
+            Object value = headerMap.get(name);
+            if (value == null) {
+                value = headerMap.get(name.toLowerCase());
+            }
+            if (value instanceof List<?> values && !values.isEmpty()) {
+                Object first = values.get(0);
+                return first != null ? first.toString() : null;
+            }
+            if (value != null && !value.toString().isBlank()) {
+                return value.toString();
+            }
+        }
+        return null;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 }
