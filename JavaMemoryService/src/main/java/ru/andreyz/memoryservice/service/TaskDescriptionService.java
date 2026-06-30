@@ -29,11 +29,14 @@ public class TaskDescriptionService {
 
     private final TaskRepository taskRepository;
     private final TaskDescriptionRepository taskDescriptionRepository;
+    private final TaskTimelineService taskTimelineService;
 
     public TaskDescriptionService(TaskRepository taskRepository,
-                                  TaskDescriptionRepository taskDescriptionRepository) {
+                                  TaskDescriptionRepository taskDescriptionRepository,
+                                  TaskTimelineService taskTimelineService) {
         this.taskRepository = taskRepository;
         this.taskDescriptionRepository = taskDescriptionRepository;
+        this.taskTimelineService = taskTimelineService;
     }
 
     public TaskDescriptionResponse get(Long taskId) {
@@ -52,16 +55,22 @@ public class TaskDescriptionService {
         Task task = requireTask(taskId);
         String normalizedContent = normalize(contentMd);
         TaskDescription existing = taskDescriptionRepository.findByTaskId(taskId).orElse(null);
+        String previousContent = existing != null ? normalize(existing.contentMd()) : "";
+        String incomingHash = sha256(normalizedContent);
+        if (existing != null && incomingHash.equals(existing.contentHash())) {
+            return toResponse(existing, taskId);
+        }
         Instant now = Instant.now();
         TaskDescription saved = taskDescriptionRepository.save(new TaskDescription(
                 existing != null ? existing.id() : null,
                 taskId,
                 normalizedContent,
-                sha256(normalizedContent),
+                incomingHash,
                 existing != null ? existing.createdAt() : now,
                 now
         ));
         syncTaskSummary(task, normalizedContent);
+        taskTimelineService.recordDescriptionUpdated(task, previousContent, normalizedContent);
         return toResponse(saved, taskId);
     }
 
@@ -163,6 +172,16 @@ public class TaskDescriptionService {
                 task.dueDate(),
                 task.source(),
                 task.emailId(),
+                task.pendingType(),
+                task.suggestedTaskId(),
+                task.agentConfidence(),
+                task.agentReason(),
+                task.sourceType(),
+                task.sourceSubject(),
+                task.sourceSender(),
+                task.proposedDescriptionAppend(),
+                task.linkedToTaskId(),
+                task.linkedAt(),
                 task.sortOrder(),
                 task.createdAt(),
                 Instant.now()

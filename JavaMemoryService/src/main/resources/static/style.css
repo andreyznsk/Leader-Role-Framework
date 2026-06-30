@@ -121,6 +121,21 @@ body {
   background: rgba(0, 212, 170, .08);
 }
 
+.los-nav-link-with-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.los-nav-alert-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bs-danger);
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, .18);
+  flex: 0 0 auto;
+}
+
 /* ─── CARDS ───────────────────────────────────────── */
 .card {
   background: var(--bg2);
@@ -211,6 +226,37 @@ body {
   margin-bottom: 8px;
 }
 
+.los-pending-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}
+
+.los-pending-description.is-expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.los-pending-toggle {
+  color: var(--accent3);
+  text-decoration: none;
+  line-height: 1;
+}
+
+.los-pending-toggle:hover,
+.los-pending-toggle:focus {
+  color: var(--accent3);
+  text-decoration: none;
+}
+
+.los-pending-toggle-icon {
+  font-size: 18px;
+}
+
 /* ─── SUMMARY STATS ───────────────────────────────── */
 .los-stat {
   background: var(--bg2);
@@ -231,6 +277,62 @@ body {
 .los-stat-label {
   font-size: 13px;
   color: var(--text2);
+}
+
+.status-option {
+  display: inline-block;
+  min-width: 98px;
+  text-align: center;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text2);
+  transition: background-color .15s, border-color .15s, color .15s, opacity .15s;
+  cursor: pointer;
+}
+
+.status-option:not(.is-selected) {
+  opacity: .78;
+}
+
+.status-option.is-selected {
+  color: #fff;
+  opacity: 1;
+}
+
+.status-option--todo {
+  border-color: var(--bs-secondary);
+  color: var(--bs-secondary);
+}
+
+.status-option--todo.is-selected {
+  background: var(--bs-secondary);
+}
+
+.status-option--in-progress {
+  border-color: var(--bs-primary);
+  color: var(--bs-primary);
+}
+
+.status-option--in-progress.is-selected {
+  background: var(--bs-primary);
+}
+
+.status-option--blocked {
+  border-color: var(--bs-danger);
+  color: var(--bs-danger);
+}
+
+.status-option--blocked.is-selected {
+  background: var(--bs-danger);
+}
+
+.status-option--done {
+  border-color: var(--bs-success);
+  color: var(--bs-success);
+}
+
+.status-option--done.is-selected {
+  background: var(--bs-success);
 }
 
 .los-kv {

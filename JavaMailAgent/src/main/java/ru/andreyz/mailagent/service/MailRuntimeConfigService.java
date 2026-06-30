@@ -49,6 +49,7 @@ public class MailRuntimeConfigService {
         this.promptTemplateService = promptTemplateService;
         String initialProtocol = normalizeProtocol(mailProperties.getProtocol());
         String classificationPrompt = promptTemplateService.loadClassificationPrompt();
+        String linkingPrompt = promptTemplateService.loadLinkingPrompt();
         this.current = new AtomicReference<>(new MailRuntimeConfig(
                 true,
                 initialProtocol,
@@ -68,6 +69,7 @@ public class MailRuntimeConfigService {
                 pathProperties.getProcessed(),
                 pathProperties.getDrafts(),
                 classificationPrompt,
+                linkingPrompt,
                 1L,
                 LocalDateTime.now()
         ));
@@ -111,6 +113,8 @@ public class MailRuntimeConfigService {
                 null, true, false, false, null));
         settings.put("classificationPrompt", descriptor(config.classificationPrompt(), "text", "Classification Prompt",
                 "Runtime prompt template for email classification. Stored in MailAgent database and applied on next email.", true, false, true, null));
+        settings.put("linkingPrompt", descriptor(config.linkingPrompt(), "text", "Mail Linking Prompt",
+                "Runtime prompt template for request-to-task linking. Applied after REQUEST classification.", true, false, true, null));
         return new ControlSettingsResponse(PLUGIN_CODE, PLUGIN_NAME, config.version(), settings);
     }
 
@@ -137,6 +141,7 @@ public class MailRuntimeConfigService {
         String processedFolder = parseString(incoming, "processedFolder", previous.processedFolder());
         String draftFolder = parseString(incoming, "draftFolder", previous.draftFolder());
         String classificationPrompt = parseText(incoming, "classificationPrompt", previous.classificationPrompt(), true);
+        String linkingPrompt = parseText(incoming, "linkingPrompt", previous.linkingPrompt(), true);
 
         MailRuntimeConfig updated = new MailRuntimeConfig(
                 enabled,
@@ -157,11 +162,15 @@ public class MailRuntimeConfigService {
                 processedFolder,
                 draftFolder,
                 classificationPrompt,
+                linkingPrompt,
                 previous.version() + 1,
                 appliedAt
         );
         if (!Objects.equals(previous.classificationPrompt(), classificationPrompt)) {
             promptTemplateService.saveClassificationPrompt(classificationPrompt);
+        }
+        if (!Objects.equals(previous.linkingPrompt(), linkingPrompt)) {
+            promptTemplateService.saveLinkingPrompt(linkingPrompt);
         }
         current.set(updated);
 
@@ -247,6 +256,7 @@ public class MailRuntimeConfigService {
         maybeAdd(changed, "processedFolder", previous.processedFolder(), updated.processedFolder());
         maybeAdd(changed, "draftFolder", previous.draftFolder(), updated.draftFolder());
         maybeAdd(changed, "classificationPrompt", previous.classificationPrompt(), updated.classificationPrompt());
+        maybeAdd(changed, "linkingPrompt", previous.linkingPrompt(), updated.linkingPrompt());
         return changed;
     }
 
@@ -275,6 +285,7 @@ public class MailRuntimeConfigService {
         applied.put("processedFolder", config.processedFolder());
         applied.put("draftFolder", config.draftFolder());
         applied.put("classificationPrompt", config.classificationPrompt());
+        applied.put("linkingPrompt", config.linkingPrompt());
         return applied;
     }
 

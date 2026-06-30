@@ -9,6 +9,7 @@ import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.ProcessedEmail;
 import ru.andreyz.mailagent.service.MailControlAuditStore;
+import ru.andreyz.mailagent.service.MailLinkingService;
 import ru.andreyz.mailagent.service.MailProcessingStateService;
 import ru.andreyz.mailagent.service.MailPromptTemplateService;
 import ru.andreyz.mailagent.service.MailRuntimeConfigService;
@@ -26,6 +27,7 @@ class MailAgentJobTest {
     private AgentClient agentClient;
     private ActionExecutor actionExecutor;
     private MailProcessingStateService processingStateService;
+    private MailLinkingService mailLinkingService;
     private MailAgentJob job;
 
     @BeforeEach
@@ -35,6 +37,8 @@ class MailAgentJobTest {
         agentClient = mock(AgentClient.class);
         actionExecutor = mock(ActionExecutor.class);
         processingStateService = mock(MailProcessingStateService.class);
+        mailLinkingService = mock(MailLinkingService.class);
+        when(mailLinkingService.apply(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
 
         MailConfig.MailProperties mailProperties = new MailConfig.MailProperties();
         mailProperties.setFetchLimit(20);
@@ -45,6 +49,7 @@ class MailAgentJobTest {
         MailControlAuditStore auditStore = mock(MailControlAuditStore.class);
         MailPromptTemplateService promptTemplateService = mock(MailPromptTemplateService.class);
         when(promptTemplateService.loadClassificationPrompt()).thenReturn("Prompt");
+        when(promptTemplateService.loadLinkingPrompt()).thenReturn("Link prompt");
         MailRuntimeConfigService runtimeConfigService = new MailRuntimeConfigService(
             mailProperties, pathProperties, imap, ews, folders, auditStore, promptTemplateService
         );
@@ -58,7 +63,8 @@ class MailAgentJobTest {
             pathProperties,
             processingStateService,
             new ObjectMapper().findAndRegisterModules(),
-            runtimeConfigService
+            runtimeConfigService,
+            mailLinkingService
         );
     }
 
@@ -133,7 +139,8 @@ class MailAgentJobTest {
                 new MailConfig.FolderProperties(),
                 mock(MailControlAuditStore.class),
                 promptTemplateService()
-            )
+            ),
+            mailLinkingService
         );
 
         assertThat(configuredJob.resolveProcessingParallelism()).isEqualTo(7);
@@ -174,6 +181,7 @@ class MailAgentJobTest {
     private MailPromptTemplateService promptTemplateService() {
         MailPromptTemplateService promptTemplateService = mock(MailPromptTemplateService.class);
         when(promptTemplateService.loadClassificationPrompt()).thenReturn("Prompt");
+        when(promptTemplateService.loadLinkingPrompt()).thenReturn("Link prompt");
         return promptTemplateService;
     }
 }

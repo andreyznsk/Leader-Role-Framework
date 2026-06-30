@@ -178,6 +178,12 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `memory.control_plugin_settings_snapshot` | Последний известный snapshot настроек плагина (для offline-рендеринга) |
 | `memory.control_plugin_audit` | История изменений настроек через control plane proxy |
 
+**Новые таблицы (CR-MEM-012):**
+
+| Таблица | Описание |
+|---------|----------|
+| `memory.agent_workspace_runs` | Аудит запусков агента из Agent Workspace (mode, provider, prompt, status, duration_ms) |
+
 **Ключевые endpoint-ы:**
 
 | Метод | Путь | Описание |
@@ -185,7 +191,7 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `GET` | `/api/context` | Контекст сессии: today/tomorrow, open incidents/risks, recent people notes |
 | `POST` | `/api/tasks` | Создать подтверждённую задачу; UI создаёт title, description, priority, status, dueDate, date |
 | `POST` | `/api/tasks/pending` | Создать задачу со статусом PENDING |
-| `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `DELETED` по умолчанием |
+| `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `ARCHIVED` и legacy `DELETED` по умолчанию |
 | `PATCH` | `/api/tasks/{id}/status` | Изменить статус задачи |
 | `POST` | `/api/capture` | Сохранить raw capture в БД и `capture-inbox/` |
 | `POST` | `/api/capture/process-now` | Ручной запуск классификации capture-файлов |
@@ -203,6 +209,9 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `GET` | `/ui/knowledge` | Web UI: Knowledge Gateway для RAG lifecycle |
 | `GET` | `/ui/stats` | Web UI: статистика использования и saved time |
 | `GET` | `/ui/settings` | Web UI: Control Plane — настройки плагинов (descriptor-driven UI) |
+| `GET` | `/ui/agent-workspace` | Web UI: Agent Workspace — Chat и Console режимы работы с агентом (CR-MEM-012) |
+| `POST` | `/api/agent/chat/run` | Запустить один prompt через AgentClient.complete(prompt) (CR-MEM-012) |
+| `WS` | `/ws/agent-console` | WebSocket: интерактивная консоль агентского процесса (CR-MEM-012) |
 
 **Global Search navigation contract:** клик по результату поиска должен открывать edit-flow конкретной сущности, а не только страницу списка.
 - `TASK` → `/ui/tasks/{id}/edit`
@@ -231,7 +240,7 @@ MemoryService выступает единой точкой управления 
 
 **Live Prompt Editing Policy:** prompt templates plugin-сервисов редактируются через тот же control plane UI `/ui/settings`, что и остальные runtime settings. Каждый plugin хранит свои prompts в собственной БД, в отдельной таблице своей схемы. Начальные prompt values seed-ятся Flyway migration-ами. После этого пользователь может менять prompt в реальном времени через descriptor-driven form (`type=text`), plugin сохраняет обновлённый prompt в свою БД и использует его на следующем вызове без рестарта процесса. Snapshot в MemoryService не является source of truth для prompts, он нужен только для proxy UI и audit/history.
 
-**Статусы задачи:** `PENDING → TODO → IN_PROGRESS → DONE` / `DELETED`
+**Статусы задачи:** `PENDING → TODO → IN_PROGRESS → DONE` / `ARCHIVED` (`DELETED` остаётся только legacy-статусом)
 
 **Capture Bot:** `POST /api/capture` сохраняет заметку без интерпретации.
 `CaptureScheduler` по `capture.scheduler.cron` пакетно читает `capture-inbox/YYYY-MM-DD/*.md`,
@@ -372,9 +381,8 @@ Leader-Role-Framework/
 ├── JavaRagService/
 │   └── rag-inbox/
 │       └── captures/   ← KNOWLEDGE captures для индексации
-└── cr/                 ← CR для ARCHITECTURE.md и CLAUDE.md
-    ├── CR-ARCH-001-master-update.md
-    └── CR-CLAUDE-001-handoff.md
+└── docs/
+    └── cr/             ← единая папка для всех ARCH/CROSS-SERVICE CR
 ```
 
 ---
@@ -509,14 +517,8 @@ Browser/Agent ──/ui/settings──→  JavaMemoryService ──proxies──
 
 ```
 Leader-Role-Framework/
-├── cr/
-│   └── CR-ARCH-001-master-update.md
 └── docs/
-    └── cr/
-        ├── CR-MAIL-004-plugin-control-api.md      (Implemented, 2026-06-23)
-        ├── CR-MEM-009-plugin-settings-store.md    (Implemented, 2026-06-23)
-        ├── CR-MEM-010-universal-plugin-control-ui.md (Implemented, 2026-06-23)
-        └── CR-RAG-001-plugin-control-api.md       (Implemented, 2026-06-23)
+    └── cr/             ← единая папка для всех ARCH/CROSS-SERVICE/BUGFIX CR
 
 JavaMemoryService/
 └── cr/
@@ -541,7 +543,7 @@ JavaMailAgent/
 ```
 1. Новая идея / фича
         ↓
-2. Создать CR-{PREFIX}-{NNN}.md в cr/ нужного сервиса
+2. Создать CR-{PREFIX}-{NNN}.md в docs/cr/ (cross-service) или {Service}/cr/ (service-specific)
         ↓
 3. Агент читает CR → вносит изменения в RFC (главную спеку)
         ↓
@@ -684,7 +686,9 @@ docker compose up -d
 | `02_create_task.md` | HIGH | POST /api/tasks → 201, видна в плане |
 | `03_read_daily_plan.md` | HIGH | GET /api/tasks?date= + /api/context + /ui/today |
 | `04_edit_task.md` | HIGH | PUT + PATCH /status + file description |
-| `05_pending_task_flow.md` | HIGH | PENDING → confirm → TODO / reject → DELETED |
+| `05_pending_task_flow.md` | HIGH | PENDING → confirm → TODO / reject → ARCHIVED |
+| `17_task_timeline_archive_flow.md` | HIGH | timeline событий задачи + archive flow |
+| `18_agent_workspace.md` | HIGH | Agent Workspace: UI smoke, Chat mode (mock), аудит в БД, WebSocket upgrade, security whitelist (CR-MEM-012) |
 | `06_incidents.md` | HIGH | OPEN → INVESTIGATING → RESOLVED |
 | `07_risks.md` | MEDIUM | OPEN → MITIGATED + getContext |
 | `08_people_and_notes.md` | MEDIUM | карточка + заметки + поиск |
@@ -723,7 +727,7 @@ docker compose up -d
 | Файл | Приоритет | Что проверяет |
 |------|-----------|--------------|
 | `01_email_to_pending_task.md` | CRITICAL | письмо → REQUEST → PENDING в MemoryService |
-| `02_pending_confirm_reject.md` | CRITICAL | PENDING → confirm → TODO / reject → DELETED |
+| `02_pending_confirm_reject.md` | CRITICAL | PENDING → confirm → TODO / reject → ARCHIVED |
 | `03_noise_no_task_created.md` | HIGH | NOISE → письмо прочитано, задача НЕ создана |
 | `04_draft_no_task_created.md` | HIGH | DRAFT → черновик в drafts/, задача НЕ создана |
 | `05_mixed_batch_three_types.md` | HIGH | 3 письма → правильные типы и read-статусы |

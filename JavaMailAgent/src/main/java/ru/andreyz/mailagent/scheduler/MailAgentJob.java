@@ -12,6 +12,7 @@ import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.service.MailProcessingStateService;
+import ru.andreyz.mailagent.service.MailLinkingService;
 import ru.andreyz.mailagent.service.MailRuntimeConfig;
 import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 import ru.andreyz.mailagent.model.ProcessedEmail;
@@ -42,6 +43,7 @@ public class MailAgentJob {
     private final MailProcessingStateService processingStateService;
     private final ObjectMapper objectMapper;
     private final MailRuntimeConfigService runtimeConfigService;
+    private final MailLinkingService mailLinkingService;
 
     public MailAgentJob(
         MailClient mailClient,
@@ -52,7 +54,8 @@ public class MailAgentJob {
         MailConfig.PathProperties pathProperties,
         MailProcessingStateService processingStateService,
         ObjectMapper objectMapper,
-        MailRuntimeConfigService runtimeConfigService
+        MailRuntimeConfigService runtimeConfigService,
+        MailLinkingService mailLinkingService
     ) {
         this.mailClient = mailClient;
         this.promptBuilder = promptBuilder;
@@ -63,6 +66,7 @@ public class MailAgentJob {
         this.processingStateService = processingStateService;
         this.objectMapper = objectMapper;
         this.runtimeConfigService = runtimeConfigService;
+        this.mailLinkingService = mailLinkingService;
     }
 
     @Scheduled(fixedDelayString = "#{${mail.poll-interval-seconds:60} * 1000}")
@@ -84,7 +88,8 @@ public class MailAgentJob {
                     countByType(failedEmail.responseType(), counts);
                 } catch (Exception e) {
                     errors++;
-                    log.warn("Retry for email {} failed: {}", failedEmail.emailId(), e.getMessage());
+                    log.error("Retry for email {} failed: {}", failedEmail.emailId(), e.getMessage());
+                    log.error("", e);
                     finishPoll(total, errors, counts);
                     return;
                 }
@@ -100,7 +105,7 @@ public class MailAgentJob {
             folders = filterIncludedFolders(folders, runtime.foldersInclude());
         } catch (Exception e) {
             log.error("Failed to list folders: {}", e.getMessage());
-            log.debug("", e);
+            log.error("", e);
             runtimeConfigService.registerPollResult("Folder list failed: " + e.getMessage());
             return;
         }
@@ -153,7 +158,7 @@ public class MailAgentJob {
         saveToInbox(email);
         String prompt = promptBuilder.build(email);
         String raw = agentClient.complete(prompt);
-        AgentResponse resp = parseAgentResponse(raw);
+        AgentResponse resp = mailLinkingService.apply(email, parseAgentResponse(raw));
         log.info("Classified as {}{}", resp.type(),
             resp.priority() != null ? ", priority " + resp.priority() : "");
         return resp;

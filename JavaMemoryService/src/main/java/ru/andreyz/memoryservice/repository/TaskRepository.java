@@ -18,7 +18,7 @@ public interface TaskRepository extends CrudRepository<Task, Long> {
     @Query("SELECT COALESCE(MAX(sort_order), -1) FROM tasks WHERE plan_id = :planId")
     int findMaxSortOrderByPlanId(@Param("planId") Long planId);
 
-    @Query("SELECT * FROM tasks WHERE status NOT IN ('PENDING','DELETED') " +
+    @Query("SELECT * FROM tasks WHERE status NOT IN ('PENDING','DELETED','ARCHIVED') " +
            "ORDER BY CASE status " +
            "WHEN 'IN_PROGRESS' THEN 1 " +
            "WHEN 'TODO' THEN 2 " +

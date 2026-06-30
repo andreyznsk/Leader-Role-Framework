@@ -16,20 +16,36 @@ public class MailPromptTemplateService {
     }
 
     public String loadClassificationPrompt() {
-        return repository.findByCode(MailPromptTemplates.CLASSIFICATION_PROMPT_CODE)
-            .map(MailPromptTemplate::template)
-            .filter(template -> template != null && !template.isBlank())
-            .orElse(MailPromptTemplates.DEFAULT_CLASSIFICATION_PROMPT);
+        return loadPrompt(MailPromptTemplates.CLASSIFICATION_PROMPT_CODE, MailPromptTemplates.DEFAULT_CLASSIFICATION_PROMPT);
     }
 
     public String saveClassificationPrompt(String template) {
-        String normalized = normalizeTemplate(template);
+        return savePrompt(MailPromptTemplates.CLASSIFICATION_PROMPT_CODE, template, MailPromptTemplates.DEFAULT_CLASSIFICATION_PROMPT);
+    }
+
+    public String loadLinkingPrompt() {
+        return loadPrompt(MailPromptTemplates.LINKING_PROMPT_CODE, MailPromptTemplates.DEFAULT_LINKING_PROMPT);
+    }
+
+    public String saveLinkingPrompt(String template) {
+        return savePrompt(MailPromptTemplates.LINKING_PROMPT_CODE, template, MailPromptTemplates.DEFAULT_LINKING_PROMPT);
+    }
+
+    private String loadPrompt(String code, String defaultValue) {
+        return repository.findByCode(code)
+            .map(MailPromptTemplate::template)
+            .filter(template -> template != null && !template.isBlank())
+            .orElse(defaultValue);
+    }
+
+    private String savePrompt(String code, String template, String defaultValue) {
+        String normalized = normalizeTemplate(template, defaultValue);
         LocalDateTime now = LocalDateTime.now();
-        MailPromptTemplate current = repository.findByCode(MailPromptTemplates.CLASSIFICATION_PROMPT_CODE)
+        MailPromptTemplate current = repository.findByCode(code)
             .orElse(null);
         MailPromptTemplate updated = new MailPromptTemplate(
             current != null ? current.id() : null,
-            MailPromptTemplates.CLASSIFICATION_PROMPT_CODE,
+            code,
             normalized,
             current != null ? current.createdAt() : now,
             now
@@ -38,11 +54,11 @@ public class MailPromptTemplateService {
         return normalized;
     }
 
-    private String normalizeTemplate(String template) {
+    private String normalizeTemplate(String template, String defaultValue) {
         if (template == null) {
-            return MailPromptTemplates.DEFAULT_CLASSIFICATION_PROMPT;
+            return defaultValue;
         }
         String normalized = template.replace("\r\n", "\n");
-        return normalized.isBlank() ? MailPromptTemplates.DEFAULT_CLASSIFICATION_PROMPT : normalized;
+        return normalized.isBlank() ? defaultValue : normalized;
     }
 }

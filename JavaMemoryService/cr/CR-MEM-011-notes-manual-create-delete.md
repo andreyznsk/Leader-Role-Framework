@@ -1,7 +1,7 @@
 # CR-MEM-011: Operational Notes — ручное добавление и удаление заметок
 
 **Дата:** 2026-06-26  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Тип:** feature  
 **Сервис:** JavaMemoryService  
 **Экран:** `GET /ui/notes`  
@@ -238,3 +238,14 @@ curl -s http://localhost:8090/api/notes?limit=20 | jq '.[] | select(.id == '"$NO
 - pin/favorite/archive для notes;
 - отдельные права доступа на удаление;
 - перенос заметки в knowledge / capture / person note.
+
+---
+
+## Фактическая реализация
+
+**Реализовано:** 2026-06-26  
+Оба сценария CR подтверждены в коде:
+- `POST /api/notes` — `NoteController.create(...)` (строка 23)
+- `DELETE /api/notes/{id}` — `NoteController.delete(...)` (строка 39–43)
+
+Файлы: `NoteController.java`, `NoteService.java`, `NoteControllerTest.java`.

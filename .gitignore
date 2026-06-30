@@ -9,6 +9,7 @@
 .env
 .env.*
 *.env
+.run
 
 # rclone local credentials/cache - keep OAuth tokens out of git
 rclone.conf

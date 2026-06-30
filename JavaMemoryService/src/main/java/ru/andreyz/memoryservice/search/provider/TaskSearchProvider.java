@@ -31,7 +31,7 @@ public class TaskSearchProvider implements SearchProvider {
                        ts_rank_cd(d.search_vector, (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))) AS description_rank
                 FROM tasks t
                 LEFT JOIN task_descriptions d ON d.task_id = t.id
-                WHERE t.status <> 'DELETED'
+                WHERE t.status NOT IN ('DELETED', 'ARCHIVED')
                   AND (
                         t.search_vector @@ (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))
                         OR d.search_vector @@ (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))

@@ -1,7 +1,7 @@
 # 2026-06-29_CR-MEM-013: Task description DB storage and searchable markdown
 
 **Дата:** 2026-06-29  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MEM  
 **Зависимости:** CR-MEM-012 Global Search tsvector providers, JavaMemoryService, PostgreSQL, UI Today/Task details  
 **Связанный Issue:** TBD  
@@ -475,3 +475,16 @@ Expected:
 - Все существующие тесты проходят.
 - Новый E2E сценарий проходит.
 - Документация обновлена под новую source-of-truth модель.
+
+---
+
+## Фактическая реализация
+
+**Реализовано:** 2026-06-29 (коммит `b1c3dfb`)  
+Полный стек подтверждён:
+- Domain: `TaskDescription`
+- Service/Controller/Repository: `TaskDescriptionService`, `TaskDescriptionController`, `TaskDescriptionRepository`
+- DTO: `TaskDescriptionResponse`, `UpdateTaskDescriptionRequest`
+- Миграция: `V14__task_description_storage.java`
+- Файловая миграция: `TaskDescriptionFileMigrationRunner`
+- Тесты на каждый слой

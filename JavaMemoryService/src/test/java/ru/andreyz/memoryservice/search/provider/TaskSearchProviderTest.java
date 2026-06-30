@@ -57,7 +57,7 @@ class TaskSearchProviderTest {
     }
 
     @Test
-    void doesNotReturnDeletedTasks() {
+    void doesNotReturnArchivedTasks() {
         Task deleted = taskService.createConfirmed(LocalDate.now(), "Old release", "NORMAL", null, "MANUAL", null);
         taskDescriptionService.update(deleted.id(), "obsolete blocker");
         taskService.deleteTask(deleted.id());

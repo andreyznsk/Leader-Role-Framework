@@ -22,6 +22,9 @@ class TaskServiceTest {
     @Autowired
     private TaskDescriptionService taskDescriptionService;
 
+    @Autowired
+    private TaskTimelineService taskTimelineService;
+
     @Test
     void createPending_hasCorrectStatus() {
         LocalDate dueDate = LocalDate.now().plusDays(2);
@@ -51,7 +54,7 @@ class TaskServiceTest {
 
         Task rejected = taskService.reject(pending.id());
 
-        assertThat(rejected.status()).isEqualTo("DELETED");
+        assertThat(rejected.status()).isEqualTo("ARCHIVED");
     }
 
     @Test
@@ -100,5 +103,86 @@ class TaskServiceTest {
         assertThat(updated.status()).isEqualTo("IN_PROGRESS");
         assertThat(taskDescriptionService.getContent(task.id())).isEqualTo("## Context\nblocked by qa approval");
         assertThat(taskService.findById(task.id()).description()).contains("blocked by qa approval");
+    }
+
+    @Test
+    void archive_hidesTaskFromDateListing() {
+        LocalDate date = LocalDate.now().plusDays(5);
+        Task task = taskService.createConfirmed(date, "Archive me", "NORMAL", null, "MANUAL", null);
+
+        taskService.archive(task.id());
+
+        assertThat(taskService.findByDate(date)).noneMatch(it -> it.id().equals(task.id()));
+        assertThat(taskService.findById(task.id()).status()).isEqualTo("ARCHIVED");
+    }
+
+    @Test
+    void linkPendingToTask_archivesPendingAndAddsEmailLinkedTimelineEvent() {
+        Task target = taskService.createConfirmed(LocalDate.now(), "Existing task", "HIGH", null, "MANUAL", null);
+        Task pending = taskService.createPending(
+                "Mail follow-up",
+                "Pending description",
+                "msg-link-test",
+                "sender@test.com",
+                "NORMAL",
+                LocalDate.now().plusDays(1),
+                "mail-agent",
+                "LINK_TO_TASK",
+                target.id(),
+                0.93,
+                "Same release thread",
+                "EMAIL",
+                "RE: Release",
+                "sender@test.com",
+                null
+        );
+
+        Task linked = taskService.linkPendingToTask(pending.id(), null, false);
+        Task archivedPending = taskService.findById(pending.id());
+
+        assertThat(linked.id()).isEqualTo(target.id());
+        assertThat(archivedPending.status()).isEqualTo("ARCHIVED");
+        assertThat(archivedPending.linkedToTaskId()).isEqualTo(target.id());
+        assertThat(archivedPending.linkedAt()).isNotNull();
+        assertThat(taskTimelineService.findEvents(target.id()))
+                .extracting(event -> event.eventType())
+                .contains("EMAIL_LINKED");
+    }
+
+    @Test
+    void linkPendingToTask_canUseAlternativeTargetAndAppendDescription() {
+        Task suggested = taskService.createConfirmed(LocalDate.now(), "Suggested task", "NORMAL", null, "MANUAL", null);
+        Task alternative = taskService.createConfirmed(LocalDate.now(), "Alternative task", "HIGH", "Initial description", "MANUAL", null);
+        Task pending = taskService.createPending(
+                "Mail update",
+                "Pending update description",
+                "msg-update-test",
+                "sender@test.com",
+                "HIGH",
+                LocalDate.now().plusDays(2),
+                "mail-agent",
+                "UPDATE_TASK",
+                suggested.id(),
+                0.88,
+                "Deadline moved in reply",
+                "EMAIL",
+                "RE: Deadline",
+                "sender@test.com",
+                "New deadline: Friday"
+        );
+
+        Task linked = taskService.linkPendingToTask(pending.id(), alternative.id(), true);
+        Task archivedPending = taskService.findById(pending.id());
+
+        assertThat(linked.id()).isEqualTo(alternative.id());
+        assertThat(taskDescriptionService.getContent(alternative.id()))
+                .contains("Initial description")
+                .contains("New deadline: Friday");
+        assertThat(archivedPending.status()).isEqualTo("ARCHIVED");
+        assertThat(archivedPending.linkedToTaskId()).isEqualTo(alternative.id());
+        assertThat(archivedPending.linkedAt()).isNotNull();
+        assertThat(taskTimelineService.findEvents(alternative.id()))
+                .extracting(event -> event.eventType())
+                .contains("EMAIL_LINKED", "DESCRIPTION_UPDATED");
     }
 }

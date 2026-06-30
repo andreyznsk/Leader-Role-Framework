@@ -1,7 +1,7 @@
 # 2026-06-28_CR-MEM-012: CaptureBot UI
 
 **Дата:** 2026-06-28  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MEM / JavaMemoryService  
 **Ветка:** feature/mailAg-001  
 **Связанный Issue:** TBD
@@ -379,3 +379,14 @@ Expected:
 - multi-user / multi-tenant access control;
 - отдельный UI для RAG index internals;
 - интеграция с корпоративным SSO.
+
+---
+
+## Фактическая реализация
+
+**Реализовано:** 2026-06-28 (ветка `feature/mailAg-001`, PR #31, коммит `2d27773`)  
+Подтверждено наличие:
+- `src/main/resources/templates/captures.html` — CaptureBot UI страница `/ui/captures`
+- `test_e2e/tests/capturebot-ui.spec.js` — E2E сценарий
+
+⚠️ Примечание: файл имеет номер CR-MEM-012, который также используется в `2026-06-29_CR-MEM-012-global-search-tsvector-providers.md`. Коллизия номеров требует отдельного шага перенумерации.

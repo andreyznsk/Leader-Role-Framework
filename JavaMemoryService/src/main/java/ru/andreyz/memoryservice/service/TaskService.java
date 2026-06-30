@@ -20,15 +20,18 @@ public class TaskService {
     private final DailyPlanRepository planRepository;
     private final UsageEventService usageEventService;
     private final TaskDescriptionService taskDescriptionService;
+    private final TaskTimelineService taskTimelineService;
 
     public TaskService(TaskRepository taskRepository,
                        DailyPlanRepository planRepository,
                        UsageEventService usageEventService,
-                       TaskDescriptionService taskDescriptionService) {
+                       TaskDescriptionService taskDescriptionService,
+                       TaskTimelineService taskTimelineService) {
         this.taskRepository = taskRepository;
         this.planRepository = planRepository;
         this.usageEventService = usageEventService;
         this.taskDescriptionService = taskDescriptionService;
+        this.taskTimelineService = taskTimelineService;
     }
 
     public Task createConfirmed(LocalDate date, String title, String priority,
@@ -44,9 +47,12 @@ public class TaskService {
         Task task = new Task(null, planId, title, description,
                 status != null ? status : "TODO", priority != null ? priority : "NORMAL",
                 dueDate != null ? dueDate : date, source != null ? source : "MANUAL", emailId,
+                "NEW_TASK", null, null, null, null, null, null, null,
+                null, null,
                 sortOrder, Instant.now(), Instant.now());
         Task saved = taskRepository.save(task);
         taskDescriptionService.initializeFromTaskField(saved);
+        taskTimelineService.recordTaskCreated(saved);
         recordTaskCreated(saved, usageSource(source), false);
         return saved;
     }
@@ -65,6 +71,16 @@ public class TaskService {
     public Task createPending(String title, String description,
                               String emailId, String sender, String priority,
                               LocalDate dueDate, String usageSource) {
+        return createPending(title, description, emailId, sender, priority, dueDate,
+                usageSource, "NEW_TASK", null, null, null, "EMAIL", null, sender, null);
+    }
+
+    public Task createPending(String title, String description,
+                              String emailId, String sender, String priority,
+                              LocalDate dueDate, String usageSource,
+                              String pendingType, Long suggestedTaskId, Double agentConfidence, String agentReason,
+                              String sourceType, String sourceSubject, String sourceSender,
+                              String proposedDescriptionAppend) {
         if (emailId != null && !emailId.isBlank()) {
             var existing = taskRepository.findFirstByEmailId(emailId);
             if (existing.isPresent()) {
@@ -75,9 +91,14 @@ public class TaskService {
         Task task = new Task(null, null, title, desc,
                 "PENDING", priority != null ? priority : "NORMAL",
                 dueDate, "EMAIL", emailId,
+                normalizePendingType(pendingType), suggestedTaskId, agentConfidence, agentReason,
+                sourceType != null ? sourceType : "EMAIL", sourceSubject, sourceSender != null ? sourceSender : sender,
+                blankToNull(proposedDescriptionAppend),
+                null, null,
                 0, Instant.now(), Instant.now());
         Task saved = taskRepository.save(task);
         taskDescriptionService.initializeFromTaskField(saved);
+        taskTimelineService.recordPendingTaskCreated(saved);
         boolean mailTask = "mail-agent".equals(usageSource);
         if (mailTask) {
             usageEventService.record(new UsageEventCommand(
@@ -103,29 +124,58 @@ public class TaskService {
         int sortOrder = taskRepository.findMaxSortOrderByPlanId(planId) + 1;
         Task confirmed = new Task(task.id(), planId, task.title(), task.description(),
                 "TODO", task.priority(), today, task.source(), task.emailId(),
+                task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
+                task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
+                task.linkedToTaskId(), task.linkedAt(),
                 sortOrder, task.createdAt(), Instant.now());
-        return taskRepository.save(confirmed);
+        Task saved = taskRepository.save(confirmed);
+        taskTimelineService.recordPendingConfirmed(task, saved);
+        return saved;
     }
 
     public Task reject(Long id) {
-        return updateStatus(id, "DELETED");
+        return archive(id);
     }
 
     public void deleteTask(Long id) {
-        updateStatus(id, "DELETED");
+        archive(id);
+    }
+
+    public Task archive(Long id) {
+        Task task = findById(id);
+        if ("ARCHIVED".equals(task.status())) {
+            return task;
+        }
+        Task archived = new Task(task.id(), task.planId(), task.title(), task.description(),
+                "ARCHIVED", task.priority(), task.dueDate(), task.source(), task.emailId(),
+                task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
+                task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
+                task.linkedToTaskId(), task.linkedAt(),
+                task.sortOrder(), task.createdAt(), Instant.now());
+        Task saved = taskRepository.save(archived);
+        taskTimelineService.recordTaskArchived(task);
+        return saved;
     }
 
     public Task edit(Long id, EditTaskRequest req) {
         Task task = findById(id);
+        String newTitle = req.title() != null ? req.title() : task.title();
+        String newStatus = req.status() != null ? req.status() : task.status();
+        String newPriority = req.priority() != null ? req.priority() : task.priority();
+        LocalDate newDueDate = req.dueDate() != null ? req.dueDate() : task.dueDate();
         Task updated = new Task(task.id(), task.planId(),
-                req.title() != null ? req.title() : task.title(),
+                newTitle,
                 task.description(),
-                req.status() != null ? req.status() : task.status(),
-                req.priority() != null ? req.priority() : task.priority(),
-                req.dueDate() != null ? req.dueDate() : task.dueDate(),
+                newStatus,
+                newPriority,
+                newDueDate,
                 task.source(), task.emailId(),
+                task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
+                task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
+                task.linkedToTaskId(), task.linkedAt(),
                 task.sortOrder(), task.createdAt(), Instant.now());
         Task saved = taskRepository.save(updated);
+        recordEditTimeline(task, newTitle, newStatus, newPriority, newDueDate);
         if (req.description() != null) {
             taskDescriptionService.update(id, req.description());
             return findById(id);
@@ -146,19 +196,37 @@ public class TaskService {
         Task task = findById(id);
         Long planId = getOrCreatePlan(toDate).id();
         int sortOrder = taskRepository.findMaxSortOrderByPlanId(planId) + 1;
+        String newStatus = task.status().equals("DONE") ? "TODO" : task.status();
         Task moved = new Task(task.id(), planId, task.title(), task.description(),
-                task.status().equals("DONE") ? "TODO" : task.status(),
+                newStatus,
                 task.priority(), toDate, task.source(), task.emailId(),
+                task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
+                task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
+                task.linkedToTaskId(), task.linkedAt(),
                 sortOrder, task.createdAt(), Instant.now());
-        return taskRepository.save(moved);
+        Task saved = taskRepository.save(moved);
+        if (!equalsNullable(task.dueDate(), toDate)) {
+            taskTimelineService.recordDueDateChanged(task, toDate);
+        }
+        if (!equalsNullable(task.status(), newStatus)) {
+            taskTimelineService.recordStatusChanged(task, newStatus);
+        }
+        return saved;
     }
 
     public Task updateStatus(Long id, String status) {
         Task task = findById(id);
+        if (equalsNullable(task.status(), status)) {
+            return task;
+        }
         Task updated = new Task(task.id(), task.planId(), task.title(), task.description(),
                 status, task.priority(), task.dueDate(), task.source(), task.emailId(),
+                task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
+                task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
+                task.linkedToTaskId(), task.linkedAt(),
                 task.sortOrder(), task.createdAt(), Instant.now());
         Task saved = taskRepository.save(updated);
+        taskTimelineService.recordStatusChanged(task, status);
         if ("DONE".equals(status) && !"DONE".equals(task.status())) {
             usageEventService.record(new UsageEventCommand(
                     UsageEventType.TASK_COMPLETED,
@@ -180,7 +248,7 @@ public class TaskService {
         if (task.planId() == null) return task;
 
         List<Task> siblings = taskRepository.findByPlanIdOrderBySortOrder(task.planId()).stream()
-                .filter(t -> !"DELETED".equals(t.status()) && !"PENDING".equals(t.status()))
+                .filter(t -> !"DELETED".equals(t.status()) && !"PENDING".equals(t.status()) && !"ARCHIVED".equals(t.status()))
                 .toList();
 
         int idx = -1;
@@ -205,9 +273,15 @@ public class TaskService {
         Integer orderA = a.sortOrder();
         Task updatedA = new Task(a.id(), a.planId(), a.title(), a.description(),
                 a.status(), a.priority(), a.dueDate(), a.source(), a.emailId(),
+                a.pendingType(), a.suggestedTaskId(), a.agentConfidence(), a.agentReason(),
+                a.sourceType(), a.sourceSubject(), a.sourceSender(), a.proposedDescriptionAppend(),
+                a.linkedToTaskId(), a.linkedAt(),
                 b.sortOrder(), a.createdAt(), Instant.now());
         Task updatedB = new Task(b.id(), b.planId(), b.title(), b.description(),
                 b.status(), b.priority(), b.dueDate(), b.source(), b.emailId(),
+                b.pendingType(), b.suggestedTaskId(), b.agentConfidence(), b.agentReason(),
+                b.sourceType(), b.sourceSubject(), b.sourceSender(), b.proposedDescriptionAppend(),
+                b.linkedToTaskId(), b.linkedAt(),
                 orderA, b.createdAt(), Instant.now());
         taskRepository.save(updatedA);
         taskRepository.save(updatedB);
@@ -223,14 +297,43 @@ public class TaskService {
             if (!t.sortOrder().equals(i)) {
                 taskRepository.save(new Task(t.id(), t.planId(), t.title(), t.description(),
                         t.status(), t.priority(), t.dueDate(), t.source(), t.emailId(),
+                        t.pendingType(), t.suggestedTaskId(), t.agentConfidence(), t.agentReason(),
+                        t.sourceType(), t.sourceSubject(), t.sourceSender(), t.proposedDescriptionAppend(),
+                        t.linkedToTaskId(), t.linkedAt(),
                         i, t.createdAt(), Instant.now()));
             }
         }
     }
 
+    public Task linkPendingToTask(Long pendingId, Long targetTaskId, boolean appendSummary) {
+        Task pending = findById(pendingId);
+        if (!"PENDING".equals(pending.status())) {
+            throw new IllegalArgumentException("Task is not pending: " + pendingId);
+        }
+        Long resolvedTargetId = targetTaskId != null ? targetTaskId : pending.suggestedTaskId();
+        if (resolvedTargetId == null) {
+            throw new IllegalArgumentException("targetTaskId is required");
+        }
+        Task target = findById(resolvedTargetId);
+        if ("PENDING".equals(target.status()) || "ARCHIVED".equals(target.status())) {
+            throw new IllegalArgumentException("Target task must be active: " + resolvedTargetId);
+        }
+
+        if (appendSummary && pending.proposedDescriptionAppend() != null && !pending.proposedDescriptionAppend().isBlank()) {
+            appendDescription(target.id(), pending.proposedDescriptionAppend());
+            target = findById(target.id());
+        }
+
+        taskTimelineService.recordEmailLinked(target, pending, resolvedTargetId);
+        archive(linkedPendingTask(pending, resolvedTargetId));
+        return target;
+    }
+
     public List<Task> findByDate(LocalDate date) {
         return planRepository.findByPlanDate(date)
-                .map(plan -> taskRepository.findByPlanIdAndStatusNotOrderBySortOrder(plan.id(), "DELETED"))
+                .map(plan -> taskRepository.findByPlanIdOrderBySortOrder(plan.id()).stream()
+                        .filter(task -> !"DELETED".equals(task.status()) && !"ARCHIVED".equals(task.status()))
+                        .toList())
                 .orElse(List.of());
     }
 
@@ -253,6 +356,16 @@ public class TaskService {
     public Task findById(Long id) {
         return taskRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found: " + id));
+    }
+
+    private Task archive(Task task) {
+        Task archived = new Task(task.id(), task.planId(), task.title(), task.description(),
+                "ARCHIVED", task.priority(), task.dueDate(), task.source(), task.emailId(),
+                task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
+                task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
+                task.linkedToTaskId(), task.linkedAt(),
+                task.sortOrder(), task.createdAt(), Instant.now());
+        return taskRepository.save(archived);
     }
 
     private DailyPlan getOrCreatePlan(LocalDate date) {
@@ -288,5 +401,53 @@ public class TaskService {
             return "ai-agent";
         }
         return source.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private void recordEditTimeline(Task original, String newTitle, String newStatus, String newPriority, LocalDate newDueDate) {
+        if (!equalsNullable(original.title(), newTitle)) {
+            taskTimelineService.recordTitleUpdated(original, newTitle);
+        }
+        if (!equalsNullable(original.status(), newStatus)) {
+            taskTimelineService.recordStatusChanged(original, newStatus);
+        }
+        if (!equalsNullable(original.priority(), newPriority)) {
+            taskTimelineService.recordPriorityChanged(original, newPriority);
+        }
+        if (!equalsNullable(original.dueDate(), newDueDate)) {
+            taskTimelineService.recordDueDateChanged(original, newDueDate);
+        }
+    }
+
+    private void appendDescription(Long taskId, String appendBlock) {
+        String current = taskDescriptionService.getContent(taskId);
+        String addition = appendBlock.trim();
+        String updated = current == null || current.isBlank()
+                ? addition
+                : current.stripTrailing() + "\n\n---\n\n" + addition;
+        taskDescriptionService.update(taskId, updated);
+    }
+
+    private Task linkedPendingTask(Task pending, Long resolvedTargetId) {
+        return new Task(pending.id(), pending.planId(), pending.title(), pending.description(),
+                pending.status(), pending.priority(), pending.dueDate(), pending.source(), pending.emailId(),
+                pending.pendingType(), pending.suggestedTaskId(), pending.agentConfidence(), pending.agentReason(),
+                pending.sourceType(), pending.sourceSubject(), pending.sourceSender(), pending.proposedDescriptionAppend(),
+                resolvedTargetId, Instant.now(),
+                pending.sortOrder(), pending.createdAt(), Instant.now());
+    }
+
+    private String normalizePendingType(String pendingType) {
+        if (pendingType == null || pendingType.isBlank()) {
+            return "NEW_TASK";
+        }
+        return pendingType.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static boolean equalsNullable(Object left, Object right) {
+        return left == null ? right == null : left.equals(right);
     }
 }

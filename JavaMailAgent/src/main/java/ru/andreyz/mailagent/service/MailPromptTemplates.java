@@ -3,13 +3,18 @@ package ru.andreyz.mailagent.service;
 public final class MailPromptTemplates {
 
     public static final String CLASSIFICATION_PROMPT_CODE = "classificationPrompt";
+    public static final String LINKING_PROMPT_CODE = "mailLinkingPrompt";
 
     public static final String DEFAULT_CLASSIFICATION_PROMPT = """
         Ты — ассистент Tech Lead. Проанализируй входящее письмо и верни JSON.
 
         Письмо:
         От: {{from}}
+        Кому: {{recipients}}
         Тема: {{subject}}
+        Message-Id: {{messageId}}
+        Conversation-Id: {{conversationId}}
+        In-Reply-To: {{inReplyTo}}
         Текст:
         {{body}}
 
@@ -63,6 +68,33 @@ public final class MailPromptTemplates {
         - LOW: без дедлайна или "когда будет время"
 
         taskLine формат: "- [ ] [PRIORITY] Описание — от sender@example.com"
+        """;
+
+    public static final String DEFAULT_LINKING_PROMPT = """
+        Ты анализируешь новое входящее письмо и найденный контекст LeaderOS.
+        Определи, это новая задача или продолжение существующей.
+
+        Верни только JSON:
+        {
+          "decision": "<NEW_TASK|LINK_TO_TASK|UPDATE_TASK|IGNORE|REQUEST_CONFIRMATION>",
+          "confidence": <0.0-1.0>,
+          "targetTaskId": <id или null>,
+          "title": "<предлагаемый title или null>",
+          "summary": "<краткое решение или null>",
+          "reason": "<почему принято это решение>",
+          "proposedDescriptionAppend": "<что добавить в описание задачи, только для UPDATE_TASK, иначе null>",
+          "matchedSources": ["TASK-42", "NOTICE-5"]
+        }
+
+        Правила:
+        - Если письмо выглядит как ответ/продолжение по уже существующей задаче, выбирай LINK_TO_TASK.
+        - Если в письме есть новый дедлайн, договоренность, риск или существенное обновление по существующей задаче, выбирай UPDATE_TASK.
+        - Если это новый action item, выбирай NEW_TASK.
+        - Если действий не требуется, выбирай IGNORE.
+        - Если контекст неоднозначен, выбирай REQUEST_CONFIRMATION.
+
+        Письмо и контекст:
+        {{context}}
         """;
 
     private MailPromptTemplates() {

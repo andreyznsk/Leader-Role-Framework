@@ -101,4 +101,85 @@ test.describe('Today UI', () => {
       await request.delete(`/api/tasks/${task.id}`);
     }
   });
+
+  test('links pending mail candidate to an alternative target task from today UI', async ({ page, request }) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const suffix = Date.now();
+
+    const suggestedResponse = await request.post('/api/tasks', {
+      data: {
+        title: `Suggested target ${suffix}`,
+        description: 'Suggested task description',
+        date: today,
+        priority: 'NORMAL',
+        source: 'MANUAL'
+      }
+    });
+    expect(suggestedResponse.ok()).toBeTruthy();
+    const suggestedTask = await suggestedResponse.json();
+
+    const alternativeResponse = await request.post('/api/tasks', {
+      data: {
+        title: `Alternative target ${suffix}`,
+        description: 'Alternative task description',
+        date: today,
+        priority: 'HIGH',
+        source: 'MANUAL'
+      }
+    });
+    expect(alternativeResponse.ok()).toBeTruthy();
+    const alternativeTask = await alternativeResponse.json();
+
+    const pendingResponse = await request.post('/api/tasks/pending', {
+      data: {
+        title: `Pending link candidate ${suffix}`,
+        description: 'Mail candidate for linking',
+        emailId: `msg-link-${suffix}`,
+        sender: 'sender@test.com',
+        priority: 'NORMAL',
+        pendingType: 'LINK_TO_TASK',
+        suggestedTaskId: suggestedTask.id,
+        agentConfidence: 0.91,
+        agentReason: 'Same release thread',
+        sourceType: 'EMAIL',
+        sourceSubject: 'RE: Release',
+        sourceSender: 'sender@test.com'
+      }
+    });
+    expect(pendingResponse.ok()).toBeTruthy();
+    const pendingTask = await pendingResponse.json();
+
+    try {
+      await page.goto('/ui/today');
+
+      const pendingCard = page.locator('.los-pending-card').filter({ hasText: pendingTask.title });
+      await expect(pendingCard).toBeVisible();
+      await expect(pendingCard).toContainText('LINK_TO_TASK');
+
+      await pendingCard.getByRole('button', { name: /Целевая задача/i }).click();
+      const pickerModal = page.locator('#taskSearchPickerModal');
+      await expect(pickerModal).toBeVisible();
+
+      const searchInput = pickerModal.locator('#taskSearchPickerInput');
+      await searchInput.fill(alternativeTask.title);
+      await pickerModal.locator('.task-search-picker-result').filter({ hasText: alternativeTask.title }).click();
+
+      await expect(pendingCard.locator(`#target-task-label-${pendingTask.id}`)).toContainText(`TASK-${alternativeTask.id}`);
+
+      await pendingCard.getByRole('button', { name: 'Связать с задачей' }).click();
+      await page.waitForLoadState('networkidle');
+
+      await expect(page.locator('.los-pending-card').filter({ hasText: pendingTask.title })).toHaveCount(0);
+
+      const timelineResponse = await request.get(`/api/tasks/${alternativeTask.id}/timeline`);
+      expect(timelineResponse.ok()).toBeTruthy();
+      const timeline = await timelineResponse.json();
+      expect(timeline.map(event => event.eventType)).toContain('EMAIL_LINKED');
+      expect(JSON.stringify(timeline)).toContain(`"pendingTaskId":${pendingTask.id}`);
+    } finally {
+      await request.post(`/api/tasks/${pendingTask.id}/archive`);
+      await request.delete(`/api/tasks/${suggestedTask.id}`);
+      await request.delete(`/api/tasks/${alternativeTask.id}`);
+    }
+  });
 });

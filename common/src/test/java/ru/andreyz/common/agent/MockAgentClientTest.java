@@ -64,4 +64,81 @@ class MockAgentClientTest {
         assertThat(response.get(1).get("type").asText()).isEqualTo("NOTE");
         assertThat(response.get(1).get("tags").asText()).isEqualTo("capture,mock");
     }
+
+    @Test
+    void classifiesMailLinkingPromptAsUpdateTaskWhenExistingTaskAndDeadlineChangePresent() throws Exception {
+        MockAgentClient client = new MockAgentClient("");
+        String prompt = """
+                Ты анализируешь новое входящее письмо и найденный контекст LeaderOS.
+                Определи, это новая задача или продолжение существующей.
+
+                Верни только JSON:
+                {
+                  "decision": "<NEW_TASK|LINK_TO_TASK|UPDATE_TASK|IGNORE|REQUEST_CONFIRMATION>"
+                }
+
+                Письмо и контекст:
+                {
+                  "email": {
+                    "id": "mail-001",
+                    "subject": "RE: Release deadline",
+                    "from": "sender@test.com",
+                    "body": "Новый срок по релизу: пятница"
+                  },
+                  "search": {
+                    "results": [
+                      {
+                        "layer": "TASK",
+                        "title": "Release tracking",
+                        "url": "/ui/tasks/42/edit"
+                      }
+                    ]
+                  }
+                }
+                """;
+
+        JsonNode response = objectMapper.readTree(client.complete(prompt));
+
+        assertThat(response.get("decision").asText()).isEqualTo("UPDATE_TASK");
+        assertThat(response.get("targetTaskId").asLong()).isEqualTo(42L);
+        assertThat(response.get("proposedDescriptionAppend").asText()).contains("Mock update from email");
+    }
+
+    @Test
+    void classifiesMailLinkingPromptAsIgnoreWhenNoActionRequired() throws Exception {
+        MockAgentClient client = new MockAgentClient("");
+        String prompt = """
+                Ты анализируешь новое входящее письмо и найденный контекст LeaderOS.
+                Определи, это новая задача или продолжение существующей.
+
+                Верни только JSON:
+                {
+                  "decision": "<NEW_TASK|LINK_TO_TASK|UPDATE_TASK|IGNORE|REQUEST_CONFIRMATION>"
+                }
+
+                Письмо и контекст:
+                {
+                  "email": {
+                    "id": "mail-002",
+                    "subject": "RE: Release closed",
+                    "from": "sender@test.com",
+                    "body": "Подтверждаю: действий не требуется, просто информация."
+                  },
+                  "search": {
+                    "results": [
+                      {
+                        "layer": "TASK",
+                        "title": "Release tracking",
+                        "url": "/ui/tasks/42/edit"
+                      }
+                    ]
+                  }
+                }
+                """;
+
+        JsonNode response = objectMapper.readTree(client.complete(prompt));
+
+        assertThat(response.get("decision").asText()).isEqualTo("IGNORE");
+        assertThat(response.get("targetTaskId").isNull()).isTrue();
+    }
 }

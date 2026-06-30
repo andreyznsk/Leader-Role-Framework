@@ -33,7 +33,8 @@ class MemoryServiceClientTest {
 
         // Не должен выбрасывать даже при недоступном URL
         assertDoesNotThrow(() -> client.createPendingTask(
-            new PendingTaskRequest("Test", "description", "email-001", "user@test.com", "NORMAL")
+            new PendingTaskRequest("Test", "description", "email-001", "user@test.com", "NORMAL",
+                null, null, null, null, null, null, null, null)
         ));
     }
 
@@ -103,7 +104,8 @@ class MemoryServiceClientTest {
         );
 
         assertDoesNotThrow(() -> client.createPendingTask(
-            new PendingTaskRequest("Test", "description", "email-001", "user@test.com", "NORMAL")
+            new PendingTaskRequest("Test", "description", "email-001", "user@test.com", "NORMAL",
+                null, null, null, null, null, null, null, null)
         ));
 
         verify(httpClient, times(3)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));

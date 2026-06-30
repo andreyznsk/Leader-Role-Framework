@@ -8,5 +8,13 @@ public record CreatePendingTaskRequest(
         String emailId,
         String sender,
         String priority,
-        LocalDate dueDate
+        LocalDate dueDate,
+        String pendingType,
+        Long suggestedTaskId,
+        Double agentConfidence,
+        String agentReason,
+        String sourceType,
+        String sourceSubject,
+        String sourceSender,
+        String proposedDescriptionAppend
 ) {}

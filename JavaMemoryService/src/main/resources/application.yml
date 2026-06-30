@@ -50,3 +50,7 @@ capture:
 
 agent:
   provider: claude
+
+agentWorkspace:
+  console:
+    allowedCommands: claude
