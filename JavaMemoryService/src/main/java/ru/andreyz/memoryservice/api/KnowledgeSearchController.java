@@ -1,5 +1,7 @@
 package ru.andreyz.memoryservice.api;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/knowledge")
 public class KnowledgeSearchController {
+
+    private static final Logger log = LoggerFactory.getLogger(KnowledgeSearchController.class);
 
     private final RestClient restClient;
     private final UsageEventService usageEventService;
@@ -49,6 +53,7 @@ public class KnowledgeSearchController {
             recordSearchEvents(request.query(), topK, safeResults.size(), durationMs, "SUCCESS");
             return ResponseEntity.ok(safeResults);
         } catch (Exception e) {
+            log.error("", e);
             long durationMs = System.currentTimeMillis() - started;
             usageEventService.record(new UsageEventCommand(
                     UsageEventType.KNOWLEDGE_SEARCH,

@@ -1,6 +1,8 @@
 package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -14,6 +16,8 @@ import java.util.List;
 
 @Component
 public class ControlPluginClient {
+
+    private static final Logger log = LoggerFactory.getLogger(ControlPluginClient.class);
 
     private final RestClient.Builder restClientBuilder;
 
@@ -68,6 +72,7 @@ public class ControlPluginClient {
                     : "UNKNOWN";
             return status == null || status.isBlank() ? "UNKNOWN" : status.toUpperCase();
         } catch (RestClientException e) {
+            log.error("", e);
             return "DOWN";
         }
     }

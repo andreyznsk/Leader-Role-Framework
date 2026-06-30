@@ -1,6 +1,8 @@
 package ru.andreyz.mailagent.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.common.agent.AgentClient;
 import ru.andreyz.mailagent.integration.MemorySearchRequest;
@@ -18,6 +20,8 @@ import java.util.Locale;
 
 @Service
 public class MailLinkingService {
+
+    private static final Logger log = LoggerFactory.getLogger(MailLinkingService.class);
 
     private static final List<String> SEARCH_LAYERS = List.of("TASK", "NOTICE", "PEOPLE", "RISK", "INCIDENT", "KNOWLEDGE");
 
@@ -46,6 +50,7 @@ public class MailLinkingService {
             MailLinkingDecision decision = parse(agentClient.complete(promptBuilder.build(email, classification, searchResponse)));
             return merge(classification, email, decision);
         } catch (Exception exception) {
+            log.error("", exception);
             return classification;
         }
     }

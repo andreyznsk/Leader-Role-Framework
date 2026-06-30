@@ -133,6 +133,7 @@ public class FileIndexer {
         try {
             return DocType.valueOf(typeRaw.trim().toUpperCase().replace("-", "_"));
         } catch (IllegalArgumentException e) {
+            log.error("", e);
             return null;
         }
     }

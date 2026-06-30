@@ -49,6 +49,7 @@ public class MailAgentControlClient {
             }
         } catch (Exception e) {
             log.warn("Failed to notify MailAgent about enabled state change: {}", fallbackMessage(e));
+            log.error("", e);
         }
     }
 
@@ -67,6 +68,7 @@ public class MailAgentControlClient {
             }
             return objectMapper.readValue(response.body(), MailAgentConnectionTestResultDto.class);
         } catch (Exception e) {
+            log.error("", e);
             return new MailAgentConnectionTestResultDto(false, "FAILED", null, null, null, null, false,
                     null, null, null, null, null, null, fallbackMessage(e), "UNKNOWN", fallbackMessage(e), baseUrl, baseUrl);
         }
@@ -84,6 +86,7 @@ public class MailAgentControlClient {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             return objectMapper.readValue(response.body(), MailAgentEndpointDetectResultDto.class);
         } catch (Exception e) {
+            log.error("", e);
             return new MailAgentEndpointDetectResultDto(false, "FAILED", null, false, false, false,
                     null, "NTLM", fallbackMessage(e), "UNKNOWN", fallbackMessage(e), baseUrl);
         }

@@ -191,6 +191,7 @@ public class EwsMailClient implements MailClient {
             );
         } catch (Exception e) {
             log.warn("EWS testConnection FAILED at {}: {}", ewsUrl, e.getMessage());
+            log.error("", e);
             return MailConnectionTestResult.failed(
                     "ews",
                     ewsProperties.getAuthType(),
@@ -429,7 +430,8 @@ public class EwsMailClient implements MailClient {
             if (mb != null) {
                 return MessageBody.getStringFromMessageBody(mb);
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("", e);
             // body not loaded via FindItem — fall through to lazy load
         }
         try {
@@ -439,6 +441,7 @@ public class EwsMailClient implements MailClient {
             return MessageBody.getStringFromMessageBody(loaded.getBody());
         } catch (Exception e) {
             log.debug("Could not load body for email {}: {}", message.getId(), e.getMessage());
+            log.error("", e);
             return "";
         }
     }
@@ -503,7 +506,8 @@ public class EwsMailClient implements MailClient {
                 }
             }
             return recipients;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("", e);
             return List.of();
         }
     }
@@ -516,7 +520,8 @@ public class EwsMailClient implements MailClient {
             }
             String value = result.toString();
             return value.isBlank() ? null : value;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("", e);
             return null;
         }
     }

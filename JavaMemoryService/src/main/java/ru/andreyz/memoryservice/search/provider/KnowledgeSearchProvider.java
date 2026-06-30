@@ -53,6 +53,7 @@ public class KnowledgeSearchProvider implements SearchProvider {
                     .toList();
         } catch (Exception e) {
             log.warn("Knowledge search unavailable: {}", e.getMessage());
+            log.error("", e);
             return List.of();
         }
     }

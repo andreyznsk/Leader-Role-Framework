@@ -1,5 +1,7 @@
 package ru.andreyz.ragservice.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.ragservice.client.OpenSearchClient;
 import ru.andreyz.ragservice.db.IndexedDocument;
@@ -19,6 +21,8 @@ import java.util.Optional;
 
 @Service
 public class RagDocumentService {
+
+    private static final Logger log = LoggerFactory.getLogger(RagDocumentService.class);
 
     private final IndexedDocumentRepository repository;
     private final FileIndexer fileIndexer;
@@ -51,6 +55,7 @@ public class RagDocumentService {
                     content
             );
         } catch (IOException e) {
+            log.error("", e);
             return unavailableDetails(document, e);
         }
     }
@@ -96,6 +101,7 @@ public class RagDocumentService {
             ParsedDocument parsed = parse(Files.readString(Path.of(document.filePath())));
             return summary(document, parsed);
         } catch (IOException e) {
+            log.error("", e);
             return unavailableSummary(document, e);
         }
     }

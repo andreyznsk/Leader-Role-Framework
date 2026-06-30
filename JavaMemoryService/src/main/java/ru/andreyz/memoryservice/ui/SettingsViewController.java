@@ -1,5 +1,7 @@
 package ru.andreyz.memoryservice.ui;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.MultiValueMap;
@@ -23,6 +25,8 @@ import java.util.Map;
 @Controller
 @RequestMapping("/ui")
 public class SettingsViewController {
+
+    private static final Logger log = LoggerFactory.getLogger(SettingsViewController.class);
 
     private final PluginSettingsService pluginSettingsService;
     private final ControlPluginService controlPluginService;
@@ -59,6 +63,7 @@ public class SettingsViewController {
             redirectAttributes.addAttribute("plugin", code);
             redirectAttributes.addAttribute("saved", code);
         } catch (RuntimeException e) {
+            log.error("", e);
             redirectAttributes.addAttribute("plugin", code);
             redirectAttributes.addAttribute("failed", code);
             redirectAttributes.addAttribute("message", e.getMessage());

@@ -45,6 +45,7 @@ public class AgentChatController {
         } catch (AgentException e) {
             long duration = System.currentTimeMillis() - start;
             log.warn("Agent chat run failed: {}", e.getMessage());
+            log.error("", e);
             audit("CHAT", provider, req.prompt(), "ERROR", duration, e.getMessage());
             return ResponseEntity.ok(AgentChatRunResponse.error(provider, duration, e.getMessage()));
         }
@@ -59,6 +60,7 @@ public class AgentChatController {
                 UUID.randomUUID(), mode, provider, prompt, status, durationMs, error);
         } catch (Exception ex) {
             log.warn("Failed to audit agent run: {}", ex.getMessage());
+            log.error("", ex);
         }
     }
 }

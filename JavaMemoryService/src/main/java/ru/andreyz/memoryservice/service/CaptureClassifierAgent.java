@@ -122,6 +122,7 @@ public class CaptureClassifierAgent {
             String json = objectMapper.writeValueAsString(value);
             return json.substring(1, json.length() - 1);
         } catch (IOException e) {
+            log.error("", e);
             return value.replace("\\", "\\\\").replace("\"", "\\\"");
         }
     }

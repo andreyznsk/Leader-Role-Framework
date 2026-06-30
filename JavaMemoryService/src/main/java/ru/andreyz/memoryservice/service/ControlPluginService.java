@@ -3,6 +3,8 @@ package ru.andreyz.memoryservice.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.dto.ControlPluginAuditDto;
 import ru.andreyz.memoryservice.dto.ControlPluginDto;
@@ -16,6 +18,8 @@ import java.util.List;
 
 @Service
 public class ControlPluginService {
+
+    private static final Logger log = LoggerFactory.getLogger(ControlPluginService.class);
 
     private final ControlPluginRegistry registry;
     private final ControlPluginStore store;
@@ -93,6 +97,7 @@ public class ControlPluginService {
             updateHealthStatus(code, plugin.baseUrl(), Instant.now());
             return audit;
         } catch (RuntimeException e) {
+            log.error("", e);
             updateHealthStatus(code, plugin.baseUrl(), Instant.now());
             return store.findAudit(code);
         }
@@ -139,6 +144,7 @@ public class ControlPluginService {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (Exception e) {
+            log.error("", e);
             return "{\"error\":\"serialization failed\"}";
         }
     }

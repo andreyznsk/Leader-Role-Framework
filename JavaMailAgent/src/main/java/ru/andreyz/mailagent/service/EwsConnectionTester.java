@@ -88,6 +88,7 @@ public class EwsConnectionTester {
             MailConnectionErrorType errorType = mapError(e);
             String details = rootMessage(e);
             log.warn("EWS test connection failed: errorType={}, message={}", errorType.name(), details);
+            log.error("", e);
             return MailConnectionTestResult.failed(
                     "ews",
                     authType.name(),

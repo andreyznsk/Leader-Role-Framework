@@ -202,6 +202,7 @@ public class RagRuntimeConfigService {
         try {
             return Math.max(1, Integer.parseInt(value.trim()));
         } catch (NumberFormatException e) {
+            log.error("", e);
             return fallback;
         }
     }

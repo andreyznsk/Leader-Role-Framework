@@ -104,6 +104,7 @@ public class ActionExecutor {
                     actionResultJson = result.actionResultJson();
                 }
             } catch (Exception exception) {
+                log.error("", exception);
                 processingStateService.markError(current, exception);
                 throw exception;
             }

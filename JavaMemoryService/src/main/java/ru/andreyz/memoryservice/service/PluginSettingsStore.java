@@ -173,6 +173,7 @@ public class PluginSettingsStore {
                     .constructMapType(HashMap.class, String.class, Object.class));
         } catch (JsonProcessingException e) {
             log.warn("Failed to parse plugin config JSON: {}", e.getMessage());
+            log.error("", e);
             return new HashMap<>();
         }
     }
@@ -193,6 +194,7 @@ public class PluginSettingsStore {
             return connection.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT).contains("postgres");
         } catch (SQLException e) {
             log.warn("Failed to detect database type for plugin settings: {}", e.getMessage());
+            log.error("", e);
             return false;
         }
     }

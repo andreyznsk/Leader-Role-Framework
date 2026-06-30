@@ -1,5 +1,7 @@
 package ru.andreyz.ragservice.validation;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -14,10 +16,13 @@ import java.util.Map;
 @Component
 public class DocumentValidator {
 
+    private static final Logger log = LoggerFactory.getLogger(DocumentValidator.class);
+
     public ValidationResult validate(Path filePath) {
         try {
             return validate(Files.readString(filePath));
         } catch (IOException e) {
+            log.error("", e);
             return ValidationResult.error("Не удалось прочитать файл: " + e.getMessage());
         }
     }
@@ -39,6 +44,7 @@ public class DocumentValidator {
         try {
             docType = DocType.valueOf(typeRaw.toUpperCase().replace("-", "_"));
         } catch (IllegalArgumentException e) {
+            log.error("", e);
             return ValidationResult.error("Неизвестный тип документа: '" + typeRaw + "'. " +
                     "Допустимые: " + Arrays.toString(DocType.values()));
         }

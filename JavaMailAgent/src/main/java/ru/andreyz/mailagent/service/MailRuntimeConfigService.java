@@ -308,6 +308,7 @@ public class MailRuntimeConfigService {
         try {
             return MailAuthType.fromValue(value, fallback);
         } catch (IllegalArgumentException e) {
+            log.error("", e);
             throw new IllegalArgumentException("Unsupported authType: " + value);
         }
     }
@@ -354,6 +355,7 @@ public class MailRuntimeConfigService {
             }
             return parsed;
         } catch (NumberFormatException e) {
+            log.error("", e);
             throw new IllegalArgumentException("Invalid number for " + key + ": " + value);
         }
     }

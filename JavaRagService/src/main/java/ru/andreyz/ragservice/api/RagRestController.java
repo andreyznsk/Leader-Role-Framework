@@ -1,5 +1,7 @@
 package ru.andreyz.ragservice.api;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.andreyz.ragservice.db.IndexedDocument;
@@ -15,6 +17,8 @@ import java.util.List;
 
 @RestController
 public class RagRestController {
+
+    private static final Logger log = LoggerFactory.getLogger(RagRestController.class);
 
     private final FileIndexer fileIndexer;
     private final RagMcpTools ragMcpTools;
@@ -37,6 +41,7 @@ public class RagRestController {
         try {
             return ResponseEntity.ok(fileIndexer.indexFile(req.file_path()));
         } catch (IOException e) {
+            log.error("", e);
             return ResponseEntity.badRequest()
                     .body(new FileIndexer.IndexResult(0, "error: " + e.getMessage(), req.file_path()));
         }

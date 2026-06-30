@@ -36,6 +36,7 @@ public class TaskDescriptionFileMigrationRunner implements ApplicationRunner {
                 taskDescriptionService.importFromLegacyFile(taskId, taskFileService.readFile(path));
             } catch (IllegalArgumentException e) {
                 log.debug("Skipping legacy task description file for unknown task {}: {}", taskId, path);
+                log.error("", e);
             } catch (RuntimeException e) {
                 log.warn("Failed to import legacy task description file {}", path, e);
             }

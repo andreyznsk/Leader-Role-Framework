@@ -37,6 +37,7 @@ public class EwsEndpointDetector {
         try {
             uri = URI.create(endpoint);
         } catch (IllegalArgumentException e) {
+            log.error("", e);
             return MailEndpointDetectResult.failed("ews", false, false, false, null,
                     MailConnectionErrorType.INVALID_ENDPOINT, "EWS endpoint is invalid", rootMessage(e), endpoint);
         }
@@ -78,6 +79,7 @@ public class EwsEndpointDetector {
                     endpoint
             );
         } catch (Exception e) {
+            log.error("", e);
             MailConnectionErrorType errorType = mapError(e);
             return MailEndpointDetectResult.failed(
                     "ews",
@@ -106,6 +108,7 @@ public class EwsEndpointDetector {
             }
             return response;
         } catch (Exception e) {
+            log.error("", e);
             return sendGet(uri);
         }
     }

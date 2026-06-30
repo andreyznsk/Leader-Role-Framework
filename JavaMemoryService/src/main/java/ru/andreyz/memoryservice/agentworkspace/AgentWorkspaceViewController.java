@@ -1,5 +1,7 @@
 package ru.andreyz.memoryservice.agentworkspace;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -11,6 +13,8 @@ import java.util.*;
 
 @Controller
 public class AgentWorkspaceViewController {
+
+    private static final Logger log = LoggerFactory.getLogger(AgentWorkspaceViewController.class);
 
     private final GlobalSearchService searchService;
 
@@ -52,12 +56,24 @@ public class AgentWorkspaceViewController {
 
             if (q != null && !q.isBlank()) {
                 List<SearchLayer> requestLayers = selectedLayerNames.stream()
-                        .map(name -> { try { return SearchLayer.valueOf(name); } catch (Exception e) { return null; } })
+                        .map(name -> {
+                            try {
+                                return SearchLayer.valueOf(name);
+                            } catch (Exception e) {
+                                log.error("", e);
+                                return null;
+                            }
+                        })
                         .filter(Objects::nonNull)
                         .toList();
 
                 SearchMode searchMode;
-                try { searchMode = SearchMode.valueOf(mode.toUpperCase()); } catch (Exception e) { searchMode = SearchMode.QUICK; }
+                try {
+                    searchMode = SearchMode.valueOf(mode.toUpperCase());
+                } catch (Exception e) {
+                    log.error("", e);
+                    searchMode = SearchMode.QUICK;
+                }
 
                 SearchResponse response = searchService.search(new SearchRequest(q, requestLayers, searchMode, 20));
                 model.addAttribute("searchResponse", response);

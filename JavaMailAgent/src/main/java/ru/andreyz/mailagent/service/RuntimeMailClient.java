@@ -1,6 +1,8 @@
 package ru.andreyz.mailagent.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.client.EwsMailClient;
 import ru.andreyz.mailagent.client.ImapMailClient;
@@ -16,6 +18,8 @@ import java.util.List;
 
 @Component
 public class RuntimeMailClient implements MailClient {
+
+    private static final Logger log = LoggerFactory.getLogger(RuntimeMailClient.class);
 
     private final ObjectMapper objectMapper;
     private final MailRuntimeConfigService runtimeConfigService;
@@ -55,6 +59,7 @@ public class RuntimeMailClient implements MailClient {
         try {
             return delegateChecked().testConnection();
         } catch (Exception e) {
+            log.error("", e);
             return MailConnectionTestResult.failed(
                     runtimeConfigService.snapshot().protocol(),
                     runtimeConfigService.snapshot().authType().name(),

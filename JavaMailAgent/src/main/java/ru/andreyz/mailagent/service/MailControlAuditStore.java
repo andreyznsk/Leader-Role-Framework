@@ -2,6 +2,8 @@ package ru.andreyz.mailagent.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import ru.andreyz.mailagent.model.ControlAuditEntry;
@@ -14,6 +16,8 @@ import java.util.Map;
 
 @Repository
 public class MailControlAuditStore {
+
+    private static final Logger log = LoggerFactory.getLogger(MailControlAuditStore.class);
 
     private final JdbcClient jdbcClient;
     private final ObjectMapper objectMapper;
@@ -93,6 +97,7 @@ public class MailControlAuditStore {
             return objectMapper.readValue(json, objectMapper.getTypeFactory()
                     .constructCollectionType(List.class, String.class));
         } catch (JsonProcessingException e) {
+            log.error("", e);
             return List.of();
         }
     }

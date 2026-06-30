@@ -71,6 +71,7 @@ public class GlobalSearchService {
                 summary = agentClient.complete(prompt);
             } catch (AgentException e) {
                 log.warn("Deep search AI summary failed: {}", e.getMessage());
+                log.error("", e);
             }
         }
 

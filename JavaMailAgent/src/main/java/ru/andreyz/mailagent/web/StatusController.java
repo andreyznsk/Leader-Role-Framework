@@ -1,5 +1,7 @@
 package ru.andreyz.mailagent.web;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -15,6 +17,8 @@ import java.util.stream.Stream;
 
 @Controller
 public class StatusController {
+
+    private static final Logger log = LoggerFactory.getLogger(StatusController.class);
 
     private final MailConfig.PathProperties pathProperties;
     private final MemoryServiceClient memoryServiceClient;
@@ -46,6 +50,7 @@ public class StatusController {
         try (Stream<Path> files = Files.list(path)) {
             return files.filter(Files::isRegularFile).count();
         } catch (IOException e) {
+            log.error("", e);
             return 0;
         }
     }
@@ -58,6 +63,7 @@ public class StatusController {
             int start = Math.max(0, all.size() - lines);
             return all.subList(start, all.size());
         } catch (IOException e) {
+            log.error("", e);
             return List.of("Error reading log: " + e.getMessage());
         }
     }

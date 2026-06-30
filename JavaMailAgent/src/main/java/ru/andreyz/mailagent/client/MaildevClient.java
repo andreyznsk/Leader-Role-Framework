@@ -93,6 +93,7 @@ public class MaildevClient implements MailClient {
             return MailConnectionTestResult.failed("maildev", null, MailConnectionErrorType.UNKNOWN,
                     "HTTP " + response.statusCode(), "Maildev returned HTTP " + response.statusCode(), apiUrl);
         } catch (Exception e) {
+            log.error("", e);
             return MailConnectionTestResult.failed("maildev", null, MailConnectionErrorType.UNKNOWN,
                     "Connection failed", e.getMessage(), apiUrl);
         }

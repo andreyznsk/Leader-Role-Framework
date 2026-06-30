@@ -106,9 +106,11 @@ public class AgentConsoleWebSocketHandler extends TextWebSocketHandler {
                     }
                 } catch (Exception e) {
                     log.debug("Process wait interrupted: {}", e.getMessage());
+                    log.error("", e);
                 }
             });
         } catch (IOException e) {
+            log.error("", e);
             sendJson(agentSession.wsSession, "ERROR", "message", "Failed to start: " + e.getMessage());
         }
     }
@@ -138,6 +140,7 @@ public class AgentConsoleWebSocketHandler extends TextWebSocketHandler {
                 }
             } catch (Exception e) {
                 log.debug("Stream {} ended: {}", type, e.getMessage());
+                log.error("", e);
             }
         });
     }
@@ -155,6 +158,7 @@ public class AgentConsoleWebSocketHandler extends TextWebSocketHandler {
             session.sendMessage(new TextMessage(mapper.writeValueAsString(node)));
         } catch (Exception e) {
             log.debug("Failed to send WS message: {}", e.getMessage());
+            log.error("", e);
         }
     }
 

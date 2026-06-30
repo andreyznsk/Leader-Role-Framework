@@ -110,7 +110,7 @@ public class MailAgentJob {
             return;
         }
 
-        log.info("Poll started — scanning {} folder(s): {}", folders.size(), folders);
+        log.debug("Poll started — scanning {} folder(s): {}", folders.size(), folders);
 
         List<Email> emailsToProcess = new ArrayList<>();
         for (String folder : folders) {
@@ -119,6 +119,7 @@ public class MailAgentJob {
                 emails = mailClient.listUnread(folder, limit);
             } catch (Exception e) {
                 log.error("Failed to fetch emails from folder {}: {}", folder, e.getMessage());
+                log.error("", e);
                 continue;
             }
 
@@ -192,11 +193,13 @@ public class MailAgentJob {
                     Thread.currentThread().interrupt();
                     errors++;
                     log.warn("Mail processing interrupted: {}", e.getMessage());
+                    log.error("", e);
                 } catch (ExecutionException e) {
                     errors++;
                     Throwable cause = e.getCause() != null ? e.getCause() : e;
                     log.warn("Unexpected mail processing failure: {}", cause.getMessage());
                     log.debug("", cause);
+                    log.error("", e);
                 }
             }
             return new ProcessingBatchResult(errors, counts);
@@ -209,6 +212,7 @@ public class MailAgentJob {
             actionExecutor.execute(email, resp);
             return new ProcessingOutcome(email.id(), resp.type().name(), null);
         } catch (Exception e) {
+            log.error("", e);
             return new ProcessingOutcome(email.id(), null, e.getMessage());
         }
     }
@@ -236,7 +240,7 @@ public class MailAgentJob {
                 countFor(AgentResponseType.NOTE, counts),
                 errors
             );
-        log.info("Poll finished: {}", result);
+        log.debug("Poll finished: {}", result);
         runtimeConfigService.registerPollResult(result);
     }
 

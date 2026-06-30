@@ -98,6 +98,7 @@ public class CaptureRouter {
             return "rag-inbox/captures/" + filename;
         } catch (IOException e) {
             log.error("Failed to write knowledge capture {}: {}", c.captureId(), e.getMessage());
+            log.error("", e);
             return "rag-inbox/captures/ERROR";
         }
     }
@@ -127,6 +128,7 @@ public class CaptureRouter {
             return "journal/" + filename;
         } catch (IOException e) {
             log.error("Failed to append journal for capture {}: {}", c.captureId(), e.getMessage());
+            log.error("", e);
             return "journal/ERROR";
         }
     }

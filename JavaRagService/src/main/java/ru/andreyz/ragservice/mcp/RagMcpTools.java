@@ -1,5 +1,7 @@
 package ru.andreyz.ragservice.mcp;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -23,6 +25,8 @@ import java.util.stream.Stream;
 @Component
 public class RagMcpTools {
 
+    private static final Logger log = LoggerFactory.getLogger(RagMcpTools.class);
+
     private final FileIndexer fileIndexer;
     private final RagSearchService searchService;
     private final IndexedDocumentRepository repository;
@@ -40,6 +44,7 @@ public class RagMcpTools {
         try {
             return fileIndexer.indexFile(filePath);
         } catch (IOException e) {
+            log.error("", e);
             return new IndexResult(0, "error: " + e.getMessage(), filePath);
         }
     }
@@ -60,6 +65,7 @@ public class RagMcpTools {
                     .filter(p -> p.toString().endsWith(suffix))
                     .toList();
         } catch (IOException e) {
+            log.error("", e);
             return new DirectoryIndexResult(0, 0, 0, 0, "scan error: " + e.getMessage());
         }
 
@@ -82,6 +88,7 @@ public class RagMcpTools {
                 else if ("invalid".equals(r.status())) invalid++;
                 else indexed++;
             } catch (Exception e) {
+                log.error("", e);
                 failed++;
             }
         }

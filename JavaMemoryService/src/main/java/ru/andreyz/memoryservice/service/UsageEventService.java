@@ -128,6 +128,7 @@ public class UsageEventService {
             return connection.getMetaData().getDatabaseProductName().toLowerCase(java.util.Locale.ROOT).contains("postgres");
         } catch (SQLException e) {
             log.warn("Failed to detect database type for usage events: {}", e.getMessage());
+            log.error("", e);
             return false;
         }
     }

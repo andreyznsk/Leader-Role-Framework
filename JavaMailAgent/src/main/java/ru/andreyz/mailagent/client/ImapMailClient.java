@@ -124,6 +124,7 @@ public class ImapMailClient implements MailClient {
             return MailConnectionTestResult.connected("imap", null, null, null, false, true,
                     "INBOX unread: " + unread, connectionTarget());
         } catch (Exception e) {
+            log.error("", e);
             return MailConnectionTestResult.failed("imap", null, MailConnectionErrorType.UNKNOWN,
                     "Connection failed", e.getMessage(), connectionTarget());
         }
@@ -232,6 +233,7 @@ public class ImapMailClient implements MailClient {
                     .findFirst()
                     .orElse(null);
         } catch (MessagingException e) {
+            log.error("", e);
             return null;
         }
     }

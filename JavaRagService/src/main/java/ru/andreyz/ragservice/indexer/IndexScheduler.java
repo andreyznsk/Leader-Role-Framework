@@ -57,6 +57,7 @@ public class IndexScheduler {
                     .toList();
         } catch (IOException e) {
             log.error("Failed to scan rag-inbox: {}", e.getMessage());
+            log.error("", e);
             runtimeConfigService.registerScanResult("Scan failed: " + e.getMessage());
             return;
         }
@@ -90,6 +91,7 @@ public class IndexScheduler {
                 }
             } catch (Exception e) {
                 log.error("Failed to process {}: {}", filePath, e.getMessage());
+                log.error("", e);
                 failed++;
             }
         }

@@ -188,6 +188,7 @@ public class CaptureService {
                     .toList();
         } catch (IOException e) {
             log.warn("Failed to list capture inbox {}: {}", dayDir, e.getMessage());
+            log.error("", e);
             return List.of();
         }
     }
@@ -219,6 +220,7 @@ public class CaptureService {
             return java.util.Optional.of(new CaptureFile(path.getFileName().toString(), text.stripTrailing()));
         } catch (IOException e) {
             log.warn("Failed to read capture file {}: {}", path, e.getMessage());
+            log.error("", e);
             return java.util.Optional.empty();
         }
     }
@@ -243,6 +245,7 @@ public class CaptureService {
             return file;
         } catch (IOException e) {
             log.warn("Failed to write capture {} to inbox: {}", capture.id(), e.getMessage());
+            log.error("", e);
             return inboxDir;
         }
     }

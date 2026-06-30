@@ -105,6 +105,7 @@ public class OpenSearchClient {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
             log.error("Failed to ensure OpenSearch index exists: {}", e.getMessage());
+            log.error("", e);
         }
     }
 
@@ -162,6 +163,7 @@ public class OpenSearchClient {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
             log.error("Failed to delete chunks for source {}: {}", source, e.getMessage());
+            log.error("", e);
         }
     }
 
