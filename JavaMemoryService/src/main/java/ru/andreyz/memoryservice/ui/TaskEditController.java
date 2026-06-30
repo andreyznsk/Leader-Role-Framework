@@ -5,12 +5,14 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import ru.andreyz.memoryservice.domain.Task;
+import ru.andreyz.memoryservice.domain.TaskEvent;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
 import ru.andreyz.memoryservice.service.TaskDescriptionService;
 import ru.andreyz.memoryservice.service.TaskService;
 import ru.andreyz.memoryservice.service.TaskTimelineService;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Controller
 @RequestMapping("/ui/tasks")
@@ -32,9 +34,11 @@ public class TaskEditController {
     public String editForm(@PathVariable Long id, Model model) {
         Task task = taskService.findById(id);
         String description = taskDescriptionService.getContent(id);
+        List<TaskEvent> timeline = taskTimelineService.findEvents(id);
         model.addAttribute("task", task);
         model.addAttribute("description", description);
-        model.addAttribute("timeline", taskTimelineService.findEvents(id));
+        model.addAttribute("timeline", timeline.stream().limit(5).toList());
+        model.addAttribute("timelineTotalCount", timeline.size());
         model.addAttribute("exportUrl", "/api/tasks/%d/description/export-md".formatted(id));
         return "task-edit";
     }

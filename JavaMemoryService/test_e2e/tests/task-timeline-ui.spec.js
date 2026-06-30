@@ -38,6 +38,18 @@ test.describe('Task timeline UI', () => {
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.list-group')).toContainText('Комментарий добавлен');
 
+      for (let i = 0; i < 5; i += 1) {
+        await page.locator('#timeline-comment').fill(`Playwright extra timeline comment ${i}`);
+        await page.getByRole('button', { name: 'Добавить' }).click();
+        await page.waitForLoadState('networkidle');
+      }
+
+      const timelineList = page.locator('#task-timeline-list');
+      await expect(timelineList).toBeVisible();
+      await expect(timelineList).toHaveCSS('overflow-y', 'auto');
+      await expect(page.locator('#task-timeline-list .list-group-item')).toHaveCount(5);
+      await expect(page.locator('.card-header .text-muted.small')).toContainText('Последние 5');
+
       const archiveButton = page.locator('#delete-btn');
       await expect(archiveButton).toHaveText('Архивировать');
       await archiveButton.click();

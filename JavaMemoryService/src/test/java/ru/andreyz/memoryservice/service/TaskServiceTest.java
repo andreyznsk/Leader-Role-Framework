@@ -88,6 +88,37 @@ class TaskServiceTest {
     }
 
     @Test
+    void updateTaskDate_movesTaskAndKeepsStatus() {
+        LocalDate initialDate = LocalDate.now().minusDays(2);
+        LocalDate targetDate = LocalDate.now().plusDays(1);
+        Task task = taskService.createConfirmed(initialDate, "Move with status", "HIGH", null, "MANUAL", null);
+        taskService.updateStatus(task.id(), "IN_PROGRESS");
+
+        Task updated = taskService.updateTaskDate(task.id(), targetDate);
+
+        assertThat(updated.status()).isEqualTo("IN_PROGRESS");
+        assertThat(updated.dueDate()).isEqualTo(targetDate);
+        assertThat(taskService.findByDate(targetDate)).anyMatch(it -> it.id().equals(task.id()));
+    }
+
+    @Test
+    void moveOverdueToToday_movesOnlyActiveOverdueTasks() {
+        LocalDate today = LocalDate.now();
+        Task overdueTodo = taskService.createConfirmed(today.minusDays(3), "Overdue TODO", "NORMAL", null, "MANUAL", null);
+        Task overdueDone = taskService.createConfirmed(today.minusDays(4), "Overdue DONE", "NORMAL", null, "MANUAL", null);
+        taskService.markDone(overdueDone.id());
+        Task futureTodo = taskService.createConfirmed(today.plusDays(2), "Future TODO", "NORMAL", null, "MANUAL", null);
+
+        int moved = taskService.moveOverdueToToday();
+
+        assertThat(moved).isGreaterThanOrEqualTo(1);
+        assertThat(taskService.findById(overdueTodo.id()).dueDate()).isEqualTo(today);
+        assertThat(taskService.findById(overdueDone.id()).dueDate()).isEqualTo(today.minusDays(4));
+        assertThat(taskService.findById(futureTodo.id()).dueDate()).isEqualTo(today.plusDays(2));
+        assertThat(taskService.findByDate(today)).anyMatch(it -> it.id().equals(overdueTodo.id()));
+    }
+
+    @Test
     void edit_withDescriptionUpdatesDatabaseBackwardsCompatibly() {
         Task task = taskService.createConfirmed(LocalDate.now(), "Task with legacy edit", "NORMAL", null, "MANUAL", null);
 

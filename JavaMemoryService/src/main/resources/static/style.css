@@ -367,6 +367,7 @@ body {
 }
 
 .task-deadline {
+  position: relative;
   min-width: 118px;
   display: inline-flex;
   align-items: center;
@@ -374,6 +375,37 @@ body {
   gap: 8px;
   font-size: 14px;
   color: var(--text2);
+}
+
+.task-deadline-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition: color .15s ease, text-decoration-color .15s ease, opacity .15s ease;
+}
+
+.task-deadline-button:hover,
+.task-deadline-button:focus-visible {
+  text-decoration-color: currentColor;
+}
+
+.task-deadline-button:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
+.task-date-picker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .task-deadline-overdue {
@@ -388,6 +420,23 @@ body {
   min-width: 108px;
   line-height: 1.05;
   font-weight: 600;
+}
+
+@media (min-width: 992px) {
+  .today-main-column {
+    min-width: 0;
+  }
+
+  .today-sidebar-column {
+    width: 220px;
+    flex: 0 0 220px;
+    max-width: 220px;
+  }
+
+  .today-sidebar-column > .mb-3,
+  #cal-sidebar {
+    width: 220px;
+  }
 }
 
 .los-collapse-toggle {

@@ -35,25 +35,17 @@ memory-service
 ui
 
 Tools:
-GitHub - Actions: ALL
+GitHub connector
 ChatGPT Codex Connector
-Installed 5 months ago  Developed by openai  https://www.chatgpt.com
-Bring ChatGPT and Codex to your GitHub repositories.
 Permissions
 Read access to checks, commit statuses, and metadata
 Read and write access to actions, code, issues, pull requests, and workflows
-Repository access
-Only select repositories
-Select at least one repository. Also includes public repositories (read-only).
-Selected 1 repository.
+Repository access Selected 1 repository.
 andreyznsk/Leader-Role-Framework
-
 
 Google Календарь
 
 Google Диск
-
-
 
 ---
 
@@ -143,6 +135,8 @@ docs/
 
 # Change Request Workflow
 
+ввести единый CR-реестр (таблица в Drive или `docs/cr/REGISTRY.md`)
+
 Все изменения начинаются с CR.
 
 Формат имени:
@@ -179,6 +173,9 @@ docs/
 ## Зависимости
 
 ## Как тестировать
+
+## После подтверждения пользователя перевести этот CR в Статус: DONE. и обновить реестр таблица `docs/cr/REGISTRY.md`
+
 ```
 
 ---

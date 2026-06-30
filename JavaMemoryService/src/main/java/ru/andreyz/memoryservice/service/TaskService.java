@@ -214,6 +214,36 @@ public class TaskService {
         return saved;
     }
 
+    public Task updateTaskDate(Long id, LocalDate date) {
+        Task task = findById(id);
+        Long planId = getOrCreatePlan(date).id();
+        int sortOrder = taskRepository.findMaxSortOrderByPlanId(planId) + 1;
+        Task updated = new Task(task.id(), planId, task.title(), task.description(),
+                task.status(),
+                task.priority(), date, task.source(), task.emailId(),
+                task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
+                task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
+                task.linkedToTaskId(), task.linkedAt(),
+                sortOrder, task.createdAt(), Instant.now());
+        Task saved = taskRepository.save(updated);
+        if (!equalsNullable(task.dueDate(), date)) {
+            taskTimelineService.recordDueDateChanged(task, date);
+        }
+        return saved;
+    }
+
+    public int moveOverdueToToday() {
+        LocalDate today = LocalDate.now();
+        List<Task> overdueTasks = taskRepository.findCurrentTasks().stream()
+                .filter(task -> task.dueDate() != null)
+                .filter(task -> task.dueDate().isBefore(today))
+                .filter(task -> !"DONE".equals(task.status()))
+                .toList();
+
+        overdueTasks.forEach(task -> updateTaskDate(task.id(), today));
+        return overdueTasks.size();
+    }
+
     public Task updateStatus(Long id, String status) {
         Task task = findById(id);
         if (equalsNullable(task.status(), status)) {

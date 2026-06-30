@@ -69,6 +69,7 @@ public class TodayViewController {
 
         Map<String, Long> deadlineCounts = allCurrentTasks.stream()
                 .filter(t -> t.dueDate() != null)
+                .filter(t -> !"DONE".equals(t.status()))
                 .collect(Collectors.groupingBy(t -> t.dueDate().toString(), Collectors.counting()));
 
         long doneTodayCount = allCurrentTasks.stream().filter(t -> "DONE".equals(t.status())).count();
@@ -88,8 +89,13 @@ public class TodayViewController {
         model.addAttribute("dueDateFilter", dueDate);
         model.addAttribute("dueDateFromFilter", dueDateFrom);
         model.addAttribute("dueDateToFilter", dueDateTo);
-        model.addAttribute("sortBy", normalizeFilter(sortBy) != null ? normalizeFilter(sortBy) : "status");
-        model.addAttribute("sortDir", normalizeFilter(sortBy) != null ? normalizeSortDir(sortDir) : "asc");
+        String normalizedSortBy = normalizeFilter(sortBy);
+        String normalizedSortDir = normalizeSortDir(sortDir);
+        model.addAttribute("defaultSortActive", normalizedSortBy == null);
+        model.addAttribute("sortBy", normalizedSortBy != null ? normalizedSortBy : "status");
+        model.addAttribute("sortDir", normalizedSortBy != null ? normalizedSortDir : "asc");
+        model.addAttribute("requestedSortBy", normalizedSortBy != null ? normalizedSortBy : "");
+        model.addAttribute("requestedSortDir", normalizedSortBy != null ? normalizedSortDir : "");
         model.addAttribute("priorityOptions", List.of("LOW", "NORMAL", "HIGH", "CRITICAL"));
         model.addAttribute("statusOptions", List.of("TODO", "IN_PROGRESS", "BLOCKED", "DONE"));
         model.addAttribute("deadlineCounts", deadlineCounts);
@@ -102,12 +108,13 @@ public class TodayViewController {
         Comparator<Task> priorityDesc = Comparator.comparingInt(
                 (Task task) -> PRIORITY_ORDER.getOrDefault(task.priority(), Integer.MIN_VALUE)
         ).reversed();
+        Comparator<Task> statusAsc = Comparator.comparing(
+                (Task task) -> STATUS_ORDER.getOrDefault(task.status(), Integer.MAX_VALUE)
+        );
         String normalizedSortBy = normalizeFilter(sortBy);
         if (normalizedSortBy == null) {
-            return Comparator.comparing(
-                            (Task task) -> STATUS_ORDER.getOrDefault(task.status(), Integer.MAX_VALUE)
-                    )
-                    .thenComparing(priorityDesc)
+            return priorityDesc
+                    .thenComparing(statusAsc)
                     .thenComparing(fallback);
         }
 
@@ -115,9 +122,7 @@ public class TodayViewController {
             case "priority" -> Comparator.comparing(
                     task -> PRIORITY_ORDER.getOrDefault(task.priority(), Integer.MAX_VALUE)
             );
-            case "status" -> Comparator.comparing(
-                    (Task task) -> STATUS_ORDER.getOrDefault(task.status(), Integer.MAX_VALUE)
-            ).thenComparing(priorityDesc);
+            case "status" -> statusAsc.thenComparing(priorityDesc);
             case "dueDate" -> Comparator.comparing(
                     Task::dueDate,
                     Comparator.nullsLast(LocalDate::compareTo)
