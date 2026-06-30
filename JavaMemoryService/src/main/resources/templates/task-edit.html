@@ -132,6 +132,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+let saveStatusTimer = null;
+
 // Links preview: extract URLs from textarea, render as clickable links
 function updateLinksPreview() {
     const text = document.getElementById('md-input').value;
@@ -219,6 +221,9 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
 
     try {
         saveStatus.classList.add('d-none');
+        saveStatus.textContent = '';
+        saveStatus.classList.remove('alert-danger');
+        saveStatus.classList.add('alert-success');
         await window.LeaderUiApi.request('/api/tasks/' + taskId, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
@@ -235,8 +240,21 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
             window.LeaderUiApi.handleSuccess('redirect:/ui/today', {response: {status: 200}, data: null});
             return;
         }
-        window.location.reload();
-    } catch (error) {}
+        saveStatus.textContent = 'Задача сохранена';
+        saveStatus.classList.remove('d-none');
+        if (saveStatusTimer) {
+            window.clearTimeout(saveStatusTimer);
+        }
+        saveStatusTimer = window.setTimeout(function () {
+            saveStatus.classList.add('d-none');
+            saveStatus.textContent = '';
+        }, 3000);
+    } catch (error) {
+        saveStatus.textContent = 'Не удалось сохранить задачу';
+        saveStatus.classList.remove('d-none');
+        saveStatus.classList.remove('alert-success');
+        saveStatus.classList.add('alert-danger');
+    }
 });
 
 document.getElementById('timeline-comment-form')?.addEventListener('submit', async function (event) {

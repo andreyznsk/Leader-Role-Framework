@@ -280,8 +280,12 @@ public class EwsMailClient implements MailClient {
         String subject = defaultString(message.getSubject(), "(no subject)");
         String from = fromAddress(message);
         String body = extractBody(message);
+        List<String> recipients = recipients(message);
+        String messageId = internetMessageId(message);
+        String conversationId = conversationKey(message);
+        String inReplyTo = inReplyTo(message);
         LocalDateTime receivedAt = toLocalDateTime(message.getDateTimeReceived());
-        return new Email(id, subject, from, defaultString(body, ""), receivedAt, folder);
+        return new Email(id, subject, from, recipients, defaultString(body, ""), messageId, conversationId, inReplyTo, receivedAt, folder);
     }
 
     private List<Email> aggregateByConversation(List<EmailMessage> messages, String folder) throws Exception {
@@ -322,7 +326,11 @@ public class EwsMailClient implements MailClient {
                 aggregateId,
                 newest.subject(),
                 newest.from(),
+                newest.recipients(),
                 body,
+                newest.messageId(),
+                conversationId,
+                newest.inReplyTo(),
                 newest.receivedAt(),
                 folder
         );
@@ -455,6 +463,71 @@ public class EwsMailClient implements MailClient {
 
     private String defaultString(String value, String fallback) {
         return value != null ? value : fallback;
+    }
+
+    private List<String> recipients(EmailMessage message) {
+        List<String> recipients = new ArrayList<>();
+        recipients.addAll(addressesViaReflection(message, "getToRecipients"));
+        recipients.addAll(addressesViaReflection(message, "getCcRecipients"));
+        recipients.addAll(addressesViaReflection(message, "getBccRecipients"));
+        return recipients.stream().distinct().toList();
+    }
+
+    private String internetMessageId(EmailMessage message) {
+        return stringViaReflection(message, "getInternetMessageId");
+    }
+
+    private String inReplyTo(EmailMessage message) {
+        return firstNonBlank(
+                stringViaReflection(message, "getInReplyTo"),
+                stringViaReflection(message, "getReferences")
+        );
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> addressesViaReflection(EmailMessage message, String methodName) {
+        try {
+            Object result = EmailMessage.class.getMethod(methodName).invoke(message);
+            if (!(result instanceof Iterable<?> values)) {
+                return List.of();
+            }
+            List<String> recipients = new ArrayList<>();
+            for (Object value : values) {
+                if (value instanceof EmailAddress address) {
+                    String resolved = address.getAddress() != null && !address.getAddress().isBlank()
+                            ? address.getAddress()
+                            : address.getName();
+                    if (resolved != null && !resolved.isBlank()) {
+                        recipients.add(resolved);
+                    }
+                }
+            }
+            return recipients;
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    private String stringViaReflection(EmailMessage message, String methodName) {
+        try {
+            Object result = EmailMessage.class.getMethod(methodName).invoke(message);
+            if (result == null) {
+                return null;
+            }
+            String value = result.toString();
+            return value.isBlank() ? null : value;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private PropertySet folderPropertySet() {

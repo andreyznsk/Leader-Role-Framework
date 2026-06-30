@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.config.MailConfig;
+import ru.andreyz.mailagent.integration.MemorySearchRequest;
+import ru.andreyz.mailagent.integration.MemorySearchResponse;
 import ru.andreyz.mailagent.model.PendingTaskRequest;
 
 import java.net.URI;
@@ -66,6 +68,17 @@ public class MemoryServiceClient {
         }
     }
 
+    public MemorySearchResponse search(MemorySearchRequest request) {
+        if (!enabled) {
+            return new MemorySearchResponse(request.query(), request.mode(), request.layers(), null, List.of());
+        }
+        try {
+            return postJson("/api/search", request, "Mail linking search completed", MemorySearchResponse.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to search in memory-service", e);
+        }
+    }
+
     public void createCapture(String text, String source, String sourceId) {
         if (!enabled) {
             log.debug("memory-service disabled, skipping capture");
@@ -115,6 +128,10 @@ public class MemoryServiceClient {
     }
 
     private void postJson(String path, Object payload, String successMessage) throws Exception {
+        postJson(path, payload, successMessage, Void.class);
+    }
+
+    private <T> T postJson(String path, Object payload, String successMessage, Class<T> responseType) throws Exception {
         String body = objectMapper.writeValueAsString(payload);
         HttpRequest httpRequest = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + path))
@@ -128,7 +145,10 @@ public class MemoryServiceClient {
                 HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() >= 200 && response.statusCode() < 300) {
                     log.info(successMessage);
-                    return;
+                    if (responseType == Void.class) {
+                        return null;
+                    }
+                    return objectMapper.readValue(response.body(), responseType);
                 }
                 throw new IllegalStateException("memory-service " + path + " returned " + response.statusCode()
                     + ": " + response.body());
@@ -143,6 +163,7 @@ public class MemoryServiceClient {
                 retrySleeper.sleep(delay);
             }
         }
+        return null;
     }
 
     @FunctionalInterface

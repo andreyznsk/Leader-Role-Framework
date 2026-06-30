@@ -8,6 +8,7 @@ import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.dto.CreatePendingTaskRequest;
 import ru.andreyz.memoryservice.dto.CreateTaskRequest;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
+import ru.andreyz.memoryservice.dto.LinkPendingTaskRequest;
 import ru.andreyz.memoryservice.dto.MoveTaskRequest;
 import ru.andreyz.memoryservice.dto.ReorderTaskRequest;
 import ru.andreyz.memoryservice.dto.UpdateTaskStatusRequest;
@@ -83,8 +84,19 @@ public class TaskController {
     @PostMapping("/pending")
     public ResponseEntity<Task> createPending(@RequestBody CreatePendingTaskRequest req) {
         Task task = taskService.createPending(
-                req.title(), req.description(), req.emailId(), req.sender(), req.priority(), req.dueDate());
+                req.title(), req.description(), req.emailId(), req.sender(), req.priority(), req.dueDate(),
+                "mail-agent", req.pendingType(), req.suggestedTaskId(), req.agentConfidence(), req.agentReason(),
+                req.sourceType(), req.sourceSubject(), req.sourceSender(), req.proposedDescriptionAppend());
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
+    }
+
+    @PostMapping("/pending/{id}/link")
+    public ResponseEntity<Task> linkPending(@PathVariable Long id, @RequestBody LinkPendingTaskRequest req) {
+        return ResponseEntity.ok(taskService.linkPendingToTask(
+                id,
+                req.targetTaskId(),
+                Boolean.TRUE.equals(req.appendSummary())
+        ));
     }
 
     @PatchMapping("/{id}/status")

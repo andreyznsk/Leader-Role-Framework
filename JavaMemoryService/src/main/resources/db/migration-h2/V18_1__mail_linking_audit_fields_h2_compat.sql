@@ -1,0 +1,2 @@
+ALTER TABLE tasks ADD COLUMN linked_to_task_id BIGINT;
+ALTER TABLE tasks ADD COLUMN linked_at TIMESTAMP;

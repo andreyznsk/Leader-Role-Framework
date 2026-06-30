@@ -5,5 +5,13 @@ public record PendingTaskRequest(
     String description,
     String emailId,
     String sender,
-    String priority
+    String priority,
+    String pendingType,
+    Long suggestedTaskId,
+    Double agentConfidence,
+    String agentReason,
+    String sourceType,
+    String sourceSubject,
+    String sourceSender,
+    String proposedDescriptionAppend
 ) {}

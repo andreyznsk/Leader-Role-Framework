@@ -124,6 +124,22 @@ public class TaskTimelineService {
                 "Задача архивирована");
     }
 
+    public void recordEmailLinked(Task task, Task pendingTask, Long targetTaskId) {
+        save(task.id(), "EMAIL_LINKED", "MAIL_AGENT", "JavaMailAgent",
+                null,
+                fields(
+                        "pendingTaskId", pendingTask.id(),
+                        "targetTaskId", targetTaskId,
+                        "sourceSubject", pendingTask.sourceSubject(),
+                        "sourceSender", pendingTask.sourceSender(),
+                        "agentReason", pendingTask.agentReason(),
+                        "agentConfidence", pendingTask.agentConfidence()
+                ),
+                pendingTask.sourceType() != null ? pendingTask.sourceType() : "EMAIL",
+                pendingTask.emailId(),
+                "Связано из письма" + summaryTail(pendingTask.sourceSubject(), pendingTask.sourceSender()));
+    }
+
     private Task requireTask(Long taskId) {
         return taskRepository.findById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
@@ -226,6 +242,17 @@ public class TaskTimelineService {
             case "API" -> new EventMeta("API", "API", "API");
             default -> new EventMeta("USER", "User", "UI");
         };
+    }
+
+    private String summaryTail(String subject, String sender) {
+        StringBuilder builder = new StringBuilder();
+        if (subject != null && !subject.isBlank()) {
+            builder.append(": ").append(subject.trim());
+        }
+        if (sender != null && !sender.isBlank()) {
+            builder.append(" от ").append(sender.trim());
+        }
+        return builder.toString();
     }
 
     private record EventMeta(String actorType, String actorName, String sourceType) {}

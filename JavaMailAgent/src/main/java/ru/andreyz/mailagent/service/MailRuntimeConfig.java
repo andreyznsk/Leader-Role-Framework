@@ -24,6 +24,7 @@ public record MailRuntimeConfig(
         String processedFolder,
         String draftFolder,
         String classificationPrompt,
+        String linkingPrompt,
         long version,
         LocalDateTime appliedAt
 ) {

@@ -15,6 +15,7 @@ public class MockAgentClient implements AgentClient {
     private static final Logger log = LoggerFactory.getLogger(MockAgentClient.class);
 
     private static final Pattern EMAIL_ID_PATTERN = Pattern.compile("\"emailId\":\\s*\"([^\"]+)\"");
+    private static final Pattern TASK_URL_PATTERN = Pattern.compile("/ui/tasks/(\\d+)/edit");
     private static final Pattern CAPTURE_FILE_PATTERN = Pattern.compile(
             "\\{\\s*\"file\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"\\s*,\\s*\"text\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"\\s*}",
             Pattern.DOTALL);
@@ -42,6 +43,9 @@ public class MockAgentClient implements AgentClient {
             log.debug("MockAgentClient returning fixed response");
             return fixedResponse;
         }
+        if (isMailLinkingPrompt(prompt)) {
+            return completeMailLinkingPrompt(prompt);
+        }
         if (isMailPrompt(prompt)) {
             return completeMailPrompt(prompt);
         }
@@ -56,6 +60,11 @@ public class MockAgentClient implements AgentClient {
 
     private boolean isMailPrompt(String prompt) {
         return prompt.contains("Письмо:") && prompt.contains("\"emailId\"");
+    }
+
+    private boolean isMailLinkingPrompt(String prompt) {
+        return prompt.contains("Определи, это новая задача или продолжение существующей.")
+                && prompt.contains("\"decision\": \"<NEW_TASK|LINK_TO_TASK|UPDATE_TASK|IGNORE|REQUEST_CONFIRMATION>\"");
     }
 
     private boolean isCapturePrompt(String prompt) {
@@ -99,6 +108,55 @@ public class MockAgentClient implements AgentClient {
                 .toString();
         log.debug("MockAgentClient capture: classified {} item(s)", captures.size());
         return response;
+    }
+
+    private String completeMailLinkingPrompt(String prompt) {
+        String upper = prompt.toUpperCase(Locale.ROOT);
+        Long targetTaskId = extractLinkedTaskId(prompt);
+        String summary = "Mock mail linking decision";
+        String reason = "Mock mail linking rule";
+        String append = null;
+        String decision = "NEW_TASK";
+
+        if (upper.contains("ДЕЙСТВИЙ НЕ ТРЕБУЕТСЯ")
+                || upper.contains("NO ACTION REQUIRED")
+                || upper.contains("ПРОСТО ИНФОРМАЦИЯ")
+                || upper.contains("INFO ONLY")) {
+            decision = "IGNORE";
+            summary = "Mock ignore";
+            reason = "Mock: informational reply without action";
+            targetTaskId = null;
+        } else if (targetTaskId != null && looksLikeUpdate(upper)) {
+            decision = "UPDATE_TASK";
+            summary = "Mock update to existing task";
+            reason = "Mock: matched task plus update keywords";
+            append = "Mock update from email: " + firstNonBlankLine(extractLinkingEmailSection(prompt));
+        } else if (targetTaskId != null) {
+            decision = "LINK_TO_TASK";
+            summary = "Mock link to existing task";
+            reason = "Mock: matched existing task in search results";
+        }
+
+        return """
+                {
+                  "decision": "%s",
+                  "confidence": 0.91,
+                  "targetTaskId": %s,
+                  "title": %s,
+                  "summary": "%s",
+                  "reason": "%s",
+                  "proposedDescriptionAppend": %s,
+                  "matchedSources": %s
+                }
+                """.formatted(
+                decision,
+                targetTaskId == null ? "null" : targetTaskId,
+                targetTaskId == null ? "\"Mock task title\"" : "null",
+                json(summary),
+                json(reason),
+                append == null ? "null" : "\"" + json(append) + "\"",
+                targetTaskId == null ? "[]" : "[\"TASK-" + targetTaskId + "\"]"
+        ).trim();
     }
 
     private List<CaptureInput> extractCaptureInputs(String prompt) {
@@ -145,6 +203,11 @@ public class MockAgentClient implements AgentClient {
     private String extractEmailSection(String prompt) {
         int idx = prompt.indexOf("Верни JSON");
         return idx >= 0 ? prompt.substring(0, idx) : prompt;
+    }
+
+    private String extractLinkingEmailSection(String prompt) {
+        int idx = prompt.indexOf("\"email\"");
+        return idx >= 0 ? prompt.substring(idx) : prompt;
     }
 
     private MailType detectMailType(String emailSection) {
@@ -203,6 +266,24 @@ public class MockAgentClient implements AgentClient {
             }
         }
         return "unknown@mock.local";
+    }
+
+    private Long extractLinkedTaskId(String prompt) {
+        Matcher matcher = TASK_URL_PATTERN.matcher(prompt);
+        if (matcher.find()) {
+            return Long.valueOf(matcher.group(1));
+        }
+        return null;
+    }
+
+    private boolean looksLikeUpdate(String upper) {
+        return upper.contains("ДЕДЛАЙН")
+                || upper.contains("НОВЫЙ СРОК")
+                || upper.contains("ПЕРЕНОС")
+                || upper.contains("СДВИГАЕМ")
+                || upper.contains("ПЯТНИЦ")
+                || upper.contains("FRIDAY")
+                || upper.contains("UPDATE");
     }
 
     private String firstNonBlankLine(String text) {

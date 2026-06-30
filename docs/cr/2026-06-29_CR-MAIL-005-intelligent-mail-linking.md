@@ -1,61 +1,99 @@
 # 2026-06-29_CR-MAIL-005: Intelligent Mail Linking
 
 **Дата:** 2026-06-29  
-**Статус:** Draft  
+**Статус:** In Progress / Partially Implemented  
 **Сервис:** MAIL / MEM  
-**Зависимости:** JavaMailAgent, JavaMemoryService, Global Search, common AgentClient, CR-MEM-012 Task Timeline Audit
+**Зависимости:** JavaMailAgent, JavaMemoryService, Global Search, common AgentClient, CR-MEM-012 Task Timeline Audit, CR-MEM-012 Global Search tsvector providers
 
 ## Проблема / Мотивация
 
-Сейчас Mail Agent работает по простой модели:
+Изначальный flow Mail Agent был простым:
 
 ```text
 новое письмо -> классификация -> REQUEST -> новая PENDING-задача
 ```
 
-Проблема: если кто-то отвечает в уже существующей email-цепочке через час, два или три, Mail Agent снова создает новую PENDING-задачу. В итоге появляются дубли задач, хотя по смыслу это продолжение уже существующей работы.
+Проблема в том, что ответ в существующей email-цепочке через час, день или неделю интерпретировался как новая работа. В результате Mail Agent создавал дублирующие PENDING-задачи, хотя по смыслу письмо было продолжением уже существующей задачи.
 
-Нужно перейти от модели `письмо = новая задача` к модели:
+Целевое поведение:
 
 ```text
-письмо = новый сигнал, который может быть новой задачей или продолжением существующей
+письмо = новый сигнал, который может быть
+- новой задачей;
+- продолжением существующей задачи;
+- обновлением существующей задачи;
+- шумом без action item.
 ```
 
-## Решение
+## Текущий статус реализации
 
-Перед созданием PENDING-задачи Mail Agent должен выполнить дополнительный reasoning-flow:
+На момент обновления этого CR часть решения уже реализована в коде.
 
-1. Получить новое письмо.
-2. Сформировать поисковый запрос из темы, отправителя, recipients, normalized subject, ключевых фраз и текста письма.
-3. Вызвать Global Search в JavaMemoryService.
-4. Найти потенциально связанные объекты:
-   - задачи;
-   - notes;
-   - notice;
-   - people;
-   - risks/incidents при необходимости;
-   - knowledge/RAG;
-   - будущие mail timeline events.
-5. Передать письмо и найденный контекст в AgentClient через специальный prompt.
-6. Агент должен вернуть решение: создать новую задачу, связать с существующей, обновить существующую или игнорировать.
+### Уже реализовано
 
-## Новый pipeline
+- В `JavaMailAgent` добавлен отдельный `MailLinkingService`.
+- Перед созданием PENDING-задачи для `REQUEST` Mail Agent вызывает `POST /api/search` в `JavaMemoryService`.
+- Добавлен `MailLinkingPromptBuilder` и отдельный runtime prompt `mailLinkingPrompt`.
+- Поддержаны решения:
+  - `NEW_TASK`
+  - `LINK_TO_TASK`
+  - `UPDATE_TASK`
+  - `IGNORE`
+  - `REQUEST_CONFIRMATION`
+- Результат linking-решения прокидывается в `PendingTaskRequest` и сохраняется в `JavaMemoryService`.
+- В `JavaMemoryService` расширена модель `tasks` полями mail-linking metadata.
+- Добавлен endpoint `POST /api/tasks/pending/{id}/link`.
+- В UI pending-секции появились действия для linking/update-кандидатов.
+- При связывании в timeline целевой задачи записывается `EMAIL_LINKED`.
+- Для `UPDATE_TASK` уже поддержан append в description целевой задачи.
+
+### Еще не закрыто
+
+- E2E-сценарии для duplicate email prevention и веток mail linking добавлены, но их нужно прогнать на полном стенде через test-runner.
+- Текущий search query builder реализован как MVP и использует не весь контекст из исходного CR.
+- Ошибки в mail-linking flow сейчас fail-open: при исключении сохраняется старое classification-решение `REQUEST`.
+
+## Целевой pipeline
 
 ```text
 New Email
   -> Mail Agent
+  -> Classification Prompt
+  -> REQUEST
   -> Search Query Builder
-  -> MemoryService /api/search
+  -> JavaMemoryService /api/search
   -> Global Search results
   -> Mail Linking Prompt Builder
   -> AgentClient
   -> Mail Linking Decision
-  -> MemoryService action
+  -> createPending(...) или IGNORE
+  -> JavaMemoryService action / UI confirmation
 ```
 
-## Решения агента
+## Реализованный flow
 
-Агент должен вернуть строго структурированный результат.
+Текущий flow работает так:
+
+1. Mail Agent классифицирует письмо обычным classification prompt.
+2. Дополнительный linking-flow запускается только для `REQUEST`.
+3. `MailLinkingService` собирает search query из:
+   - normalized subject;
+   - `from`;
+   - сокращенного body.
+4. Mail Agent вызывает `POST /api/search` с mode `QUICK`, limit `8`.
+5. В prompt передаются:
+   - `email`;
+   - `classification`;
+   - `search`.
+6. AgentClient возвращает JSON-решение mail linking.
+7. Решение мержится в `AgentResponse`.
+8. `ActionExecutor`:
+   - для `NEW_TASK` создает обычную PENDING-задачу;
+   - для `LINK_TO_TASK` и `UPDATE_TASK` создает linking/update pending-кандидат;
+   - для `REQUEST_CONFIRMATION` создает pending-кандидат с альтернативой "Создать новую задачу";
+   - для `IGNORE` переводит письмо в `NOISE` и не создает задачу.
+
+## Решения агента
 
 Минимальные типы решений:
 
@@ -81,17 +119,16 @@ REQUEST_CONFIRMATION
 
 Письмо относится к существующей задаче, но не требует изменения ее текущих полей.
 
-Действие:
+Текущее действие:
 
 ```text
 создать pending-кандидат на связывание
-или сразу связать при high confidence
 ```
 
 После подтверждения пользователя:
 
 ```text
-pending-кандидат исчезает из очереди
+pending-кандидат архивируется
 в timeline существующей задачи появляется EMAIL_LINKED
 ```
 
@@ -99,125 +136,141 @@ pending-кандидат исчезает из очереди
 
 Письмо относится к существующей задаче и содержит значимое обновление: новый срок, новое решение, новый риск, новая договоренность.
 
-Действие:
+Текущее действие:
 
 ```text
 создать pending-кандидат на обновление задачи
 ```
 
-После подтверждения пользователя:
+После подтверждения пользователя через link-action:
 
 ```text
-обновить описание/summary существующей задачи
+обновить description существующей задачи append-блоком
 добавить timeline event EMAIL_LINKED
-добавить timeline event AGENT_SUMMARY_ADDED или DESCRIPTION_UPDATED
+добавить DESCRIPTION_UPDATED через TaskDescriptionService
 ```
+
+Примечание: отдельный event `AGENT_SUMMARY_ADDED` пока не реализован.
 
 ### IGNORE
 
 Письмо не требует действий.
 
-Действие:
+Текущее действие:
 
 ```text
 не создавать задачу
-пометить письмо обработанным по текущим правилам Mail Agent
+вернуть итоговый AgentResponseType = NOISE
+обработать письмо по текущим mail side-effect rules
 ```
 
 ### REQUEST_CONFIRMATION
 
 Агент не уверен.
 
-Действие:
+Текущее действие:
 
 ```text
-создать PENDING-кандидат с вариантами действий в UI
+создать PENDING-кандидат
+дать пользователю выбор создать новую задачу или работать с suggested task, если она есть
 ```
 
 ## Prompt
 
-Добавить новый prompt template в Mail Agent settings/control plane.
+В `JavaMailAgent` уже добавлен отдельный prompt template `mailLinkingPrompt`.
 
-Примерная задача prompt-а:
+Текущий ожидаемый JSON:
 
-```text
-Ты анализируешь новое входящее письмо и найденный контекст LeaderOS.
-Определи, является ли письмо новой задачей или продолжением существующей.
-
-Верни строго JSON:
-- decision
-- confidence
-- targetTaskId
-- title
-- summary
-- reason
-- proposedDescriptionAppend
-- matchedSources
+```json
+{
+  "decision": "<NEW_TASK|LINK_TO_TASK|UPDATE_TASK|IGNORE|REQUEST_CONFIRMATION>",
+  "confidence": 0.0,
+  "targetTaskId": 142,
+  "title": "string or null",
+  "summary": "string or null",
+  "reason": "string",
+  "proposedDescriptionAppend": "string or null",
+  "matchedSources": ["TASK-42", "NOTICE-5"]
+}
 ```
 
-Prompt должен учитывать:
+Текущий prompt уже требует:
 
-- тему письма;
-- normalized subject без RE/FWD;
-- sender/recipients;
-- messageId/conversationId при наличии;
-- тело письма;
-- найденные Global Search results;
-- существующие задачи и их статусы;
-- timeline событий задачи, если доступен.
+- определить новое это action item или продолжение существующей задачи;
+- вернуть только JSON;
+- различать `LINK_TO_TASK`, `UPDATE_TASK`, `NEW_TASK`, `IGNORE`, `REQUEST_CONFIRMATION`.
+
+### Ограничения текущего prompt context
+
+Сейчас в context передаются:
+
+- `email`
+- `email.recipients`
+- `email.messageId`
+- `email.conversationId`
+- `email.inReplyTo`
+- `normalizedSubject`
+- `thread`
+- `classification`
+- `search`
+
+Что все еще ограничено:
+
+- нет richer thread metadata beyond `messageId` / `conversationId` / `inReplyTo`;
+- нет task timeline context в search results как отдельного слоя;
+- classification prompt template в уже установленной БД не переписывается автоматически, если пользователь ранее сохранял свою версию prompt-а.
 
 ## Изменения в API
 
-### MemoryService: поиск перед созданием задачи
+### JavaMemoryService: поиск перед созданием задачи
 
-Использовать существующий `POST /api/search`, но добавить или уточнить contract для mail-linking сценария.
+Используется существующий `POST /api/search`.
 
-Нужны слои:
+Текущий mail-linking request:
 
-```text
-TASK
-NOTE
-PERSON
-RISK
-INCIDENT
-KNOWLEDGE
+```json
+{
+  "query": "<normalized subject + from + body snippet>",
+  "layers": ["TASK", "NOTICE", "PEOPLE", "RISK", "INCIDENT", "KNOWLEDGE"],
+  "mode": "QUICK",
+  "limit": 8
+}
 ```
 
-После реализации CR-MEM-012 желательно добавить поиск по task timeline events.
+Примечания:
 
-### MemoryService: pending-кандидат на связывание
+- В коде используется `NOTICE`, а не `NOTE`.
+- В коде используется `PEOPLE`, а не `PERSON`.
+- Поиск по timeline events как отдельному слою пока не реализован.
 
-Нужно расширить модель pending task или добавить отдельный тип pending decision.
+### JavaMemoryService: pending-кандидат на связывание
 
-Минимальный вариант: расширить PENDING-задачу полями:
+Реализован подход через расширение обычной PENDING-задачи.
 
-```text
-pending_type: NEW_TASK | LINK_TO_TASK | UPDATE_TASK
-suggested_task_id
-agent_confidence
-agent_reason
-source_type = EMAIL
-source_id = mail message id
-source_subject
-source_sender
-proposed_description_append
-```
-
-UI должен показывать карточку решения:
+Текущий payload `POST /api/tasks/pending` фактически поддерживает поля:
 
 ```text
-Письмо: RE: Release
-Agent считает: похоже на TASK-142
-Причина: совпадают тема релиза, дедлайн и участники
-
-[Создать новую задачу]
-[Связать с TASK-142]
-[Отклонить]
+title
+description
+emailId
+sender
+priority
+dueDate
+pendingType
+suggestedTaskId
+agentConfidence
+agentReason
+sourceType
+sourceSubject
+sourceSender
+proposedDescriptionAppend
 ```
 
-### MemoryService: применить связывание
+Примечание: отдельного `source_id` поля нет; в качестве идентификатора письма используется существующее поле `emailId`.
 
-Добавить endpoint:
+### JavaMemoryService: применить связывание
+
+Реализован endpoint:
 
 ```http
 POST /api/tasks/pending/{pendingId}/link
@@ -232,18 +285,20 @@ Body:
 }
 ```
 
-Действие:
+Текущее действие endpoint:
 
-- pending-кандидат больше не отображается в pending queue;
-- существующая задача получает новый summary/description append при необходимости;
-- в timeline существующей задачи добавляется `EMAIL_LINKED`;
-- при обновлении описания добавляется `DESCRIPTION_UPDATED` или `AGENT_SUMMARY_ADDED`.
+- проверяет, что исходная задача находится в статусе `PENDING`;
+- берет `targetTaskId` из body или fallback из `suggestedTaskId`;
+- не позволяет линковать в `PENDING` и `ARCHIVED`;
+- при `appendSummary=true` добавляет `proposedDescriptionAppend` в description target task;
+- пишет `EMAIL_LINKED` в timeline целевой задачи;
+- архивирует pending-кандидат.
 
 ## Изменения в схеме БД
 
-Вариант MVP: расширить таблицу pending/tasks полями для linking-кандидата.
+MVP реализован через расширение таблицы `tasks`.
 
-Рекомендуемые поля:
+Фактически добавлены поля:
 
 ```text
 pending_type
@@ -251,7 +306,6 @@ suggested_task_id
 agent_confidence
 agent_reason
 source_type
-source_id
 source_subject
 source_sender
 proposed_description_append
@@ -259,52 +313,78 @@ linked_to_task_id
 linked_at
 ```
 
-Если текущая модель не позволяет аккуратно расширить tasks, допустимо ввести отдельную таблицу `memory.pending_task_decisions`.
+Что пока не реализовано из исходной идеи:
+
+```text
+source_id
+```
+
+Если понадобится полноценный audit по факту связывания без чтения timeline, это можно будет добавить отдельной миграцией.
 
 ## UI изменения
 
-В pending section UI добавить поддержку карточек типа `LINK_TO_TASK` и `UPDATE_TASK`.
-
-Для обычной новой задачи оставить текущий flow:
+В pending section UI уже есть поддержка карточек типа:
 
 ```text
-[Подтвердить]
+LINK_TO_TASK
+UPDATE_TASK
+REQUEST_CONFIRMATION
+```
+
+Текущий UI flow:
+
+### Для обычной новой задачи
+
+```text
+[Принять]
+[Изменить]
 [Отклонить]
 ```
 
-Для linking-кандидата:
+### Для linking/update-кандидата
 
 ```text
 [Создать новую задачу]
-[Связать с найденной задачей]
-[Выбрать другую задачу]
+[Связать с TASK-<suggestedTaskId>] или [Обновить TASK-<suggestedTaskId>]
+[Изменить]
 [Отклонить]
 ```
 
-После связывания pending-кандидат исчезает из очереди, а существующая задача показывает в timeline:
+Что еще не реализовано:
 
 ```text
-EMAIL_LINKED — Связано из письма RE: Release от Иванова
+отдельный dedicated search picker по всем задачам вместо ограниченного dropdown списка
+```
+
+После связывания pending-кандидат пропадает из pending queue, а существующая задача получает timeline event:
+
+```text
+EMAIL_LINKED — Связано из письма: <subject> от <sender>
 ```
 
 ## Зависимости
 
-Этот CR должен выполняться после:
+Этот CR логически опирается на:
 
 ```text
 2026-06-29_CR-MEM-012-task-timeline-audit.md
+2026-06-29_CR-MEM-012-global-search-tsvector-providers.md
 ```
 
-Причина: результат linking должен отображаться как timeline event существующей задачи.
+Причина:
+
+- linking должен отображаться как timeline event существующей задачи;
+- linking использует Global Search по operational layers.
 
 ## Как тестировать
 
 ### Scenario 1: новое письмо создает новую задачу
 
 1. Отправить письмо с новым уникальным содержанием.
-2. Mail Agent вызывает Global Search.
-3. Agent возвращает `NEW_TASK`.
-4. Создается новая PENDING-задача.
+2. Mail Agent классифицирует письмо как `REQUEST`.
+3. Mail Agent вызывает Global Search.
+4. Agent возвращает `NEW_TASK`.
+5. Создается новая PENDING-задача.
 
 ### Scenario 2: ответ на письмо предлагает связать с задачей
 
@@ -314,34 +394,55 @@ EMAIL_LINKED — Связано из письма RE: Release от Иванов�
 4. Agent возвращает `LINK_TO_TASK`.
 5. UI показывает linking-кандидат.
 6. Пользователь нажимает `Связать`.
-7. Pending исчезает из очереди.
+7. Pending архивируется.
 8. В timeline существующей задачи появляется `EMAIL_LINKED`.
 
 ### Scenario 3: письмо обновляет существующую задачу
 
 1. Создать задачу с дедлайном.
-2. Отправить письмо с новым сроком.
+2. Отправить письмо с новым сроком или новой договоренностью.
 3. Agent возвращает `UPDATE_TASK`.
 4. UI показывает предложенное обновление.
-5. Пользователь подтверждает.
-6. Описание/summary задачи обновляется.
-7. Timeline содержит `EMAIL_LINKED` и update event.
+5. Пользователь нажимает `Обновить TASK-...`.
+6. Description задачи получает append.
+7. Timeline содержит `EMAIL_LINKED`.
+8. Timeline description storage содержит `DESCRIPTION_UPDATED`.
 
 ### Scenario 4: noise не создает задачу
 
-1. Отправить шумовое письмо.
+1. Отправить письмо, которое classification определяет как `REQUEST`, но linking считает шумом.
 2. Agent возвращает `IGNORE`.
-3. Новая задача не создается.
+3. Итоговый тип меняется на `NOISE`.
+4. Новая задача не создается.
+
+### Scenario 5: fail-open при ошибке linking flow
+
+1. Сломать `POST /api/search` или вернуть невалидный JSON из linking prompt.
+2. Убедиться, что `MailLinkingService` не роняет обработку письма.
+3. Письмо продолжает обрабатываться как исходный `REQUEST`.
+4. Создается обычная PENDING-задача.
+
+## Remaining Work
+
+1. Прогнать новые E2E-сценарии на полном стенде через test-runner и зафиксировать результат в отчёте.
+2. Расширить prompt context:
+   - richer search candidates;
+   - при необходимости timeline fragments.
+3. Прогнать новый task search picker в полном browser E2E на живом стенде.
 
 ## Acceptance Criteria
 
-- [ ] Mail Agent перед созданием PENDING-задачи вызывает MemoryService Global Search.
-- [ ] Добавлен Mail Linking Prompt Builder.
-- [ ] AgentClient возвращает structured decision для mail linking.
-- [ ] Поддержаны решения `NEW_TASK`, `LINK_TO_TASK`, `UPDATE_TASK`, `IGNORE`, `REQUEST_CONFIRMATION`.
-- [ ] Pending UI умеет показывать linking-кандидата.
-- [ ] Пользователь может связать pending-кандидат с существующей задачей.
-- [ ] После связывания pending исчезает из очереди.
-- [ ] В timeline существующей задачи появляется `EMAIL_LINKED`.
-- [ ] Для `UPDATE_TASK` existing task получает summary/description append.
-- [ ] Добавлены E2E-сценарии для duplicate email prevention и mail linking.
+- [x] Mail Agent перед созданием PENDING-задачи вызывает MemoryService Global Search.
+- [x] Добавлен Mail Linking Prompt Builder.
+- [x] AgentClient возвращает structured decision для mail linking.
+- [x] Поддержаны решения `NEW_TASK`, `LINK_TO_TASK`, `UPDATE_TASK`, `IGNORE`, `REQUEST_CONFIRMATION`.
+- [x] Pending UI умеет показывать linking-кандидата.
+- [x] Пользователь может связать pending-кандидат с существующей задачей.
+- [x] После связывания pending исчезает из очереди.
+- [x] В timeline существующей задачи появляется `EMAIL_LINKED`.
+- [x] Для `UPDATE_TASK` existing task получает description append.
+- [x] Добавлены E2E-сценарии для duplicate email prevention и mail linking.
+- [x] Добавлен UI-flow выбора альтернативной target task.
+- [x] Dropdown заменен на dedicated task search picker поверх `/api/search`.
+- [x] В prompt/context добавлены recipients и thread metadata.
+- [x] Добавлены отдельные DB-поля `linked_to_task_id` / `linked_at`.
