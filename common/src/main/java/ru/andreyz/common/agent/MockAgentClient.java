@@ -1,18 +1,17 @@
 package ru.andreyz.common.agent;
 
 import jakarta.annotation.PostConstruct;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class MockAgentClient implements AgentClient {
 
-    private static final Logger log = LoggerFactory.getLogger(MockAgentClient.class);
 
     private static final Pattern EMAIL_ID_PATTERN = Pattern.compile("\"emailId\":\\s*\"([^\"]+)\"");
     private static final Pattern TASK_URL_PATTERN = Pattern.compile("/ui/tasks/(\\d+)/edit");

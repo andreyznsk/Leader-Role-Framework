@@ -1,7 +1,5 @@
 package ru.andreyz.mailagent.web;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -14,11 +12,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Controller
 public class StatusController {
 
-    private static final Logger log = LoggerFactory.getLogger(StatusController.class);
 
     private final MailConfig.PathProperties pathProperties;
     private final MemoryServiceClient memoryServiceClient;

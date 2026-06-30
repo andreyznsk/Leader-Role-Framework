@@ -1,8 +1,6 @@
 package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ru.andreyz.memoryservice.dto.MailAgentEndpointDetectRequestDto;
@@ -16,11 +14,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class MailAgentControlClient {
 
-    private static final Logger log = LoggerFactory.getLogger(MailAgentControlClient.class);
 
     private final HttpClient httpClient = HttpClient.newBuilder().build();
     private final ObjectMapper objectMapper;

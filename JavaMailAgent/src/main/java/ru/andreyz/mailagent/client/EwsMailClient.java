@@ -24,8 +24,6 @@ import microsoft.exchange.webservices.data.search.FindItemsResults;
 import microsoft.exchange.webservices.data.search.FolderView;
 import microsoft.exchange.webservices.data.search.ItemView;
 import microsoft.exchange.webservices.data.search.filter.SearchFilter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
@@ -46,10 +44,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.lang.Nullable;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class EwsMailClient implements MailClient {
 
-    private static final Logger log = LoggerFactory.getLogger(EwsMailClient.class);
     private static final String INBOX = "Inbox";
     private static final String AGGREGATED_PREFIX = "ews-conv:";
 

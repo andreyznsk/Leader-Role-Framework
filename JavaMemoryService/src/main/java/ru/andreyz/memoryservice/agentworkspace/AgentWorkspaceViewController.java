@@ -1,7 +1,5 @@
 package ru.andreyz.memoryservice.agentworkspace;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -10,11 +8,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import ru.andreyz.memoryservice.search.*;
 
 import java.util.*;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Controller
 public class AgentWorkspaceViewController {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentWorkspaceViewController.class);
 
     private final GlobalSearchService searchService;
 

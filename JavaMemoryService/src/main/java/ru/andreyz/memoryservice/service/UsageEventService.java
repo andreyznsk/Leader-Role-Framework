@@ -2,8 +2,6 @@ package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.domain.UsageEvent;
@@ -15,11 +13,12 @@ import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class UsageEventService {
 
-    private static final Logger log = LoggerFactory.getLogger(UsageEventService.class);
 
     private final UsageEventRepository usageEventRepository;
     private final UsageSavedTimePolicy savedTimePolicy;

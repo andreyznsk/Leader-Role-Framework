@@ -1,8 +1,6 @@
 package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -13,11 +11,12 @@ import ru.andreyz.memoryservice.dto.ControlPluginSettingsUpdateRequest;
 import ru.andreyz.memoryservice.dto.ControlPluginSettingsUpdateResponse;
 
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class ControlPluginClient {
 
-    private static final Logger log = LoggerFactory.getLogger(ControlPluginClient.class);
 
     private final RestClient.Builder restClientBuilder;
 

@@ -1,7 +1,5 @@
 package ru.andreyz.memoryservice.api;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,12 +25,13 @@ import ru.andreyz.memoryservice.service.ControlPluginService;
 import ru.andreyz.memoryservice.service.PluginSettingsService;
 
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/settings")
 public class SettingsController {
 
-    private static final Logger log = LoggerFactory.getLogger(SettingsController.class);
 
     private final PluginSettingsService pluginSettingsService;
     private final ControlPluginService controlPluginService;

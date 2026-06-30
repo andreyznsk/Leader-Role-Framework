@@ -1,7 +1,5 @@
 package ru.andreyz.memoryservice.search;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.common.agent.AgentClient;
 import ru.andreyz.common.agent.AgentException;
@@ -13,11 +11,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class GlobalSearchService {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalSearchService.class);
     private static final int DEFAULT_LIMIT = 20;
     private static final long QUICK_TIMEOUT_MS = 1500;
     private static final long DEEP_TIMEOUT_MS = 5000;
@@ -30,16 +31,6 @@ public class GlobalSearchService {
     private final SearchPromptBuilder promptBuilder;
     private final AgentClient agentClient;
     private final SearchQueryParser searchQueryParser;
-
-    public GlobalSearchService(List<SearchProvider> providers,
-                               SearchPromptBuilder promptBuilder,
-                               AgentClient agentClient,
-                               SearchQueryParser searchQueryParser) {
-        this.providers = providers;
-        this.promptBuilder = promptBuilder;
-        this.agentClient = agentClient;
-        this.searchQueryParser = searchQueryParser;
-    }
 
     public SearchResponse search(SearchRequest request) {
         List<SearchLayer> layers = normalizeLayers(request.layers());

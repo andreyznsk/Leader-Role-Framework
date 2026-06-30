@@ -3,8 +3,6 @@ package ru.andreyz.memoryservice.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.dto.ControlPluginAuditDto;
 import ru.andreyz.memoryservice.dto.ControlPluginDto;
@@ -15,11 +13,12 @@ import ru.andreyz.memoryservice.dto.ControlPluginSettingsUpdateResponse;
 
 import java.time.Instant;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class ControlPluginService {
 
-    private static final Logger log = LoggerFactory.getLogger(ControlPluginService.class);
 
     private final ControlPluginRegistry registry;
     private final ControlPluginStore store;

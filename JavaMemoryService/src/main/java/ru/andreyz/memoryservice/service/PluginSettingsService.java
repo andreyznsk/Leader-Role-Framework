@@ -1,7 +1,5 @@
 package ru.andreyz.memoryservice.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
@@ -20,11 +18,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class PluginSettingsService {
 
-    private static final Logger log = LoggerFactory.getLogger(PluginSettingsService.class);
     private static final String SECRET_MASK = "*****";
 
     private final PluginRegistry pluginRegistry;

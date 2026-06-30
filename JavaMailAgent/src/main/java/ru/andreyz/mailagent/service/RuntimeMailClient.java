@@ -1,8 +1,6 @@
 package ru.andreyz.mailagent.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.client.EwsMailClient;
 import ru.andreyz.mailagent.client.ImapMailClient;
@@ -15,11 +13,12 @@ import ru.andreyz.mailagent.model.MailConnectionErrorType;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
 
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class RuntimeMailClient implements MailClient {
 
-    private static final Logger log = LoggerFactory.getLogger(RuntimeMailClient.class);
 
     private final ObjectMapper objectMapper;
     private final MailRuntimeConfigService runtimeConfigService;

@@ -2,8 +2,6 @@ package ru.andreyz.ragservice.control;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -11,11 +9,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Repository
 public class RagControlAuditStore {
 
-    private static final Logger log = LoggerFactory.getLogger(RagControlAuditStore.class);
 
     private final JdbcClient jdbcClient;
     private final ObjectMapper objectMapper;

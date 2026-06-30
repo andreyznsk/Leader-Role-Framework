@@ -2,8 +2,6 @@ package ru.andreyz.mailagent.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import ru.andreyz.mailagent.model.ControlAuditEntry;
@@ -13,11 +11,12 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Repository
 public class MailControlAuditStore {
 
-    private static final Logger log = LoggerFactory.getLogger(MailControlAuditStore.class);
 
     private final JdbcClient jdbcClient;
     private final ObjectMapper objectMapper;

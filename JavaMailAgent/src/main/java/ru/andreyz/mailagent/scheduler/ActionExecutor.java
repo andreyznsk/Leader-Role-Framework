@@ -1,8 +1,6 @@
 package ru.andreyz.mailagent.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.config.MailConfig;
@@ -22,11 +20,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class ActionExecutor {
 
-    private static final Logger log = LoggerFactory.getLogger(ActionExecutor.class);
 
     private final MemoryServiceClient memoryServiceClient;
     private final MailClient mailClient;
@@ -35,22 +36,6 @@ public class ActionExecutor {
     private final MailRuntimeConfigService runtimeConfigService;
     private final MailProcessingStateService processingStateService;
     private final ObjectMapper objectMapper;
-
-    public ActionExecutor(MemoryServiceClient memoryServiceClient,
-                          MailClient mailClient,
-                          MailConfig.PathProperties pathProperties,
-                          NoticeDocumentWriter noticeDocumentWriter,
-                          MailRuntimeConfigService runtimeConfigService,
-                          MailProcessingStateService processingStateService,
-                          ObjectMapper objectMapper) {
-        this.memoryServiceClient = memoryServiceClient;
-        this.mailClient = mailClient;
-        this.pathProperties = pathProperties;
-        this.noticeDocumentWriter = noticeDocumentWriter;
-        this.runtimeConfigService = runtimeConfigService;
-        this.processingStateService = processingStateService;
-        this.objectMapper = objectMapper;
-    }
 
     public void execute(Email email, AgentResponse response) throws Exception {
         MailRuntimeConfig runtime = runtimeConfigService.snapshot();

@@ -1,7 +1,5 @@
 package ru.andreyz.ragservice.validation;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -12,11 +10,12 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class DocumentValidator {
 
-    private static final Logger log = LoggerFactory.getLogger(DocumentValidator.class);
 
     public ValidationResult validate(Path filePath) {
         try {

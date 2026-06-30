@@ -1,8 +1,6 @@
 package ru.andreyz.mailagent.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import ru.andreyz.common.agent.AgentClient;
@@ -27,11 +25,14 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class MailAgentJob {
 
-    private static final Logger log = LoggerFactory.getLogger(MailAgentJob.class);
     private static final AgentResponseType[] RESPONSE_TYPES = AgentResponseType.values();
 
     private final MailClient mailClient;
@@ -44,30 +45,6 @@ public class MailAgentJob {
     private final ObjectMapper objectMapper;
     private final MailRuntimeConfigService runtimeConfigService;
     private final MailLinkingService mailLinkingService;
-
-    public MailAgentJob(
-        MailClient mailClient,
-        PromptBuilder promptBuilder,
-        AgentClient agentClient,
-        ActionExecutor actionExecutor,
-        MailConfig.MailProperties mailProperties,
-        MailConfig.PathProperties pathProperties,
-        MailProcessingStateService processingStateService,
-        ObjectMapper objectMapper,
-        MailRuntimeConfigService runtimeConfigService,
-        MailLinkingService mailLinkingService
-    ) {
-        this.mailClient = mailClient;
-        this.promptBuilder = promptBuilder;
-        this.agentClient = agentClient;
-        this.actionExecutor = actionExecutor;
-        this.mailProperties = mailProperties;
-        this.pathProperties = pathProperties;
-        this.processingStateService = processingStateService;
-        this.objectMapper = objectMapper;
-        this.runtimeConfigService = runtimeConfigService;
-        this.mailLinkingService = mailLinkingService;
-    }
 
     @Scheduled(fixedDelayString = "#{${mail.poll-interval-seconds:60} * 1000}")
     public void poll() {

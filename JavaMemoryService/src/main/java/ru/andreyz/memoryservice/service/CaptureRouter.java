@@ -1,7 +1,5 @@
 package ru.andreyz.memoryservice.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.domain.PersonNameNote;
@@ -15,11 +13,12 @@ import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class CaptureRouter {
 
-    private static final Logger log = LoggerFactory.getLogger(CaptureRouter.class);
 
     private final TaskService taskService;
     private final RiskService riskService;

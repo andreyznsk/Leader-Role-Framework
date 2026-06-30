@@ -1,8 +1,6 @@
 package ru.andreyz.common.agent;
 
 import jakarta.annotation.PostConstruct;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 
 import java.io.OutputStreamWriter;
@@ -10,10 +8,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class CodeProcessAgentClient implements AgentClient {
 
-    private static final Logger log = LoggerFactory.getLogger(CodeProcessAgentClient.class);
 
     private final List<String> command;
     private final int timeoutMinutes;

@@ -9,8 +9,6 @@ import microsoft.exchange.webservices.data.core.service.folder.Folder;
 import microsoft.exchange.webservices.data.core.service.schema.FolderSchema;
 import microsoft.exchange.webservices.data.search.FindFoldersResults;
 import microsoft.exchange.webservices.data.search.FolderView;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.client.EwsSupport;
 import ru.andreyz.mailagent.config.MailConfig;
@@ -27,17 +25,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class EwsConnectionTester {
 
-    private static final Logger log = LoggerFactory.getLogger(EwsConnectionTester.class);
 
     private final MailConfig.TestConnectionProperties testConnectionProperties;
-
-    public EwsConnectionTester(MailConfig.TestConnectionProperties testConnectionProperties) {
-        this.testConnectionProperties = testConnectionProperties;
-    }
 
     public MailConnectionTestResult test(MailConfig.MailProperties mailProperties,
                                          MailConfig.EwsProperties ewsProperties,

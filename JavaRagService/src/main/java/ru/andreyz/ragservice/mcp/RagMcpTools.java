@@ -1,7 +1,5 @@
 package ru.andreyz.ragservice.mcp;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -21,11 +19,12 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class RagMcpTools {
 
-    private static final Logger log = LoggerFactory.getLogger(RagMcpTools.class);
 
     private final FileIndexer fileIndexer;
     private final RagSearchService searchService;

@@ -1,7 +1,5 @@
 package ru.andreyz.ragservice.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.ragservice.client.OpenSearchClient;
 import ru.andreyz.ragservice.db.IndexedDocument;
@@ -18,11 +16,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class RagDocumentService {
 
-    private static final Logger log = LoggerFactory.getLogger(RagDocumentService.class);
 
     private final IndexedDocumentRepository repository;
     private final FileIndexer fileIndexer;

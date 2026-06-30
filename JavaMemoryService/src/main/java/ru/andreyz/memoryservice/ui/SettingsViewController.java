@@ -1,7 +1,5 @@
 package ru.andreyz.memoryservice.ui;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.MultiValueMap;
@@ -21,12 +19,13 @@ import ru.andreyz.memoryservice.service.PluginSettingsService;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Controller
 @RequestMapping("/ui")
 public class SettingsViewController {
 
-    private static final Logger log = LoggerFactory.getLogger(SettingsViewController.class);
 
     private final PluginSettingsService pluginSettingsService;
     private final ControlPluginService controlPluginService;
