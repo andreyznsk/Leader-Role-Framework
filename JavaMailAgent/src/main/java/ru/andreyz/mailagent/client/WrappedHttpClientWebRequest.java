@@ -3,6 +3,8 @@ package ru.andreyz.mailagent.client;
 import microsoft.exchange.webservices.data.core.exception.http.EWSHttpException;
 import microsoft.exchange.webservices.data.core.request.HttpClientWebRequest;
 import microsoft.exchange.webservices.data.core.request.HttpWebRequest;
+import org.apache.http.ConnectionClosedException;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,7 +23,14 @@ import java.util.Map;
  * <p>
  * This wrapper returns {@code "text/xml; charset=utf-8"} when the real
  * content type is {@code null}.
+ * <p>
+ * Some Exchange servers also terminate chunked responses without the final
+ * closing chunk after the SOAP payload has already been read. Apache HttpClient
+ * raises {@link ConnectionClosedException} from {@link #close()} while trying
+ * to consume the entity for connection reuse. We suppress only that cleanup-time
+ * failure so successful SOAP calls are not downgraded to hard errors.
  */
+@Slf4j
 public class WrappedHttpClientWebRequest extends HttpWebRequest {
 
     private final HttpClientWebRequest delegate;
@@ -58,7 +67,15 @@ public class WrappedHttpClientWebRequest extends HttpWebRequest {
 
     @Override
     public void close() throws IOException {
-        delegate.close();
+        try {
+            delegate.close();
+        } catch (ConnectionClosedException e) {
+            if (isPrematureChunkTermination(e)) {
+                log.warn("Ignoring premature chunked-response termination during EWS response cleanup: {}", e.getMessage());
+                return;
+            }
+            throw e;
+        }
     }
 
     @Override
@@ -99,5 +116,12 @@ public class WrappedHttpClientWebRequest extends HttpWebRequest {
     @Override
     public Map<String, String> getRequestProperty() throws EWSHttpException {
         return delegate.getRequestProperty();
+    }
+
+    static boolean isPrematureChunkTermination(ConnectionClosedException exception) {
+        String message = exception.getMessage();
+        return message != null
+                && message.contains("Premature end of chunk coded message body")
+                && message.contains("closing chunk expected");
     }
 }
