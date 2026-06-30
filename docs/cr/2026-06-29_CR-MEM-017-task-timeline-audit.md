@@ -1,7 +1,9 @@
-# 2026-06-29_CR-MEM-012: Task Timeline Audit
+# 2026-06-29_CR-MEM-017: Task Timeline Audit
+
+_Переименован из CR-MEM-012 для устранения коллизии номеров, 2026-06-30._
 
 **Дата:** 2026-06-29  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MEM  
 **Зависимости:** JavaMemoryService, UI Today, Pending Task Flow, future Intelligent Mail Linking
 

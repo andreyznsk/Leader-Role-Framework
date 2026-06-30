@@ -1,9 +1,9 @@
-# CR: Today UI Calendar Navigation
+# 2026-06-29_CR-MEM-014: Today UI Calendar Navigation
 
--   **ID:** CR-MEM-012
--   **Module:** JavaMemoryService
--   **Area:** UI / Today
--   **Type:** UX Improvement
+**Дата:** 2026-06-29  
+**Статус:** Draft  
+**Сервис:** MEM / JavaMemoryService  
+**ID:** CR-MEM-014
 
 ## Summary
 

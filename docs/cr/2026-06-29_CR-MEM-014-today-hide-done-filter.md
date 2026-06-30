@@ -1,7 +1,7 @@
 # 2026-06-29_CR-MEM-014: Today UI hide Done tasks filter
 
 **Дата:** 2026-06-29  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MEM / JavaMemoryService  
 **Тип:** Enhancement / UI  
 **Branch:** feature/mailAg-001
