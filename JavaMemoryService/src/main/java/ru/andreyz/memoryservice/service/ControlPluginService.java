@@ -13,9 +13,12 @@ import ru.andreyz.memoryservice.dto.ControlPluginSettingsUpdateResponse;
 
 import java.time.Instant;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class ControlPluginService {
+
 
     private final ControlPluginRegistry registry;
     private final ControlPluginStore store;
@@ -93,6 +96,7 @@ public class ControlPluginService {
             updateHealthStatus(code, plugin.baseUrl(), Instant.now());
             return audit;
         } catch (RuntimeException e) {
+            log.error("", e);
             updateHealthStatus(code, plugin.baseUrl(), Instant.now());
             return store.findAudit(code);
         }
@@ -139,6 +143,7 @@ public class ControlPluginService {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (Exception e) {
+            log.error("", e);
             return "{\"error\":\"serialization failed\"}";
         }
     }

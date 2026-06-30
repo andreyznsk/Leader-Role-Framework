@@ -11,9 +11,12 @@ import ru.andreyz.memoryservice.dto.ControlPluginSettingsUpdateRequest;
 import ru.andreyz.memoryservice.dto.ControlPluginSettingsUpdateResponse;
 
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class ControlPluginClient {
+
 
     private final RestClient.Builder restClientBuilder;
 
@@ -68,6 +71,7 @@ public class ControlPluginClient {
                     : "UNKNOWN";
             return status == null || status.isBlank() ? "UNKNOWN" : status.toUpperCase();
         } catch (RestClientException e) {
+            log.error("", e);
             return "DOWN";
         }
     }

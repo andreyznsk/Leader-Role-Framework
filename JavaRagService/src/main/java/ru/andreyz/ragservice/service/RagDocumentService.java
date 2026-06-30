@@ -16,9 +16,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class RagDocumentService {
+
 
     private final IndexedDocumentRepository repository;
     private final FileIndexer fileIndexer;
@@ -51,6 +54,7 @@ public class RagDocumentService {
                     content
             );
         } catch (IOException e) {
+            log.error("", e);
             return unavailableDetails(document, e);
         }
     }
@@ -96,6 +100,7 @@ public class RagDocumentService {
             ParsedDocument parsed = parse(Files.readString(Path.of(document.filePath())));
             return summary(document, parsed);
         } catch (IOException e) {
+            log.error("", e);
             return unavailableSummary(document, e);
         }
     }

@@ -1,7 +1,5 @@
 package ru.andreyz.ragservice.control;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -12,11 +10,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class RagRuntimeConfigService {
 
-    private static final Logger log = LoggerFactory.getLogger(RagRuntimeConfigService.class);
 
     private static final String PLUGIN_CODE = "rag";
     private static final String PLUGIN_NAME = "RAG Service";
@@ -202,6 +201,7 @@ public class RagRuntimeConfigService {
         try {
             return Math.max(1, Integer.parseInt(value.trim()));
         } catch (NumberFormatException e) {
+            log.error("", e);
             return fallback;
         }
     }

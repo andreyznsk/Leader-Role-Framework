@@ -1,7 +1,5 @@
 package ru.andreyz.mailagent.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.model.ControlAuditEntry;
@@ -15,22 +13,17 @@ import ru.andreyz.mailagent.model.ControlStatusResponse;
 
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class MailAgentControlService {
 
-    private static final Logger log = LoggerFactory.getLogger(MailAgentControlService.class);
 
     private final MailClient mailClient;
     private final MailRuntimeConfigService runtimeConfigService;
     private final MailConnectionTestService mailConnectionTestService;
-
-    public MailAgentControlService(MailClient mailClient,
-                                   MailRuntimeConfigService runtimeConfigService,
-                                   MailConnectionTestService mailConnectionTestService) {
-        this.mailClient = mailClient;
-        this.runtimeConfigService = runtimeConfigService;
-        this.mailConnectionTestService = mailConnectionTestService;
-    }
 
     public void applyEnabled(Boolean enabled) {
         if (enabled != null) {

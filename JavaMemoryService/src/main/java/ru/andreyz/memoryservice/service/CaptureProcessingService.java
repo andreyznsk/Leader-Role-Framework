@@ -1,7 +1,5 @@
 package ru.andreyz.memoryservice.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.andreyz.memoryservice.domain.Capture;
 import ru.andreyz.memoryservice.domain.Risk;
@@ -14,29 +12,20 @@ import ru.andreyz.memoryservice.dto.UsageEventCommand;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 
+@Slf4j
+@RequiredArgsConstructor
 @Service
 public class CaptureProcessingService {
 
-    private static final Logger log = LoggerFactory.getLogger(CaptureProcessingService.class);
 
     private final CaptureService captureService;
     private final CaptureClassifierAgent classifierAgent;
     private final CaptureRouter captureRouter;
     private final ContextService contextService;
     private final UsageEventService usageEventService;
-
-    public CaptureProcessingService(CaptureService captureService,
-                                     CaptureClassifierAgent classifierAgent,
-                                     CaptureRouter captureRouter,
-                                     ContextService contextService,
-                                     UsageEventService usageEventService) {
-        this.captureService = captureService;
-        this.classifierAgent = classifierAgent;
-        this.captureRouter = captureRouter;
-        this.contextService = contextService;
-        this.usageEventService = usageEventService;
-    }
 
     public ProcessResult processToday() {
         List<CaptureService.CaptureFile> pending = captureService.findTodayFiles();

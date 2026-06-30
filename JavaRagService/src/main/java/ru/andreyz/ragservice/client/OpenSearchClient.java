@@ -4,8 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.PostConstruct;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ru.andreyz.ragservice.control.RagRuntimeConfig;
@@ -22,11 +20,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class OpenSearchClient {
 
-    private static final Logger log = LoggerFactory.getLogger(OpenSearchClient.class);
 
     private final String index;
     private final RagRuntimeConfigService runtimeConfigService;
@@ -105,6 +104,7 @@ public class OpenSearchClient {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
             log.error("Failed to ensure OpenSearch index exists: {}", e.getMessage());
+            log.error("", e);
         }
     }
 
@@ -162,6 +162,7 @@ public class OpenSearchClient {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
             log.error("Failed to delete chunks for source {}: {}", source, e.getMessage());
+            log.error("", e);
         }
     }
 

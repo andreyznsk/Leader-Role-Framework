@@ -9,9 +9,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Repository
 public class RagControlAuditStore {
+
 
     private final JdbcClient jdbcClient;
     private final ObjectMapper objectMapper;
@@ -91,6 +94,7 @@ public class RagControlAuditStore {
             return objectMapper.readValue(json, objectMapper.getTypeFactory()
                     .constructCollectionType(List.class, String.class));
         } catch (JsonProcessingException e) {
+            log.error("", e);
             return List.of();
         }
     }

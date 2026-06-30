@@ -1,7 +1,5 @@
 package ru.andreyz.memoryservice.search.provider;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -12,15 +10,16 @@ import ru.andreyz.memoryservice.search.SearchResultItem;
 
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Semantic search via JavaRagService /api/search through the Memory-owned proxy.
  * Never accesses the 'rag' schema directly.
  */
+@Slf4j
 @Component
 public class KnowledgeSearchProvider implements SearchProvider {
 
-    private static final Logger log = LoggerFactory.getLogger(KnowledgeSearchProvider.class);
 
     private final RestClient restClient;
     private final String ragBaseUrl;
@@ -53,6 +52,7 @@ public class KnowledgeSearchProvider implements SearchProvider {
                     .toList();
         } catch (Exception e) {
             log.warn("Knowledge search unavailable: {}", e.getMessage());
+            log.error("", e);
             return List.of();
         }
     }

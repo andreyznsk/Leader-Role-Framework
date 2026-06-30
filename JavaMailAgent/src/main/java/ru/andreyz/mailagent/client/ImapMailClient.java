@@ -12,8 +12,6 @@ import jakarta.mail.Store;
 import jakarta.mail.UIDFolder;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.search.FlagTerm;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.MailConnectionErrorType;
@@ -29,10 +27,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class ImapMailClient implements MailClient {
 
-    private static final Logger log = LoggerFactory.getLogger(ImapMailClient.class);
 
     private final MailConfig.MailProperties mailProperties;
     private final MailConfig.ImapProperties imapProperties;
@@ -124,6 +123,7 @@ public class ImapMailClient implements MailClient {
             return MailConnectionTestResult.connected("imap", null, null, null, false, true,
                     "INBOX unread: " + unread, connectionTarget());
         } catch (Exception e) {
+            log.error("", e);
             return MailConnectionTestResult.failed("imap", null, MailConnectionErrorType.UNKNOWN,
                     "Connection failed", e.getMessage(), connectionTarget());
         }
@@ -232,6 +232,7 @@ public class ImapMailClient implements MailClient {
                     .findFirst()
                     .orElse(null);
         } catch (MessagingException e) {
+            log.error("", e);
             return null;
         }
     }

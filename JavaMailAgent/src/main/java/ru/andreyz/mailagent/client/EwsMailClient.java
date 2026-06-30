@@ -24,8 +24,6 @@ import microsoft.exchange.webservices.data.search.FindItemsResults;
 import microsoft.exchange.webservices.data.search.FolderView;
 import microsoft.exchange.webservices.data.search.ItemView;
 import microsoft.exchange.webservices.data.search.filter.SearchFilter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import ru.andreyz.mailagent.config.MailConfig;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.MailConnectionTestResult;
@@ -46,10 +44,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.lang.Nullable;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class EwsMailClient implements MailClient {
 
-    private static final Logger log = LoggerFactory.getLogger(EwsMailClient.class);
     private static final String INBOX = "Inbox";
     private static final String AGGREGATED_PREFIX = "ews-conv:";
 
@@ -191,6 +190,7 @@ public class EwsMailClient implements MailClient {
             );
         } catch (Exception e) {
             log.warn("EWS testConnection FAILED at {}: {}", ewsUrl, e.getMessage());
+            log.error("", e);
             return MailConnectionTestResult.failed(
                     "ews",
                     ewsProperties.getAuthType(),
@@ -429,7 +429,8 @@ public class EwsMailClient implements MailClient {
             if (mb != null) {
                 return MessageBody.getStringFromMessageBody(mb);
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("", e);
             // body not loaded via FindItem — fall through to lazy load
         }
         try {
@@ -439,6 +440,7 @@ public class EwsMailClient implements MailClient {
             return MessageBody.getStringFromMessageBody(loaded.getBody());
         } catch (Exception e) {
             log.debug("Could not load body for email {}: {}", message.getId(), e.getMessage());
+            log.error("", e);
             return "";
         }
     }
@@ -503,7 +505,8 @@ public class EwsMailClient implements MailClient {
                 }
             }
             return recipients;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("", e);
             return List.of();
         }
     }
@@ -516,7 +519,8 @@ public class EwsMailClient implements MailClient {
             }
             String value = result.toString();
             return value.isBlank() ? null : value;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("", e);
             return null;
         }
     }

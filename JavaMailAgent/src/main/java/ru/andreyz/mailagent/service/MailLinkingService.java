@@ -15,9 +15,12 @@ import ru.andreyz.mailagent.scheduler.MailLinkingPromptBuilder;
 
 import java.util.List;
 import java.util.Locale;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class MailLinkingService {
+
 
     private static final List<String> SEARCH_LAYERS = List.of("TASK", "NOTICE", "PEOPLE", "RISK", "INCIDENT", "KNOWLEDGE");
 
@@ -46,6 +49,7 @@ public class MailLinkingService {
             MailLinkingDecision decision = parse(agentClient.complete(promptBuilder.build(email, classification, searchResponse)));
             return merge(classification, email, decision);
         } catch (Exception exception) {
+            log.error("", exception);
             return classification;
         }
     }

@@ -25,10 +25,13 @@ import ru.andreyz.memoryservice.service.ControlPluginService;
 import ru.andreyz.memoryservice.service.PluginSettingsService;
 
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/settings")
 public class SettingsController {
+
 
     private final PluginSettingsService pluginSettingsService;
     private final ControlPluginService controlPluginService;
@@ -64,6 +67,7 @@ public class SettingsController {
         try {
             return ResponseEntity.ok(controlPluginService.getPluginSettings(code));
         } catch (RuntimeException e) {
+            log.error("", e);
             return ResponseEntity.status(503).body(java.util.Map.of(
                     "pluginCode", code,
                     "status", "UNAVAILABLE",
@@ -78,6 +82,7 @@ public class SettingsController {
         try {
             return ResponseEntity.ok(controlPluginService.updatePluginSettings(code, request));
         } catch (RuntimeException e) {
+            log.error("", e);
             return ResponseEntity.status(503).body(java.util.Map.of(
                     "pluginCode", code,
                     "status", "UNAVAILABLE",

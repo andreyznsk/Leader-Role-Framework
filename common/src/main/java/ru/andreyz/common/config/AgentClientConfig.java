@@ -1,7 +1,5 @@
 package ru.andreyz.common.config;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
@@ -18,11 +16,12 @@ import ru.andreyz.common.agent.CodeProcessAgentClient;
 import ru.andreyz.common.agent.GigaChatAgentClient;
 import ru.andreyz.common.agent.MockAgentClient;
 import ru.andreyz.common.agent.OllamaAgentClient;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @AutoConfiguration
 public class AgentClientConfig {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentClientConfig.class);
 
     @Bean
     @ConditionalOnMissingBean(AgentClient.class)
