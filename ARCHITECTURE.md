@@ -1,6 +1,6 @@
 # LeaderOS — Architecture - Мастер-Спека
 
-**Последнее обновление:** 2026-06-26
+**Последнее обновление:** 2026-07-02
 **Статус:** Living document — обновлять при любом изменении контрактов между сервисами
 **git:** https://github.com/andreyznsk/Leader-Role-Framework.git
 ---
@@ -207,11 +207,12 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `PUT` | `/api/notes/{id}` | Обновить заметку (title/text/tags/source) |
 | `DELETE` | `/api/notes/{id}` | Удалить заметку: `204 No Content` / `404 Not Found` (hard delete, CR-MEM-011) |
 | `GET/POST/PUT/DELETE` | `/api/incidents`, `/api/risks`, `/api/people` | CRUD/soft delete рабочих сущностей |
-| `GET` | `/ui/today` | Web UI: план дня |
+| `GET` | `/ui/today` | Web UI: план дня. Сайдбар разделён на вкладки **ToDo** (`/ui/today`, DONE всегда скрыт) и **Done** (`/ui/today?status=DONE`, только DONE); toggle «No Done» убран (CR-MEM-025) |
 | `GET` | `/ui/notes` | Web UI: Operational Notes |
 | `GET` | `/ui/captures` | Web UI: Capture Inbox |
+| `GET` | `/ui/search` | Web UI: Global Search — standalone top-level страница (CR-MEM-022, un-relocated из Agent Workspace) |
 | `GET` | `/ui/knowledge` | Web UI: Knowledge Gateway для RAG lifecycle |
-| `GET` | `/ui/intake` | Web UI: Intake Gateway для ручного review автоматических входящих сигналов |
+| `GET` | `/ui/intake` | Web UI: Intake Gateway для ручного review автоматических входящих сигналов. Поддерживает bulk-выбор карточек чекбоксами + массовый Apply/Reject (CR-MEM-026) |
 | `GET` | `/ui/stats` | Web UI: статистика использования и saved time |
 | `GET` | `/ui/settings` | Web UI: Control Plane — настройки плагинов (descriptor-driven UI) |
 | `GET` | `/ui/agent-workspace` | Web UI: Agent Workspace — Chat и Console режимы работы с агентом (CR-MEM-012) |
@@ -254,7 +255,7 @@ MemoryService выступает единой точкой управления 
 `PERSON_NOTE → suggestedRoute=PERSON`, `KNOWLEDGE → suggestedRoute=RAG`.
 После успешного создания intake item файл переносится в `capture-inbox/processed/YYYY-MM-DD/`.
 
-**Важно:** agent-originated MCP writes (`createTask`, `createIncident`, `addRisk` и т.п.) пока не маршрутизируются через Intake Gateway. Это отдельный follow-up CR.
+**Важно:** agent-originated MCP writes маршрутизируются через Intake Gateway. MCP write-tools публикуют proposal (`proposeTask`, `proposeRisk`, `proposeIncident`, `proposePersonNote`), а не прямую запись в operational memory.
 
 **Usage Statistics:** Memory Service владеет таблицей `memory.usage_events` и пишет события
 из task, pending task, capture, capture processing и knowledge search flow. Агрегаты доступны через
@@ -264,9 +265,9 @@ REST proxy (`/api/knowledge/**`) и не получают прямого JDBC-д
 `usage_events.correlation_id` хранится без жёсткого лимита `VARCHAR(128)`, чтобы не падать на длинных
 mail `Message-ID`.
 
-**MCP tools:** `getContext`, `getTasks`, `createTask`, `markTaskDone`, `moveTask`,
-`updateTaskStatus`, `getTaskDescription`, `setTaskDescription`, `createIncident`,
-`resolveIncident`, `addRisk`, `updateRisk`, `addPeopleNote`, `searchPeople`.
+**MCP tools:** `getContext`, `getTasks`, `getTaskDescription`, `proposeTask`,
+`proposeIncident`, `proposeIncidentUpdate`, `proposeRisk`, `proposeRiskUpdate`,
+`proposePersonNote`, `searchPeople`.
 
 **Входящие вызовы от:** JavaMailAgent, Claude-агент, CLI/user scripts
 

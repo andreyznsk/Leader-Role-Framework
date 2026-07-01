@@ -3,8 +3,9 @@ package ru.andreyz.memoryservice.mcp;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
-import ru.andreyz.memoryservice.domain.PeopleNote;
 import ru.andreyz.memoryservice.domain.Person;
+import ru.andreyz.memoryservice.dto.AgentProposalResponse;
+import ru.andreyz.memoryservice.service.AgentIntakeProposalService;
 import ru.andreyz.memoryservice.service.PeopleService;
 
 import java.util.List;
@@ -13,17 +14,20 @@ import java.util.List;
 public class PeopleTools {
 
     private final PeopleService peopleService;
+    private final AgentIntakeProposalService agentIntakeProposalService;
 
-    public PeopleTools(PeopleService peopleService) {
+    public PeopleTools(PeopleService peopleService, AgentIntakeProposalService agentIntakeProposalService) {
         this.peopleService = peopleService;
+        this.agentIntakeProposalService = agentIntakeProposalService;
     }
 
-    @Tool(description = "Add a chronological note about a team member or stakeholder (e.g. after 1-1, meeting observation)")
-    public PeopleNote addPeopleNote(
+    @Tool(description = "Create a person note proposal in Intake Gateway. This does not write directly to people notes.")
+    public AgentProposalResponse proposePersonNote(
             @ToolParam(description = "Person ID") Long personId,
             @ToolParam(description = "Note text") String note,
-            @ToolParam(description = "Comma-separated tags: trust,blocker,key-person", required = false) String tags) {
-        return peopleService.addNote(personId, note, tags);
+            @ToolParam(description = "Comma-separated tags: trust,blocker,key-person", required = false) String tags,
+            @ToolParam(description = "Optional run/session/source identifier", required = false) String sourceId) {
+        return agentIntakeProposalService.createPersonNoteProposal(personId, note, tags, sourceId);
     }
 
     @Tool(description = "Search for a person by name to get their profile and recent notes")

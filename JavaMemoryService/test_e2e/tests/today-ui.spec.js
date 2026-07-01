@@ -18,7 +18,7 @@ test.describe('Today UI', () => {
 
     try {
       await page.goto('/ui/today');
-      await expect(page).toHaveTitle(/План дня/);
+      await expect(page).toHaveTitle(/ToDo/);
 
       const taskLink = page.locator(`a.task-title-clickable[href="/ui/tasks/${task.id}/edit"]`);
       await expect(taskLink).toHaveText(task.title);

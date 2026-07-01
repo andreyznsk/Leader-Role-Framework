@@ -184,6 +184,12 @@ regex `/Сохранить/` матчит ОБА кнопки: "💾 Сохра�
 
 В этой сессии реальный корень репозитория — `/home/andreyz/IdeaProjects/claude/Leader-Role-Framework/` (git worktree с префиксом `claude`), а НЕ `/home/andreyz/IdeaProjects/Leader-Role-Framework/` (путь без `claude/`, который иногда фигурирует в системных промптах/описании агента). Проверять фактический cwd/наличие файлов перед использованием пути из инструкций — раньше приводило к ложному "AGENT.md недоступен".
 
+### task-done-confirm.spec.js (2026-07-01, window.confirm перед DONE)
+
+Новый тест для CR: window.confirm() перед переводом задачи в DONE в двух местах — чекбокс "Выполнено" на /ui/today (today.html toggleDone) и выбор статуса DONE в /ui/tasks/{id}/edit (task-edit.html submit handler). 5/5 PASS с первого прогона, без правок теста и без правок кода.
+
+Перед запуском потребовалась пересборка — `find JavaMemoryService/src -newer JavaMemoryService/target/memory-service.jar` показал, что `today.html`/`task-edit.html` новее JAR-а (правки CR ещё не собраны). Общий паттерн: перед любым новым test_e2e/tests/*.spec.js всегда проверять этой командой, не отставать ли JAR от исходников, а не полагаться на то что сервис "уже вроде запущен".
+
 ## MailAgent E2E — инфраструктурные паттерны (2026-06-25)
 
 ### Maildev доступ

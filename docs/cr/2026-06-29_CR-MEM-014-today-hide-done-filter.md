@@ -1,7 +1,7 @@
 # 2026-06-29_CR-MEM-014: Today UI hide Done tasks filter
 
 **Дата:** 2026-06-29  
-**Статус:** Implemented  
+**Статус:** Superseded by [CR-MEM-025](2026-07-02_CR-MEM-025-today-todo-done-tabs.md) (2026-07-02) — toggle «No Done» убран, вместо него отдельные вкладки ToDo/Done в сайдбаре.
 **Сервис:** MEM / JavaMemoryService  
 **Тип:** Enhancement / UI  
 **Branch:** feature/mailAg-001

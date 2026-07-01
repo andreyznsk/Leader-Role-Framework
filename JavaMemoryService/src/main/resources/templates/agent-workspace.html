@@ -22,10 +22,6 @@
             <a class="nav-link" th:classappend="${activeTab == 'console'} ? 'active'"
                href="/ui/agent-workspace?tab=console">Console</a>
         </li>
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'search'} ? 'active'"
-               href="/ui/agent-workspace?tab=search">Search</a>
-        </li>
     </ul>
 
     <!-- ===== CHAT TAB ===== -->
@@ -91,118 +87,6 @@
         </div>
     </div>
 
-    <!-- ===== SEARCH TAB ===== -->
-    <div th:if="${activeTab == 'search'}">
-        <form method="get" action="/ui/agent-workspace">
-            <input type="hidden" name="tab" value="search"/>
-            <div class="input-group mb-3">
-                <input type="text" name="q" class="form-control form-control-lg"
-                       placeholder="Что ищем?"
-                       th:value="${query}" autofocus autocomplete="off"/>
-                <button class="btn btn-primary px-4" type="submit">Search</button>
-            </div>
-
-            <div class="mb-3">
-                <span class="text-muted small me-3">Mode:</span>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="mode" id="modeQuick" value="QUICK"
-                           th:checked="${searchMode == null or searchMode == 'QUICK'}"/>
-                    <label class="form-check-label" for="modeQuick">Quick</label>
-                </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="mode" id="modeDeep" value="DEEP"
-                           th:checked="${searchMode == 'DEEP'}"/>
-                    <label class="form-check-label" for="modeDeep">Deep AI Summary</label>
-                </div>
-            </div>
-
-            <div class="mb-3">
-                <span class="text-muted small d-block mb-2">Layers:</span>
-                <div class="d-flex flex-wrap gap-2">
-                    <th:block th:each="layer : ${availableLayers}">
-                        <div class="form-check" th:if="${layer.available}">
-                            <input class="form-check-input" type="checkbox"
-                                   name="layers" th:value="${layer.name}"
-                                   th:id="'layer-' + ${layer.name}"
-                                   th:checked="${selectedLayers != null and selectedLayers.contains(layer.name)}"
-                                   th:disabled="${!layer.enabled}"/>
-                            <label class="form-check-label" th:for="'layer-' + ${layer.name}"
-                                   th:classappend="${!layer.enabled} ? 'text-muted'"
-                                   th:text="${layer.title}"></label>
-                        </div>
-                        <div class="form-check" th:unless="${layer.available}">
-                            <input class="form-check-input" type="checkbox" disabled/>
-                            <label class="form-check-label text-muted">
-                                <span th:text="${layer.title}"></span>
-                                <small class="text-secondary"> (soon)</small>
-                            </label>
-                        </div>
-                    </th:block>
-                </div>
-            </div>
-
-            <div class="mb-4">
-                <span class="text-muted small me-2">Presets:</span>
-                <a href="/ui/agent-workspace?tab=search&amp;preset=notice"
-                   class="btn btn-sm btn-outline-secondary me-1"
-                   th:classappend="${preset == 'notice'} ? 'active'">Notice only</a>
-                <a href="/ui/agent-workspace?tab=search&amp;preset=everything"
-                   class="btn btn-sm btn-outline-secondary me-1"
-                   th:classappend="${preset == 'everything'} ? 'active'">Everything</a>
-                <a href="/ui/agent-workspace?tab=search&amp;preset=documentation"
-                   class="btn btn-sm btn-outline-secondary me-1"
-                   th:classappend="${preset == 'documentation'} ? 'active'">Documentation</a>
-                <a href="/ui/agent-workspace?tab=search&amp;preset=people_tasks"
-                   class="btn btn-sm btn-outline-secondary"
-                   th:classappend="${preset == 'people_tasks'} ? 'active'">People &amp; Tasks</a>
-            </div>
-        </form>
-
-        <div th:if="${searchResponse != null}">
-            <hr/>
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="text-muted small">
-                    Results for: <strong th:text="${searchResponse.query}"></strong>
-                    &nbsp;·&nbsp; <span th:text="${#lists.size(searchResponse.results)}"></span> found
-                    &nbsp;·&nbsp; mode: <span th:text="${searchResponse.mode}"></span>
-                </span>
-            </div>
-
-            <div th:if="${searchResponse.summary != null}" class="card mb-4 border-primary">
-                <div class="card-header text-primary fw-bold small">AI Summary</div>
-                <div class="card-body small" th:text="${searchResponse.summary}"></div>
-            </div>
-
-            <div th:if="${#lists.isEmpty(searchResponse.results)}" class="text-muted">
-                Ничего не найдено по запросу «<span th:text="${searchResponse.query}"></span>»
-            </div>
-
-            <th:block th:each="entry : ${resultsByLayer}" th:if="${!#lists.isEmpty(entry.value)}">
-                <div class="mb-1 mt-3">
-                    <span class="badge bg-secondary" th:text="${entry.key}"></span>
-                </div>
-                <div th:each="item : ${entry.value}" class="card mb-2">
-                    <div class="card-body py-2 px-3">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <a th:if="${item.url() != null}"
-                                   th:href="${item.url()}"
-                                   class="fw-semibold text-decoration-none"
-                                   th:text="${item.title()}"></a>
-                                <span th:unless="${item.url() != null}"
-                                      class="fw-semibold" th:text="${item.title()}"></span>
-                                <div th:if="${item.snippet() != null}"
-                                     class="text-muted small mt-1"
-                                     th:text="${#strings.abbreviate(item.snippet(), 200)}"></div>
-                            </div>
-                            <span class="text-muted small ms-3 text-nowrap"
-                                  th:text="${'score: ' + #numbers.formatDecimal(item.score(), 1, 2)}"></span>
-                        </div>
-                    </div>
-                </div>
-            </th:block>
-        </div>
-    </div>
 </div>
 
 <script th:inline="none">

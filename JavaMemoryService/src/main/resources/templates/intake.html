@@ -45,12 +45,27 @@
         Intake queue is empty for selected filters.
     </div>
 
+    <div th:if="${!#lists.isEmpty(items)}" class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <input type="checkbox" class="form-check-input" id="intake-select-all"
+               onchange="toggleAllIntakeSelection(this.checked)"/>
+        <label for="intake-select-all" class="form-check-label small text-muted">Выбрать все</label>
+        <span class="small text-muted" id="intake-bulk-count">0 выбрано</span>
+        <button type="button" class="btn btn-sm btn-primary" id="intake-bulk-apply-btn" disabled
+                onclick="bulkApplyIntakeItems()">Подтвердить выбранные</button>
+        <button type="button" class="btn btn-sm btn-outline-danger" id="intake-bulk-reject-btn" disabled
+                onclick="bulkRejectIntakeItems()">Отклонить выбранные</button>
+    </div>
+
     <div class="d-grid gap-3">
         <section th:each="item : ${items}" class="card p-3 shadow-sm">
             <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
-                <div>
-                    <div class="small text-muted" th:text="${item.sourceId != null ? item.sourceType + ' · ' + item.sourceId : item.sourceType}">MAIL</div>
-                    <div class="fw-semibold" th:text="${item.suggestedRoute != null ? item.suggestedRoute : 'Unclassified'}">RAG</div>
+                <div class="d-flex align-items-start gap-2">
+                    <input type="checkbox" class="form-check-input intake-item-checkbox mt-1"
+                           th:attr="data-item-id=${item.id}" onchange="updateIntakeSelection()"/>
+                    <div>
+                        <div class="small text-muted" th:text="${item.sourceId != null ? item.sourceType + ' · ' + item.sourceId : item.sourceType}">MAIL</div>
+                        <div class="fw-semibold" th:text="${item.suggestedRoute != null ? item.suggestedRoute : 'Unclassified'}">RAG</div>
+                    </div>
                 </div>
                 <div class="text-end small text-muted">
                     <div th:text="${item.status}">NEW</div>
@@ -155,6 +170,67 @@
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({reason: 'noise', reviewedBy: 'ui'})
         });
+        window.location.reload();
+    }
+
+    function getSelectedIntakeIds() {
+        return Array.from(document.querySelectorAll('.intake-item-checkbox:checked'))
+            .map(function (checkbox) { return checkbox.dataset.itemId; });
+    }
+
+    function toggleAllIntakeSelection(checked) {
+        document.querySelectorAll('.intake-item-checkbox').forEach(function (checkbox) {
+            checkbox.checked = checked;
+        });
+        updateIntakeSelection();
+    }
+
+    function updateIntakeSelection() {
+        const all = document.querySelectorAll('.intake-item-checkbox');
+        const selected = getSelectedIntakeIds();
+
+        const countEl = document.getElementById('intake-bulk-count');
+        if (countEl) countEl.textContent = selected.length + ' выбрано';
+
+        const applyBtn = document.getElementById('intake-bulk-apply-btn');
+        const rejectBtn = document.getElementById('intake-bulk-reject-btn');
+        if (applyBtn) applyBtn.disabled = selected.length === 0;
+        if (rejectBtn) rejectBtn.disabled = selected.length === 0;
+
+        const selectAll = document.getElementById('intake-select-all');
+        if (selectAll) {
+            selectAll.checked = all.length > 0 && selected.length === all.length;
+            selectAll.indeterminate = selected.length > 0 && selected.length < all.length;
+        }
+    }
+
+    async function bulkApplyIntakeItems() {
+        const ids = getSelectedIntakeIds();
+        if (ids.length === 0) return;
+        if (!window.confirm('Подтвердить ' + ids.length + ' выбранных элементов с текущим маршрутом?')) return;
+
+        for (const id of ids) {
+            await window.LeaderUiApi.request('/api/intake/' + id + '/apply', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(intakePayload(id))
+            });
+        }
+        window.location.reload();
+    }
+
+    async function bulkRejectIntakeItems() {
+        const ids = getSelectedIntakeIds();
+        if (ids.length === 0) return;
+        if (!window.confirm('Отклонить ' + ids.length + ' выбранных элементов?')) return;
+
+        for (const id of ids) {
+            await window.LeaderUiApi.request('/api/intake/' + id + '/reject', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({reason: 'noise', reviewedBy: 'ui'})
+            });
+        }
         window.location.reload();
     }
 </script>
