@@ -28,6 +28,7 @@
 | CR-MEM-021        | [2026-06-30_CR-MEM-021-intake-rollback-reapply.md](2026-06-30_CR-MEM-021-intake-rollback-reapply.md) | Draft | 2026-06-30 |
 | CR-MEM-022        | [2026-06-30_CR-MEM-022-left-sidebar-navigation.md](2026-06-30_CR-MEM-022-left-sidebar-navigation.md) | Implemented | 2026-06-30 |
 | CR-MEM-023        | [2026-06-30_CR-MEM-023-task-edit-right-control-panel.md](2026-06-30_CR-MEM-023-task-edit-right-control-panel.md) | Implemented | 2026-06-30 |
+| CR-MEM-024        | [2026-07-01_CR-MEM-024-agent-mcp-write-via-intake.md](2026-07-01_CR-MEM-024-agent-mcp-write-via-intake.md) | Implemented | 2026-07-01 |
 | CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md) | Draft | —          |
 
 ---
@@ -72,5 +73,5 @@
 
 ---
 
-_Следующий свободный номер в MEM серии: **CR-MEM-024**_  
-_Последнее обновление реестра: 2026-06-30_
+_Следующий свободный номер в MEM серии: **CR-MEM-025**_  
+_Последнее обновление реестра: 2026-07-01_

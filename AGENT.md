@@ -24,9 +24,96 @@
 |------------|-----------|
 | `getContext` | Полный контекст текущей сессии |
 | `getTasks` | Задачи на дату |
-| `getRisks` | Операционные риски |
-| `getPeople` | Данные о людях и стейкхолдерах |
+| `searchPeople` | Данные о людях и стейкхолдерах |
 | `searchKnowledge` | Поиск знаний по всей базе |
+
+## Как работать с Memory MCP
+
+### Read tools
+
+Для чтения operational context используй только MCP:
+
+- `getContext` — старт любой рабочей сессии
+- `getTasks(date, status?)` — задачи на день
+- `getTaskDescription(id)` — детали конкретной задачи
+- `searchPeople(name)` — поиск человека и контекста по нему
+- `searchKnowledge(query, topK?)` — знания, архитектура, решения, история
+
+### Write tools
+
+Через MCP агент **не пишет напрямую** в operational memory.
+Все agent-originated write actions идут через Intake Gateway как proposal.
+
+Используй только:
+
+- `proposeTask`
+- `proposeRisk`
+- `proposeRiskUpdate`
+- `proposeIncident`
+- `proposeIncidentUpdate`
+- `proposePersonNote`
+
+### Жёсткое правило
+
+Запрещено через MCP:
+
+- создавать task/risk/incident напрямую;
+- менять статус task напрямую;
+- двигать task напрямую;
+- писать task description напрямую;
+- писать people notes напрямую.
+
+Если нужно изменить operational сущность, агент должен создать proposal в `/ui/intake`.
+
+### Как выглядит flow записи
+
+```text
+1. Агент понял, что нужно создать/обновить сущность
+2. Вызывает propose* tool
+3. Получает ответ:
+   "Proposal created in Intake Gateway. Open /ui/intake to review and apply."
+4. Сообщает пользователю, что proposal создан
+5. Направляет пользователя в /ui/intake для review/apply
+```
+
+### Что говорить пользователю после propose*
+
+Короткий шаблон:
+
+```text
+Создал proposal в Intake Gateway.
+Открой /ui/intake, проверь payload и нажми Apply.
+```
+
+Если важно, уточни target route:
+
+- task proposal -> `TASK`
+- risk proposal -> `RISK`
+- incident proposal -> `INCIDENT`
+- people note proposal -> `PERSON`
+
+### Когда использовать proposal tools
+
+Используй `proposeTask`, если:
+
+- пользователь просит добавить задачу;
+- ты предлагаешь follow-up action;
+- из обсуждения явно следует actionable item.
+
+Используй `proposeRisk` / `proposeRiskUpdate`, если:
+
+- найден operational risk;
+- нужно зафиксировать mitigation/status change риска.
+
+Используй `proposeIncident` / `proposeIncidentUpdate`, если:
+
+- нужно зафиксировать новый incident;
+- нужно предложить resolution, root cause, action items.
+
+Используй `proposePersonNote`, если:
+
+- есть наблюдение о человеке;
+- есть сигнал по стейкхолдеру, который нужно сохранить.
 
 ## Источники данных
 
@@ -35,8 +122,9 @@
 **Задачи, планы, инциденты, риски, люди, знания** — ТОЛЬКО через MCP `memory`:
 - `getContext` — полный контекст сессии
 - `getTasks` — задачи на дату
-- `getRisks` — операционные риски
+- `searchPeople` — люди и stakeholder context
 - `searchKnowledge` — поиск знаний
+- `proposeTask` / `proposeRisk` / `proposeIncident` / `proposePersonNote` — только proposal через intake
 - НЕ читать `plans/today.md` напрямую
 - НЕ читать `workspace/` для оперативных данных
 

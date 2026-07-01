@@ -4,10 +4,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import ru.andreyz.memoryservice.domain.Task;
+import ru.andreyz.memoryservice.dto.AgentProposalResponse;
+import ru.andreyz.memoryservice.dto.IntakeApplyRequest;
+import ru.andreyz.memoryservice.service.IntakeService;
+import ru.andreyz.memoryservice.service.TaskService;
 
 import java.time.LocalDate;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,37 +20,36 @@ class McpTaskToolTest {
     @Autowired
     private TaskTools taskTools;
 
+    @Autowired
+    private IntakeService intakeService;
+
+    @Autowired
+    private TaskService taskService;
+
     @Test
-    void createTask_thenVisibleInGetTasks() {
+    void proposeTask_createsAgentIntakeItem() {
         String today = LocalDate.now().toString();
 
-        Task created = taskTools.createTask("Провести 1-1", today, "HIGH", null, "AGENT");
-        assertThat(created.id()).isNotNull();
-        assertThat(created.title()).isEqualTo("Провести 1-1");
+        AgentProposalResponse created = taskTools.proposeTask("Провести 1-1", today, "HIGH", null, "run-task-1");
+        var intakeItem = intakeService.get(created.intakeId());
 
-        List<Task> tasks = taskTools.getTasks(today, null);
-        assertThat(tasks).anyMatch(t -> t.title().equals("Провести 1-1"));
+        assertThat(created.status()).isEqualTo("NEW");
+        assertThat(created.suggestedRoute()).isEqualTo("TASK");
+        assertThat(intakeItem.sourceType()).isEqualTo("AGENT_MCP");
+        assertThat(intakeItem.createdBy()).isEqualTo("agent-mcp");
+        assertThat(intakeItem.suggestedRoute()).isEqualTo("TASK");
+        assertThat(intakeItem.suggestedPayload().get("title").asText()).isEqualTo("Провести 1-1");
+        assertThat(intakeItem.suggestedPayload().get("date").asText()).isEqualTo(today);
     }
 
     @Test
-    void markTaskDone_changesStatus() {
+    void applyTaskProposal_createsOperationalTask() {
         String today = LocalDate.now().toString();
+        AgentProposalResponse proposal = taskTools.proposeTask("Задача через intake", today, "HIGH", "Описание", "run-task-apply");
 
-        Task task = taskTools.createTask("Задача для завершения", today, null, null, "AGENT");
-        Task done = taskTools.markTaskDone(task.id());
+        intakeService.apply(proposal.intakeId(), new IntakeApplyRequest(null, null, "reviewer"));
 
-        assertThat(done.status()).isEqualTo("DONE");
-    }
-
-    @Test
-    void moveTask_appearsOnTargetDate() {
-        String today = LocalDate.now().toString();
-        String tomorrow = LocalDate.now().plusDays(1).toString();
-
-        Task task = taskTools.createTask("Задача для переноса", today, null, null, "AGENT");
-        Task moved = taskTools.moveTask(task.id(), tomorrow);
-
-        List<Task> tomorrowTasks = taskTools.getTasks(tomorrow, null);
-        assertThat(tomorrowTasks).anyMatch(t -> t.title().equals("Задача для переноса"));
+        assertThat(taskService.findByDate(LocalDate.parse(today)))
+                .anyMatch(task -> task.title().equals("Задача через intake") && "TODO".equals(task.status()));
     }
 }

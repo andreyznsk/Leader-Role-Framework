@@ -1,7 +1,7 @@
-# 2026-07-01_CR-MEM-019: Agent MCP write-tools via Intake Gateway
+# 2026-07-01_CR-MEM-024: Agent MCP write-tools via Intake Gateway
 
 **Дата:** 2026-07-01  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MEM  
 **Тип:** enhancement / architecture / mcp-safety  
 **Связанная задача:** https://github.com/andreyznsk/Leader-Role-Framework/issues/57
@@ -319,20 +319,20 @@ proposeIncident
 
 ## Acceptance Criteria
 
-- [ ] Agent-facing MCP write tools больше не создают Task/Risk/Incident напрямую.
-- [ ] Добавлены proposal tools: `proposeTask`, `proposeRisk`, `proposeIncident`.
-- [ ] При необходимости добавлены `proposeNote`, `proposeKnowledge`, `proposePersonNote`.
-- [ ] Proposal tools создают intake item через `IntakeService.create(...)`.
-- [ ] У intake item выставляется `sourceType = AGENT_MCP`.
-- [ ] `sourcePayload` содержит raw tool input.
-- [ ] `suggestedRoute` корректно выставляется в `TASK | RISK | INCIDENT | NOTE | RAG | PERSON`.
-- [ ] `suggestedPayload` содержит нормализованный payload для Apply.
-- [ ] `/ui/intake` показывает agent proposal.
-- [ ] Пользователь может изменить route/payload и нажать Apply.
-- [ ] Existing `IntakeTargetApplier` создаёт целевую сущность после Apply.
-- [ ] Добавлены E2E сценарии на proposal → intake → apply.
-- [ ] Обновлены RFC/ARCHITECTURE.md после реализации.
-- [ ] CR после подтверждения пользователя переведён в статус `Implemented`, реестр `docs/cr/REGISTRY.md` обновлён.
+- [x] Agent-facing MCP write tools больше не создают Task/Risk/Incident напрямую.
+- [x] Добавлены proposal tools: `proposeTask`, `proposeRisk`, `proposeIncident`.
+- [x] При необходимости добавлены proposal tools для доступных agent write-cases; в текущем scope добавлен `proposePersonNote`.
+- [x] Proposal tools создают intake item через `IntakeService.create(...)`.
+- [x] У intake item выставляется `sourceType = AGENT_MCP`.
+- [x] `sourcePayload` содержит raw tool input.
+- [x] `suggestedRoute` корректно выставляется в `TASK | RISK | INCIDENT | NOTE | RAG | PERSON`.
+- [x] `suggestedPayload` содержит нормализованный payload для Apply.
+- [x] `/ui/intake` показывает agent proposal.
+- [x] Пользователь может изменить route/payload и нажать Apply.
+- [x] Existing `IntakeTargetApplier` создаёт целевую сущность после Apply.
+- [x] Добавлены E2E сценарии на proposal → intake → apply.
+- [x] Обновлены RFC/ARCHITECTURE.md после реализации.
+- [x] CR после подтверждения пользователя переведён в статус `Implemented`, реестр `docs/cr/REGISTRY.md` обновлён.
 
 ## Definition of Done
 

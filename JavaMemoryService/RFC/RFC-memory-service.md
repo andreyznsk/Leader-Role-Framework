@@ -16,7 +16,7 @@
 
 - Хранит оперативный контекст Tech Lead в PostgreSQL (local/prod) / H2 (test)
 - Предоставляет Thymeleaf UI для просмотра и ручного редактирования данных
-- Предоставляет MCP-интерфейс для Claude Agent (чтение/запись задач, планов, инцидентов)
+- Предоставляет MCP-интерфейс для Claude Agent (чтение operational memory и proposal-запись через Intake Gateway)
 - Принимает предложения задач от java-mail-agent (статус PENDING) и ждёт подтверждения через UI
 - Принимает raw capture-заметки в `capture-inbox/`, пакетно классифицирует их через `AgentClient` из `common`
   и маршрутизирует в задачи, риски, заметки, вопросы, RAG inbox или daily journal
@@ -972,28 +972,24 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 |------|----------|----------------------|
 | `getContext` | Полный контекст сессии (today + tomorrow + incidents + risks + people notes) | Старт сессии |
 | `getTasks` | Задачи на конкретную дату + фильтр по статусу | "Скажи план на сегодня" |
-| `createTask` | Создать подтверждённую задачу (source=MANUAL/AGENT) | После явного "да" от пользователя |
-| `markTaskDone` | Задача → DONE | "Отметь задачу X как выполненную" |
-| `moveTask` | Перенести задачу на дату | "Перенеси задачу X на завтра" |
-| `updateTaskStatus` | Изменить статус задачи | Любое изменение статуса |
+| `proposeTask` | Создать proposal задачи в Intake Gateway | Когда агент предлагает новую задачу |
 | `getTaskDescription` | Читать Markdown-описание задачи из PostgreSQL | "Покажи детали задачи X" |
-| `setTaskDescription` | Записать Markdown-описание задачи в PostgreSQL | "Обнови детали задачи X" |
-| `createIncident` | Зафиксировать инцидент | После подтверждения пользователем |
-| `resolveIncident` | Закрыть инцидент с root cause | После подтверждения пользователем |
-| `addRisk` | Добавить риск | После подтверждения пользователем |
-| `updateRisk` | Изменить статус/митигацию риска | После подтверждения пользователем |
-| `addPeopleNote` | Записать заметку о человеке | Наблюдение по итогам встречи и т.д. |
+| `proposeIncident` | Создать proposal инцидента в Intake Gateway | Когда агент предлагает новый incident |
+| `proposeIncidentUpdate` | Создать proposal обновления incident | Когда агент предлагает resolution/update |
+| `proposeRisk` | Создать proposal риска в Intake Gateway | Когда агент предлагает новый risk |
+| `proposeRiskUpdate` | Создать proposal обновления риска | Когда агент предлагает mitigation/status update |
+| `proposePersonNote` | Создать proposal заметки о человеке | Наблюдение по итогам встречи и т.д. |
 | `searchPeople` | Найти человека по имени | "Что я знаю про Иванова?" |
 
 `getTaskDescription` реализован поверх `GET /api/tasks/{id}/description`; source of truth — `memory.task_descriptions`, а markdown-файл создаётся только через export endpoint.
 Task timeline доступен через `GET /api/tasks/{id}/timeline`; любые значимые изменения задачи создают immutable event в `task_events`.
 Today UI также поддерживает inline-смену даты задачи через `PATCH /api/tasks/{id}/date` и batch-операцию `POST /api/tasks/move-overdue-to-today`.
 
-Важно: текущие MCP write-tools ещё не используют Intake Gateway. Agent-originated writes через MCP будут вынесены в отдельный CR.
+Важно: MCP write-tools для агента используют Intake Gateway. Агент не пишет напрямую в `Task` / `Risk` / `Incident`, а создаёт proposal для ручного review в `/ui/intake`.
 
 ### Правило подтверждения (ОБЯЗАТЕЛЬНО в CLAUDE.md агента)
 
-Перед вызовом `createTask`, `createIncident`, `addRisk` агент ВСЕГДА показывает:
+Перед вызовом `proposeTask`, `proposeIncident`, `proposeRisk` агент ВСЕГДА показывает:
 
 ```
 📌 Создать задачу?
@@ -1033,35 +1029,17 @@ public class TaskTools {
         @ToolParam(description = "Date YYYY-MM-DD") String date,
         @ToolParam(description = "Status filter: TODO|IN_PROGRESS|DONE|BLOCKED", required = false) String status) { }
 
-    @Tool(description = "Create a confirmed task. Call only after explicit user confirmation.")
-    public Task createTask(
+    @Tool(description = "Create a task proposal in Intake Gateway.")
+    public AgentProposalResponse proposeTask(
         @ToolParam(description = "Task title") String title,
         @ToolParam(description = "Date YYYY-MM-DD") String date,
         @ToolParam(description = "Priority: LOW|NORMAL|HIGH|CRITICAL", required = false) String priority,
         @ToolParam(description = "Description", required = false) String description,
-        @ToolParam(description = "Source: MANUAL|AGENT") String source) { }
-
-    @Tool(description = "Mark task as DONE")
-    public Task markTaskDone(@ToolParam(description = "Task ID") Long id) { }
-
-    @Tool(description = "Move task to another date")
-    public Task moveTask(
-        @ToolParam(description = "Task ID") Long id,
-        @ToolParam(description = "Target date YYYY-MM-DD") String toDate) { }
-
-    @Tool(description = "Update task status")
-    public Task updateTaskStatus(
-        @ToolParam(description = "Task ID") Long id,
-        @ToolParam(description = "Status: TODO|IN_PROGRESS|DONE|BLOCKED") String status) { }
+        @ToolParam(description = "Optional run/session/source identifier", required = false) String sourceId) { }
 
     @Tool(description = "Get task description from file bus. Returns empty string if no file.")
     public String getTaskDescription(
         @ToolParam(description = "Task ID") Long id) { }
-
-    @Tool(description = "Write or update task description in file bus.")
-    public void setTaskDescription(
-        @ToolParam(description = "Task ID") Long id,
-        @ToolParam(description = "Markdown content") String content) { }
 }
 ```
 
@@ -1244,7 +1222,7 @@ Mail routing в первом этапе выглядит так:
 Если итоговый route = `TASK`, intake apply создаёт pending task, который дальше живёт обычным потоком
 `PENDING -> TODO -> IN_PROGRESS -> DONE`.
 
-**Агент через MCP не участвует в intake-потоке** — его write-tools пока создают сущности напрямую, это отдельный follow-up CR.
+**Агент через MCP участвует в intake-потоке** — его write-tools создают proposal в `intake_items`, а пользователь подтверждает их через `/ui/intake`.
 `NOTICE` письма в этот поток попадают как intake items со `suggestedRoute=RAG`; до ручного Apply они не становятся RAG-документами.
 
 ---
@@ -1268,8 +1246,10 @@ src/test/java/ru/zaytsev/memory/
 └── mcp/
     ├── McpConnectionTest.java       # SSE handshake + tools/list
     ├── McpContextToolTest.java      # getContext
-    ├── McpTaskToolTest.java         # createTask, markDone, move
-    └── McpIncidentToolTest.java     # createIncident, resolve
+    ├── McpTaskToolTest.java         # proposeTask + intake apply
+    ├── McpRiskToolTest.java         # proposeRisk + intake apply
+    ├── McpIncidentToolTest.java     # proposeIncident + intake apply
+    └── McpPeopleToolTest.java       # proposePersonNote
 ```
 
 ### Базовый класс MCP тестов
@@ -1327,36 +1307,28 @@ class McpConnectionTest extends BaseMcpTest {
         assertThat(response.getBody())
             .contains("getContext")
             .contains("getTasks")
-            .contains("createTask")
-            .contains("createIncident")
-            .contains("addRisk");
+            .contains("proposeTask")
+            .contains("proposeIncident")
+            .contains("proposeRisk");
     }
 }
 
 class McpTaskToolTest extends BaseMcpTest {
 
     @Test
-    void createTask_thenVisibleInGetTasks() {
+    void proposeTask_createsIntakeItem() {
         String today = LocalDate.now().toString();
 
-        // создаём задачу
-        ResponseEntity<String> create = callTool("createTask", """
-            {"title":"Провести 1-1","date":"%s","priority":"HIGH","source":"AGENT"}
+        // создаём proposal
+        ResponseEntity<String> create = callTool("proposeTask", """
+            {"title":"Провести 1-1","date":"%s","priority":"HIGH","sourceId":"run-1"}
             """.formatted(today));
         assertThat(create.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-        // проверяем что видна в getTasks
-        ResponseEntity<String> tasks = callTool("getTasks", """
-            {"date":"%s"}
-            """.formatted(today));
-        assertThat(tasks.getBody()).contains("Провести 1-1");
+        assertThat(create.getBody()).contains("Proposal created in Intake Gateway");
     }
 
     @Test
-    void markTaskDone_changesStatus() { ... }
-
-    @Test
-    void moveTask_appearsOnTargetDate() { ... }
+    void applyTaskProposal_createsOperationalTask() { ... }
 }
 
 class McpContextToolTest extends BaseMcpTest {
@@ -1701,7 +1673,7 @@ public record Task(
 После старта сервиса проверить что MCP работает и все tools зарегистрированы:
 
 ```bash
-# tools/list — должен вернуть getContext, getTasks, createTask и др.
+# tools/list — должен вернуть getContext, getTasks, proposeTask и др.
 curl -X POST http://localhost:8082/mcp/message \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'

@@ -60,15 +60,37 @@ public class IntakeTargetApplier {
     }
 
     private String applyTask(JsonNode payload) {
-        Task task = taskService.createPending(
-                requiredText(payload, "title"),
-                optionalText(payload, "description", "body", "summary", "text"),
-                optionalText(payload, "emailId", "sourceId"),
-                optionalText(payload, "sender", "sourceSender"),
-                optionalText(payload, "priority"),
-                null,
-                "intake-gateway"
-        );
+        String title = requiredText(payload, "title");
+        String description = optionalText(payload, "description", "body", "summary", "text");
+        String sourceId = optionalText(payload, "emailId", "sourceId");
+        String sender = optionalText(payload, "sender", "sourceSender");
+        String priority = optionalText(payload, "priority");
+        String dateValue = optionalText(payload, "date", "dueDate");
+        Task task;
+        if (dateValue != null) {
+            LocalDate date = LocalDate.parse(dateValue);
+            String status = normalizeTaskStatus(optionalText(payload, "status"));
+            task = taskService.createConfirmed(
+                    date,
+                    title,
+                    priority,
+                    description,
+                    "intake-gateway",
+                    sourceId,
+                    date,
+                    status
+            );
+        } else {
+            task = taskService.createPending(
+                    title,
+                    description,
+                    sourceId,
+                    sender,
+                    priority,
+                    null,
+                    "intake-gateway"
+            );
+        }
         return "tasks/" + task.id();
     }
 
@@ -141,6 +163,13 @@ public class IntakeTargetApplier {
 
     private String defaultIncidentSeverity(String severity) {
         return severity != null && !severity.isBlank() ? severity : "MEDIUM";
+    }
+
+    private String normalizeTaskStatus(String status) {
+        if (status == null || status.isBlank() || "PENDING".equalsIgnoreCase(status)) {
+            return "TODO";
+        }
+        return status.trim().toUpperCase();
     }
 
     private String applyRag(JsonNode payload, String sourceRef) {
