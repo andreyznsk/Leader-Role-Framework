@@ -766,7 +766,7 @@ Base: `http://localhost:8082/ui`
 - Группировка пунктов:
   - **Операционная работа** — Today, Intake Gateway, Notes, Capture Inbox
   - **Контекст и риски** — People, Risks, Incidents
-  - **Знания** — Global Search (`/ui/search`, релоцирован в `/ui/agent-workspace?tab=search`, CR-MEM-012), Knowledge
+  - **Знания** — Global Search (`/ui/search`, standalone-страница; была временно релоцирована в `/ui/agent-workspace?tab=search` в CR-MEM-012, вынесена обратно отдельной top-level страницей в CR-MEM-022), Knowledge
   - **Автоматизация** — Agent Workspace, Control Plane (Settings), Usage Stats
   - **Система** — Presentation
 - Корневой элемент — `<nav data-testid="leaderos-sidebar">`, используется как navigation marker в E2E smoke-тестах.
@@ -926,6 +926,13 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 - stdout/stderr отображаются потоково с временными метками
 - Закрытие вкладки / WebSocket завершает процесс
 - `xterm.js` не используется в этом CR (простая браузерная консоль)
+
+**`/ui/search`** — Global Search (CR-MEM-009/015, un-relocated from Agent Workspace in CR-MEM-022)
+
+Standalone top-level страница, обслуживается `SearchViewController`, рендерит `search.html`.
+Параметры: `q` (query), `mode` (`QUICK`/`DEEP`), `layers` (multi), `preset` (`notice`/`everything`/`documentation`/`people_tasks`).
+Форма — обычный `GET`, полная перезагрузка страницы (без AJAX). Результаты группируются по layer (`resultsByLayer`), AI Summary показывается только в `DEEP` mode.
+`/ui/agent-workspace` больше не содержит Search-вкладку — только `Chat` и `Console`.
 
 **Global Search → edit-flow navigation**
 - Результат `TASK` обязан вести сразу в `/ui/tasks/{id}/edit`.

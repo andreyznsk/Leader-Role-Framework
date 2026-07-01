@@ -210,6 +210,7 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `GET` | `/ui/today` | Web UI: план дня |
 | `GET` | `/ui/notes` | Web UI: Operational Notes |
 | `GET` | `/ui/captures` | Web UI: Capture Inbox |
+| `GET` | `/ui/search` | Web UI: Global Search — standalone top-level страница (CR-MEM-022, un-relocated из Agent Workspace) |
 | `GET` | `/ui/knowledge` | Web UI: Knowledge Gateway для RAG lifecycle |
 | `GET` | `/ui/intake` | Web UI: Intake Gateway для ручного review автоматических входящих сигналов |
 | `GET` | `/ui/stats` | Web UI: статистика использования и saved time |
