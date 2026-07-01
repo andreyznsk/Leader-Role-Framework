@@ -752,6 +752,25 @@ Endpoint: `/ws/agent-console`
 
 Base: `http://localhost:8082/ui`
 
+### Глобальная навигация (CR-MEM-022: Left Sidebar)
+
+Все `/ui/*` страницы используют общий Thymeleaf-фрагмент `fragments/layout.html :: sidebar` —
+левое боковое меню вместо верхнего navbar.
+
+- **Expanded** (`~264px`): логотип `LeaderOS`, группы с заголовками, иконка + label у каждого пункта.
+- **Collapsed** (`72px`, кнопка `#los-collapse-btn`): только иконки, hover-tooltip с названием пункта. Main content расширяется (offset считается через CSS-переменную `--los-sidebar-w`, переключается классом `html.los-collapsed`).
+- Состояние collapse хранится в `localStorage` (`leaderos.sidebar.collapsed`) и применяется до первого рендера страницы (anti-FOUC inline script в `head`-фрагменте), чтобы избежать скачка layout при переходах между страницами.
+- **Mobile** (`<992px`): sidebar скрыт по умолчанию, показывается кнопка-гамбургер (`#los-mobile-toggle`) в слим top bar; открывается как overlay drawer с backdrop; клик по пункту меню закрывает drawer.
+- Активный пункт подсвечивается по `window.location.pathname` (JS в фрагменте, класс `.los-nav-item.active`).
+- Группировка пунктов:
+  - **Операционная работа** — Today, Intake Gateway, Notes, Capture Inbox
+  - **Контекст и риски** — People, Risks, Incidents
+  - **Знания** — Global Search (`/ui/search`, релоцирован в `/ui/agent-workspace?tab=search`, CR-MEM-012), Knowledge
+  - **Автоматизация** — Agent Workspace, Control Plane (Settings), Usage Stats
+  - **Система** — Presentation
+- Корневой элемент — `<nav data-testid="leaderos-sidebar">`, используется как navigation marker в E2E smoke-тестах.
+- Верхний navbar (`.los-navbar` / `.los-links`) удалён из `style.css`, заменён на `.los-sidebar` / `.los-nav-item`.
+
 ### Страницы
 
 **`/ui/today`** — Главная страница
@@ -920,7 +939,7 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 
 ### Технические требования UI
 - Bootstrap 5 CDN + `static/style.css`
-- Thymeleaf fragments: `fragments/layout.html` (nav + head)
+- Thymeleaf fragments: `fragments/layout.html` (`head` + `sidebar`, CR-MEM-022 — левый sidebar вместо верхнего navbar)
 - Формы через POST (не AJAX) — проще и надёжнее для MVP
 - Для PUT из HTML-форм включён `spring.mvc.hiddenmethod.filter.enabled=true`
   и используется hidden input `_method=PUT`

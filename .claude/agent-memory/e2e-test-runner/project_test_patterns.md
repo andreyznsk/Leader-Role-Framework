@@ -147,6 +147,43 @@ regex `/Сохранить/` матчит ОБА кнопки: "💾 Сохра�
 - Дополнительно найден и исправлен `today-ui.spec.js` (не входил в исходный diff CR, но сломан теми же иконками на кнопках Save/Save-close): `getByRole('button', { name: 'Сохранить', exact: true })` не матчит `"💾 Сохранить"` — заменено на `button[value="save"]` / `button[value="save_close"]`, тот же паттерн что и в task-timeline-ui.spec.js.
 - Сервис нужно перезапускать через `./test-runner/start-services.sh --service JavaMemoryService --profile local` (не голым `java -jar`) — иначе поднимается на дефолтном H2 без профиля `local`, что ломает Flyway-миграции (`JSONB` не поддерживается H2 → CRASH при старте).
 
+### CR-MEM-022 прогон (2026-07-01, sidebar-navigation.spec.js, branch feature/MEM-023-2026-06-30)
+
+Новый тест `sidebar-navigation.spec.js` (14 тестов) для рефакторинга layout.html (topbar → left sidebar). 12/14 PASS, 2 FAIL — оба FAIL являются багами САМОГО ТЕСТА, не приложения:
+
+1. **"collapsing the sidebar persists across navigation via localStorage" (строка 27-44)** — FAIL.
+   Причина: `beforeEach` вызывает `page.addInitScript(() => localStorage.removeItem('leaderos.sidebar.collapsed'))`.
+   `addInitScript` выполняется ПЕРЕД КАЖДОЙ навигацией в рамках теста (не только один раз при первом goto) — так что `page.goto('/ui/notes')` внутри теста заново стирает только что установленный `collapsed=true` ДО того как head-скрипт layout.html успевает его прочитать.
+   Подтверждено вручную (debug-скрипт с `chromium.launch()`): localStorage реально становится `null` после второй навигации именно из-за init-script, а не из-за багов в приложении.
+   **Фикс теста:** выносить `addInitScript` только в `test.beforeEach` для первого goto, либо использовать `page.evaluate(() => localStorage.removeItem(...))` один раз до первого `page.goto`, а не `addInitScript`.
+
+2. **"mobile viewport hides sidebar behind a drawer toggle" (строка 46-60)** — FAIL на первой же проверке (до клика на toggle).
+   Тест использует `await expect(sidebar).toBeInViewport({ ratio: 0 })` ожидая что это подтверждает "sidebar скрыт". На деле по докам Playwright 1.61: `ratio: 0` означает "element should intersect viewport at any positive ratio" — т.е. это требование, что элемент ЧАСТИЧНО виден, полная противоположность намерению теста.
+   Подтверждено вручную: на mobile viewport 390×844 сайдбар реально скрыт через `transform: translateX(-280px)` (bounding box `x:-280, width:280` — впритык к левому краю, ratio пересечения = 0), т.е. верстка работает корректно.
+   **Фикс теста:** заменить на `await expect(sidebar).not.toBeInViewport();` для проверки состояния "скрыт", `toBeInViewport()` без опций — уже используется в этом же тесте после клика на toggle (строка 55) для проверки "виден", это корректно.
+
+**Why:** оба дефекта — в тесте, не в приложении (`layout.html` рефакторинг сам по себе не сломан). Верифицировано отдельными debug-скриптами через `chromium.launch()` напрямую (не через test runner), логируя `localStorage`/`classList`/`boundingBox` вручную.
+**How to apply:** при повторных прогонах sidebar-navigation.spec.js — эти 2 FAIL ожидаемы, пока тест не подправлен. Не относить на счёт регрессии layout/CSS.
+
+**UPDATE 2026-07-01 (тот же день):** оба фикса применены в `sidebar-navigation.spec.js` — `beforeEach` теперь делает `page.goto('/ui/today')` + `page.evaluate(() => localStorage.removeItem(...))` вместо `addInitScript`; mobile-тест использует `.not.toBeInViewport()`. Повторный прогон: 14/14 PASS. Больше не ожидать эти 2 FAIL.
+
+### Полный прогон test_e2e/tests/*.spec.js после CR-MEM-022 (2026-07-01)
+
+68 тестов всего (54 старых + 14 новых sidebar). 57 PASS, 11 FAIL:
+- 2 FAIL — sidebar-navigation.spec.js (баги теста, см. выше)
+- 1 FAIL — capturebot-ui.spec.js "clicking filter button reloads history with correct status" — уже известный order-dependent флейк (см. ниже, не связан с CR-MEM-022)
+- 8 FAIL — capturebot-ui.spec.js секция "4. CaptureRouter — all route types create downstream entities" (TASK/RISK/NOTE/QUESTION/KNOWLEDGE/PERSON_NOTE), все с одинаковым паттерном: `expect(capture.routedTo).toContain('risks'/'notes'/...)` получает `"intake/{uuid}"` вместо прямого пути.
+
+**Root cause (НЕ регрессия CR-MEM-022):** коммит `23150e4 "Intake done"` (до текущей ветки) переписал `CaptureRouter.route()` — теперь ВСЕГДА создаёт `IntakeItemDto` через `IntakeService.create()` и возвращает `"intake/" + created.id()`, вместо прямого роутинга в notes/risks/tasks/etc. Это архитектурное изменение (Intake Gateway workflow — с этим связан новый пункт "Intake Gateway" в сайдбаре из CR-MEM-022). Файл `capturebot-ui.spec.js` не был обновлён под новую архитектуру и содержит устаревшие ассерты на прямой роутинг.
+Подтверждено: `git status` показывает что в текущей ветке изменены только `.html`/`style.css` (layout-related), Java-код `CaptureRouter.java`/`CaptureProcessingService.java` не менялся — то есть это pre-existing несоответствие теста архитектуре, никак не связанное с сегодняшним sidebar CR.
+**How to apply:** при будущих прогонах capturebot-ui.spec.js секция 4 — ожидать эти 8 FAIL пока тест не переписан под Intake Gateway (например: assert `capture.routedTo` начинается с `"intake/"`, затем проверять `suggestedRoute`/`GET /api/intake/{id}` вместо `GET /api/risks|notes|...`). Не путать с регрессией от layout/CSS изменений.
+- Другие сьюты (today-ui, task-edit-right-control-panel — включая mobile viewport тест, search-ui, task-timeline-ui, 14_today_hide_done_filter) — 26/26 PASS, без регрессий от sidebar/CSS изменений.
+- В логах JavaMemoryService.log во время прогона — только `FileAlreadyExistsException: capture-inbox/.../HH-mm-ss-N.md` (коллизия имени файла при параллельном создании captures в capturebot-ui.spec.js, `fullyParallel: true` в конфиге) — инфраструктурный флейк, не связан с layout.
+
+### Важно: путь до корня репозитория в этой сессии
+
+В этой сессии реальный корень репозитория — `/home/andreyz/IdeaProjects/claude/Leader-Role-Framework/` (git worktree с префиксом `claude`), а НЕ `/home/andreyz/IdeaProjects/Leader-Role-Framework/` (путь без `claude/`, который иногда фигурирует в системных промптах/описании агента). Проверять фактический cwd/наличие файлов перед использованием пути из инструкций — раньше приводило к ложному "AGENT.md недоступен".
+
 ## MailAgent E2E — инфраструктурные паттерны (2026-06-25)
 
 ### Maildev доступ
