@@ -1,0 +1,1 @@
+-- H2 test override: base PostgreSQL migration is replaced by V17_1__mail_linking_pending_tasks_h2_compat.sql.

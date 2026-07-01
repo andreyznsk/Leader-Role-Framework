@@ -112,8 +112,8 @@ class MailAgentJobTest {
 
         verify(mailClient).listUnread("INBOX", 20);
         verify(mailClient).listUnread("Team", 20);
-        verify(actionExecutor).execute(eq(first), any());
-        verify(actionExecutor).execute(eq(second), any());
+        verify(actionExecutor).execute(eq(first), any(), eq("prompt"), contains("NOISE"));
+        verify(actionExecutor).execute(eq(second), any(), eq("prompt"), contains("NOISE"));
     }
 
     @Test
@@ -162,8 +162,8 @@ class MailAgentJobTest {
             "INBOX"
         );
         return ProcessedEmail.newProcessing(email, "REQUEST", LocalDateTime.now())
-            .withCheckpoint("REQUEST", ru.andreyz.mailagent.model.MailProcessingRoute.MEMORY_PENDING_TASK,
-                "{\"taskLine\":\"- [ ] test\"}", null, null, LocalDateTime.now())
+            .withCheckpoint("REQUEST", ru.andreyz.mailagent.model.MailProcessingRoute.INTAKE_WRITE,
+                "{\"responseType\":\"REQUEST\",\"intakeRequest\":{\"suggestedRoute\":\"TASK\"},\"sourceId\":\"" + emailId + "\",\"processedFolder\":null,\"moveEnabled\":true,\"markAsRead\":false}", null, null, LocalDateTime.now())
             .withError("memory down", LocalDateTime.now());
     }
 

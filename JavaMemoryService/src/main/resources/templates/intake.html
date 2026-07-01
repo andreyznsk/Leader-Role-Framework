@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
+<head th:replace="fragments/layout :: head('Intake Gateway')"></head>
+<body>
+<nav th:replace="fragments/layout :: nav"></nav>
+
+<main class="container-fluid py-3 px-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <h4 class="mb-1">Intake Gateway</h4>
+            <div class="text-muted small">Ручная очередь перед задачами, заметками, людьми, инцидентами, рисками и RAG</div>
+        </div>
+        <form method="get" action="/ui/intake" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1" for="status">Status</label>
+                <select class="form-select form-select-sm" id="status" name="status">
+                    <option value="">All</option>
+                    <option th:each="value : ${statusOptions}" th:value="${value}" th:text="${value}"
+                            th:selected="${activeStatus == value}">NEW</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1" for="sourceType">Source</label>
+                <select class="form-select form-select-sm" id="sourceType" name="sourceType">
+                    <option value="">All</option>
+                    <option th:each="value : ${sourceOptions}" th:value="${value}" th:text="${value}"
+                            th:selected="${activeSourceType == value}">MAIL</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1" for="suggestedRoute">Suggested route</label>
+                <select class="form-select form-select-sm" id="suggestedRoute" name="suggestedRoute">
+                    <option value="">All</option>
+                    <option th:each="value : ${routeOptions}" th:value="${value}" th:text="${value}"
+                            th:selected="${activeSuggestedRoute == value}">RAG</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-primary" type="submit">Filter</button>
+            </div>
+        </form>
+    </div>
+
+    <div th:if="${#lists.isEmpty(items)}" class="text-muted border rounded p-4">
+        Intake queue is empty for selected filters.
+    </div>
+
+    <div class="d-grid gap-3">
+        <section th:each="item : ${items}" class="card p-3 shadow-sm">
+            <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+                <div>
+                    <div class="small text-muted" th:text="${item.sourceId != null ? item.sourceType + ' · ' + item.sourceId : item.sourceType}">MAIL</div>
+                    <div class="fw-semibold" th:text="${item.suggestedRoute != null ? item.suggestedRoute : 'Unclassified'}">RAG</div>
+                </div>
+                <div class="text-end small text-muted">
+                    <div th:text="${item.status}">NEW</div>
+                    <div th:text="${item.confidence != null ? 'confidence ' + item.confidence : item.createdAt}">confidence 0.87</div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <label class="form-label small text-muted mb-1">Original payload</label>
+                    <pre class="form-control bg-dark text-light border-secondary small"
+                         style="min-height: 180px; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto;"
+                         th:text="${item.sourcePayload}">payload</pre>
+                </div>
+                <div class="col-lg-6">
+                    <label class="form-label small text-muted mb-1">Final payload</label>
+                    <textarea class="form-control font-monospace small intake-final-payload bg-dark text-light border-secondary"
+                              rows="10"
+                              style="overflow: auto; resize: vertical;"
+                              th:attr="data-item-id=${item.id}"
+                              th:text="${item.finalPayload != null ? item.finalPayload : item.suggestedPayload}">{}</textarea>
+                </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+                <div class="col-lg-6">
+                    <details th:if="${item.agentPrompt != null}">
+                        <summary class="small text-muted">Agent prompt</summary>
+                        <pre class="form-control bg-dark text-light border-secondary small mt-2"
+                             style="min-height: 160px; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto;"
+                             th:text="${item.agentPrompt}">prompt</pre>
+                    </details>
+                </div>
+                <div class="col-lg-6">
+                    <details th:if="${item.agentResult != null}">
+                        <summary class="small text-muted">Agent result</summary>
+                        <pre class="form-control bg-dark text-light border-secondary small mt-2"
+                             style="min-height: 160px; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto;"
+                             th:text="${item.agentResult}">result</pre>
+                    </details>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap align-items-end gap-2 mt-3">
+                <div>
+                    <label class="form-label small text-muted mb-1">Target receiver</label>
+                    <select class="form-select form-select-sm intake-final-route" th:attr="data-item-id=${item.id}">
+                        <option th:each="route : ${routeOptions}"
+                                th:value="${route}"
+                                th:text="${route}"
+                                th:selected="${(item.finalRoute != null ? item.finalRoute : item.suggestedRoute) == route}">RAG</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        th:attr="data-item-id=${item.id}"
+                        onclick="saveIntakeItem(this.dataset.itemId)">Save changes</button>
+                <button type="button" class="btn btn-sm btn-primary"
+                        th:attr="data-item-id=${item.id}"
+                        onclick="applyIntakeItem(this.dataset.itemId)">Apply</button>
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                        th:attr="data-item-id=${item.id}"
+                        onclick="rejectIntakeItem(this.dataset.itemId)">Reject</button>
+                <span class="small text-muted" th:if="${item.appliedAt != null}" th:text="${'Applied at ' + item.appliedAt}">Applied at</span>
+                <span class="small text-muted" th:if="${item.rejectReason != null}" th:text="${'Reject reason: ' + item.rejectReason}">reason</span>
+            </div>
+        </section>
+    </div>
+</main>
+
+<script>
+    function intakePayload(id) {
+        const payloadField = document.querySelector('.intake-final-payload[data-item-id="' + id + '"]');
+        const routeField = document.querySelector('.intake-final-route[data-item-id="' + id + '"]');
+        return {
+            finalRoute: routeField ? routeField.value : null,
+            finalPayload: payloadField ? payloadField.value : null,
+            reviewedBy: 'ui'
+        };
+    }
+
+    async function saveIntakeItem(id) {
+        await window.LeaderUiApi.request('/api/intake/' + id, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(intakePayload(id))
+        });
+        window.location.reload();
+    }
+
+    async function applyIntakeItem(id) {
+        await window.LeaderUiApi.request('/api/intake/' + id + '/apply', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(intakePayload(id))
+        });
+        window.location.reload();
+    }
+
+    async function rejectIntakeItem(id) {
+        await window.LeaderUiApi.request('/api/intake/' + id + '/reject', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({reason: 'noise', reviewedBy: 'ui'})
+        });
+        window.location.reload();
+    }
+</script>
+</body>
+</html>
