@@ -25,7 +25,7 @@ public class V19__intake_gateway extends BaseJavaMigration {
                     CREATE TABLE IF NOT EXISTS intake_items (
                         id UUID PRIMARY KEY,
                         source_type VARCHAR(32) NOT NULL,
-                        source_id CLOB,
+                        source_id VARCHAR(512),
                         source_payload_json CLOB,
                         source_text CLOB,
                         agent_provider VARCHAR(32),

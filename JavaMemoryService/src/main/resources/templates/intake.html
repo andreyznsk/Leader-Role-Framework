@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
 <head th:replace="fragments/layout :: head('Intake Gateway')"></head>
 <body>
 <nav th:replace="fragments/layout :: nav"></nav>
 
-<main class="container py-4">
+<main class="container-fluid py-3 px-4">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
         <div>
             <h4 class="mb-1">Intake Gateway</h4>
@@ -46,7 +46,7 @@
     </div>
 
     <div class="d-grid gap-3">
-        <section th:each="item : ${items}" class="border rounded bg-white p-3 shadow-sm">
+        <section th:each="item : ${items}" class="card p-3 shadow-sm">
             <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
                 <div>
                     <div class="small text-muted" th:text="${item.sourceId != null ? item.sourceType + ' · ' + item.sourceId : item.sourceType}">MAIL</div>
@@ -61,12 +61,15 @@
             <div class="row g-3">
                 <div class="col-lg-6">
                     <label class="form-label small text-muted mb-1">Original payload</label>
-                    <pre class="form-control bg-body-tertiary small" style="min-height: 180px;" th:text="${item.sourcePayload}">payload</pre>
+                    <pre class="form-control bg-dark text-light border-secondary small"
+                         style="min-height: 180px; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto;"
+                         th:text="${item.sourcePayload}">payload</pre>
                 </div>
                 <div class="col-lg-6">
                     <label class="form-label small text-muted mb-1">Final payload</label>
-                    <textarea class="form-control font-monospace small intake-final-payload"
+                    <textarea class="form-control font-monospace small intake-final-payload bg-dark text-light border-secondary"
                               rows="10"
+                              style="overflow: auto; resize: vertical;"
                               th:attr="data-item-id=${item.id}"
                               th:text="${item.finalPayload != null ? item.finalPayload : item.suggestedPayload}">{}</textarea>
                 </div>
@@ -76,13 +79,17 @@
                 <div class="col-lg-6">
                     <details th:if="${item.agentPrompt != null}">
                         <summary class="small text-muted">Agent prompt</summary>
-                        <pre class="form-control bg-body-tertiary small mt-2" style="min-height: 160px;" th:text="${item.agentPrompt}">prompt</pre>
+                        <pre class="form-control bg-dark text-light border-secondary small mt-2"
+                             style="min-height: 160px; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto;"
+                             th:text="${item.agentPrompt}">prompt</pre>
                     </details>
                 </div>
                 <div class="col-lg-6">
                     <details th:if="${item.agentResult != null}">
                         <summary class="small text-muted">Agent result</summary>
-                        <pre class="form-control bg-body-tertiary small mt-2" style="min-height: 160px;" th:text="${item.agentResult}">result</pre>
+                        <pre class="form-control bg-dark text-light border-secondary small mt-2"
+                             style="min-height: 160px; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto;"
+                             th:text="${item.agentResult}">result</pre>
                     </details>
                 </div>
             </div>

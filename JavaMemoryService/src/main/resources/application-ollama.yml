@@ -1,6 +1,8 @@
 # Профиль: Ollama локальный (агентский режим)
 # Запуск: --spring.profiles.active=ollama
 # Модель: qwen3:8b — локальная Ollama localhost:11434
+server:
+  port: 8090
 
 spring:
   datasource:

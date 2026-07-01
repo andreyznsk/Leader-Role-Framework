@@ -11,7 +11,6 @@ import ru.andreyz.memoryservice.dto.IntakeCreateRequest;
 import ru.andreyz.memoryservice.dto.IntakeItemDto;
 import ru.andreyz.memoryservice.dto.IntakeRejectRequest;
 import ru.andreyz.memoryservice.dto.IntakeUpdateRequest;
-import ru.andreyz.memoryservice.repository.IntakeItemRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,21 +24,21 @@ import java.util.stream.StreamSupport;
 @Service
 public class IntakeService {
 
-    private final IntakeItemRepository intakeItemRepository;
+    private final IntakeStore intakeStore;
     private final IntakeTargetApplier intakeTargetApplier;
     private final ObjectMapper objectMapper;
 
-    public IntakeService(IntakeItemRepository intakeItemRepository,
+    public IntakeService(IntakeStore intakeStore,
                          IntakeTargetApplier intakeTargetApplier,
                          ObjectMapper objectMapper) {
-        this.intakeItemRepository = intakeItemRepository;
+        this.intakeStore = intakeStore;
         this.intakeTargetApplier = intakeTargetApplier;
         this.objectMapper = objectMapper;
     }
 
     public IntakeItemDto create(IntakeCreateRequest request) {
         Instant now = Instant.now();
-        IntakeItem created = intakeItemRepository.save(new IntakeItem(
+        IntakeItem created = intakeStore.save(new IntakeItem(
                 UUID.randomUUID(),
                 normalizeRequired(request.sourceType(), "sourceType"),
                 blankToNull(request.sourceId()),
@@ -79,13 +78,19 @@ public class IntakeService {
                 .toList();
     }
 
+    public int countNew() {
+        return (int) streamAll()
+                .filter(item -> "NEW".equals(item.status()))
+                .count();
+    }
+
     public IntakeItemDto get(UUID id) {
         return toDto(findRequired(id));
     }
 
     public IntakeItemDto update(UUID id, IntakeUpdateRequest request) {
         IntakeItem existing = findRequired(id);
-        IntakeItem updated = intakeItemRepository.save(new IntakeItem(
+        IntakeItem updated = intakeStore.save(new IntakeItem(
                 existing.id(),
                 existing.sourceType(),
                 existing.sourceId(),
@@ -122,7 +127,7 @@ public class IntakeService {
                 : parseStoredJson(existing.finalPayloadJson(), existing.suggestedPayloadJson());
         intakeTargetApplier.apply(finalRoute, finalPayload, existing.id().toString());
 
-        IntakeItem applied = intakeItemRepository.save(new IntakeItem(
+        IntakeItem applied = intakeStore.save(new IntakeItem(
                 existing.id(),
                 existing.sourceType(),
                 existing.sourceId(),
@@ -151,7 +156,7 @@ public class IntakeService {
 
     public IntakeItemDto reject(UUID id, IntakeRejectRequest request) {
         IntakeItem existing = findRequired(id);
-        IntakeItem rejected = intakeItemRepository.save(new IntakeItem(
+        IntakeItem rejected = intakeStore.save(new IntakeItem(
                 existing.id(),
                 existing.sourceType(),
                 existing.sourceId(),
@@ -180,13 +185,13 @@ public class IntakeService {
 
     private java.util.stream.Stream<IntakeItem> streamAll() {
         return StreamSupport.stream(
-                Spliterators.spliteratorUnknownSize(intakeItemRepository.findAll().iterator(), 0),
+                Spliterators.spliteratorUnknownSize(intakeStore.findAll().iterator(), 0),
                 false
         );
     }
 
     private IntakeItem findRequired(UUID id) {
-        return intakeItemRepository.findById(id)
+        return intakeStore.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Intake item not found: " + id));
     }
 

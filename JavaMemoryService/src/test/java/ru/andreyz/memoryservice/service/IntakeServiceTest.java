@@ -11,7 +11,6 @@ import ru.andreyz.memoryservice.dto.IntakeApplyRequest;
 import ru.andreyz.memoryservice.dto.IntakeCreateRequest;
 import ru.andreyz.memoryservice.dto.IntakeRejectRequest;
 import ru.andreyz.memoryservice.dto.IntakeUpdateRequest;
-import ru.andreyz.memoryservice.repository.IntakeItemRepository;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -27,16 +26,16 @@ import static org.mockito.Mockito.when;
 
 class IntakeServiceTest {
 
-    private IntakeItemRepository repository;
+    private IntakeStore intakeStore;
     private IntakeTargetApplier targetApplier;
     private IntakeService service;
 
     @BeforeEach
     void setUp() {
-        repository = mock(IntakeItemRepository.class);
+        intakeStore = mock(IntakeStore.class);
         targetApplier = mock(IntakeTargetApplier.class);
-        service = new IntakeService(repository, targetApplier, new ObjectMapper());
-        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        service = new IntakeService(intakeStore, targetApplier, new ObjectMapper());
+        when(intakeStore.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -86,8 +85,8 @@ class IntakeServiceTest {
                 null,
                 null
         );
-        when(repository.findById(id)).thenReturn(Optional.of(existing));
-        when(repository.findAll()).thenReturn(List.of(existing));
+        when(intakeStore.findById(id)).thenReturn(Optional.of(existing));
+        when(intakeStore.findAll()).thenReturn(List.of(existing));
         when(targetApplier.apply("NOTE", JsonNodeFactory.instance.objectNode().put("title", "Updated note"), id.toString()))
                 .thenReturn("notes/1");
 

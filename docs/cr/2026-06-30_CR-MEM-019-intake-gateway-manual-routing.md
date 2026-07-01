@@ -1,7 +1,7 @@
 # 2026-06-30_CR-MEM-019: Intake Gateway — ручной входящий гейтвей
 
 **Дата:** 2026-06-30  
-**Статус:** Draft  
+**Статус:** DONE  
 **Сервис:** MEM  
 **Зависимости:** JavaMemoryService, JavaMailAgent, JavaRagService, common AgentClient, Global Search
 

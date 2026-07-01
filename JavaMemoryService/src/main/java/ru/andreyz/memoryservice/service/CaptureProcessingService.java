@@ -5,12 +5,15 @@ import ru.andreyz.memoryservice.domain.Capture;
 import ru.andreyz.memoryservice.domain.Risk;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.domain.UsageEventType;
-import ru.andreyz.memoryservice.dto.ContextDto;
 import ru.andreyz.memoryservice.dto.ClassifiedCapture;
+import ru.andreyz.memoryservice.dto.ContextDto;
 import ru.andreyz.memoryservice.dto.UsageEventCommand;
+import ru.andreyz.memoryservice.service.CaptureClassifierAgent.ClassificationBatch;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
@@ -42,9 +45,12 @@ public class CaptureProcessingService {
                 .toList();
         processingIds.forEach(id -> captureService.markProcessing(id));
 
-        List<ClassifiedCapture> classified;
+        Map<String, String> pendingTextByFile = new HashMap<>();
+        pending.forEach(file -> pendingTextByFile.put(file.file(), file.text()));
+
+        ClassificationBatch batch;
         try {
-            classified = classifierAgent.classifyFiles(pending, buildDayContext());
+            batch = classifierAgent.classifyFilesWithTrace(pending, buildDayContext());
         } catch (Exception e) {
             log.error("Classification failed: {}", e.getMessage(), e);
             processingIds.forEach(id -> captureService.markError(id, e.getMessage()));
@@ -52,9 +58,15 @@ public class CaptureProcessingService {
         }
 
         int routed = 0;
-        for (ClassifiedCapture c : classified) {
+        for (ClassifiedCapture c : batch.items()) {
             try {
-                String routedTo = captureRouter.route(c);
+                String routedTo = captureRouter.route(
+                        c,
+                        pendingTextByFile.get(c.file()),
+                        batch.prompt(),
+                        batch.rawResult(),
+                        batch.agentProvider()
+                );
                 if (c.captureId() != null) {
                     captureService.markProcessed(c.captureId(), c.type(), routedTo);
                 }
@@ -96,16 +108,22 @@ public class CaptureProcessingService {
         try {
             CaptureService.CaptureFile file = new CaptureService.CaptureFile(
                     String.valueOf(id), capture.rawText());
-            List<ClassifiedCapture> classified = classifierAgent.classifyFiles(
+            ClassificationBatch batch = classifierAgent.classifyFilesWithTrace(
                     List.of(file), buildDayContext());
 
-            if (classified.isEmpty()) {
+            if (batch.items().isEmpty()) {
                 captureService.markError(id, "No classification result returned");
                 return;
             }
 
-            ClassifiedCapture c = classified.get(0);
-            String routedTo = captureRouter.route(c);
+            ClassifiedCapture c = batch.items().get(0);
+            String routedTo = captureRouter.route(
+                    c,
+                    capture.rawText(),
+                    batch.prompt(),
+                    batch.rawResult(),
+                    batch.agentProvider()
+            );
             captureService.markProcessed(id, c.type(), routedTo);
 
             usageEventService.record(new UsageEventCommand(
