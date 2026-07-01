@@ -4,6 +4,8 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 import ru.andreyz.memoryservice.domain.Task;
+import ru.andreyz.memoryservice.dto.AgentProposalResponse;
+import ru.andreyz.memoryservice.service.AgentIntakeProposalService;
 import ru.andreyz.memoryservice.service.TaskDescriptionService;
 import ru.andreyz.memoryservice.service.TaskService;
 
@@ -15,10 +17,14 @@ public class TaskTools {
 
     private final TaskService taskService;
     private final TaskDescriptionService taskDescriptionService;
+    private final AgentIntakeProposalService agentIntakeProposalService;
 
-    public TaskTools(TaskService taskService, TaskDescriptionService taskDescriptionService) {
+    public TaskTools(TaskService taskService,
+                     TaskDescriptionService taskDescriptionService,
+                     AgentIntakeProposalService agentIntakeProposalService) {
         this.taskService = taskService;
         this.taskDescriptionService = taskDescriptionService;
+        this.agentIntakeProposalService = agentIntakeProposalService;
     }
 
     @Tool(description = "Get tasks for a specific date. Optionally filter by status.")
@@ -31,29 +37,26 @@ public class TaskTools {
                 : taskService.findByDate(localDate);
     }
 
-    @Tool(description = "Create a confirmed task. IMPORTANT: Call only after explicit user confirmation ('да', 'ок', 'добавить').")
-    public Task createTask(
+    @Tool(description = "Create a task proposal in Intake Gateway. This does not write directly to tasks. User must review and apply it in /ui/intake.")
+    public AgentProposalResponse proposeTask(
             @ToolParam(description = "Task title") String title,
             @ToolParam(description = "Date YYYY-MM-DD") String date,
             @ToolParam(description = "Priority: LOW|NORMAL|HIGH|CRITICAL", required = false) String priority,
             @ToolParam(description = "Task description", required = false) String description,
-            @ToolParam(description = "Source: MANUAL|AGENT") String source) {
-        return taskService.createConfirmed(LocalDate.parse(date), title, priority, description, source, null);
+            @ToolParam(description = "Optional run/session/source identifier", required = false) String sourceId) {
+        return agentIntakeProposalService.createTaskProposal(title, date, priority, description, sourceId);
     }
 
-    @Tool(description = "Mark task as DONE")
     public Task markTaskDone(@ToolParam(description = "Task ID") Long id) {
         return taskService.markDone(id);
     }
 
-    @Tool(description = "Move task to another date")
     public Task moveTask(
             @ToolParam(description = "Task ID") Long id,
             @ToolParam(description = "Target date YYYY-MM-DD") String toDate) {
         return taskService.moveToDate(id, LocalDate.parse(toDate));
     }
 
-    @Tool(description = "Update task status")
     public Task updateTaskStatus(
             @ToolParam(description = "Task ID") Long id,
             @ToolParam(description = "Status: TODO|IN_PROGRESS|DONE|BLOCKED") String status) {
@@ -65,7 +68,6 @@ public class TaskTools {
         return taskDescriptionService.getContent(id);
     }
 
-    @Tool(description = "Write or update the markdown description of a task in the database.")
     public void setTaskDescription(
             @ToolParam(description = "Task ID") Long id,
             @ToolParam(description = "Markdown content") String content) {

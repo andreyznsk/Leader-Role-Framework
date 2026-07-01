@@ -103,6 +103,25 @@ class ActionExecutorTest {
     }
 
     @Test
+    void noiseFallsBackToEmailIdWhenResponseEmailIdIsNull() throws Exception {
+        Path inbox = tempDir.resolve("inbox");
+        Files.createDirectories(inbox);
+        String emailId = "test-noise-null-email-id-001";
+        Files.writeString(inbox.resolve(emailId + ".json"), "{}");
+
+        AgentResponse response = new AgentResponse(
+            AgentResponseType.NOISE, null, "CI notification", null, null, null, null, null, null, null, null,
+            null, null, null, null, null
+        );
+
+        executor.execute(email(emailId), response);
+
+        verify(memoryServiceClient).createIntake(any());
+        assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
+        assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
+    }
+
+    @Test
     void requestCreatesIntakeTaskInsteadOfDirectPlanAppend() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);

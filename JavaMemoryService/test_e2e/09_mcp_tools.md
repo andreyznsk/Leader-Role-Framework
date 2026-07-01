@@ -40,12 +40,12 @@ curl -s -X POST "http://localhost:8082/mcp/message?sessionId=$SESSION_ID" \
 sleep 1
 
 TOOLS_JSON=$(cat /tmp/mcp_sse.txt | grep -o '"name":"[a-zA-Z]*"' | sort -u)
-for TOOL in getContext getTasks createTask markTaskDone createIncident addRisk addPeopleNote; do
+for TOOL in getContext getTasks proposeTask proposeIncident proposeIncidentUpdate proposeRisk proposeRiskUpdate proposePersonNote; do
   echo "$TOOLS_JSON" | grep -q "\"$TOOL\"" \
     && echo "✅ $TOOL" || echo "❌ $TOOL MISSING"
 done
 ```
-**Expected:** все 7 инструментов показывают ✅
+**Expected:** все 8 инструментов показывают ✅
 
 ### Step 4 — Вызвать getTasks без ошибок
 ```bash

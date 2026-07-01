@@ -255,7 +255,7 @@ MemoryService выступает единой точкой управления 
 `PERSON_NOTE → suggestedRoute=PERSON`, `KNOWLEDGE → suggestedRoute=RAG`.
 После успешного создания intake item файл переносится в `capture-inbox/processed/YYYY-MM-DD/`.
 
-**Важно:** agent-originated MCP writes (`createTask`, `createIncident`, `addRisk` и т.п.) пока не маршрутизируются через Intake Gateway. Это отдельный follow-up CR.
+**Важно:** agent-originated MCP writes маршрутизируются через Intake Gateway. MCP write-tools публикуют proposal (`proposeTask`, `proposeRisk`, `proposeIncident`, `proposePersonNote`), а не прямую запись в operational memory.
 
 **Usage Statistics:** Memory Service владеет таблицей `memory.usage_events` и пишет события
 из task, pending task, capture, capture processing и knowledge search flow. Агрегаты доступны через
@@ -265,9 +265,9 @@ REST proxy (`/api/knowledge/**`) и не получают прямого JDBC-д
 `usage_events.correlation_id` хранится без жёсткого лимита `VARCHAR(128)`, чтобы не падать на длинных
 mail `Message-ID`.
 
-**MCP tools:** `getContext`, `getTasks`, `createTask`, `markTaskDone`, `moveTask`,
-`updateTaskStatus`, `getTaskDescription`, `setTaskDescription`, `createIncident`,
-`resolveIncident`, `addRisk`, `updateRisk`, `addPeopleNote`, `searchPeople`.
+**MCP tools:** `getContext`, `getTasks`, `getTaskDescription`, `proposeTask`,
+`proposeIncident`, `proposeIncidentUpdate`, `proposeRisk`, `proposeRiskUpdate`,
+`proposePersonNote`, `searchPeople`.
 
 **Входящие вызовы от:** JavaMailAgent, Claude-агент, CLI/user scripts
 

@@ -119,8 +119,9 @@ public class ActionExecutor {
                 yield new StepResult(MailProcessingRoute.MOVE_TO_PROCESSED, payload, null, null);
             }
             case MOVE_TO_PROCESSED -> {
-                moveToProcessedIfEnabled(resolveInbox(payload.sourceId()),
-                    resolveProcessed(payload.sourceId(), payload.processedFolder()),
+                String sourceId = resolveStoredEmailId(email, payload.sourceId());
+                moveToProcessedIfEnabled(resolveInbox(sourceId),
+                    resolveProcessed(sourceId, payload.processedFolder()),
                     payload.moveEnabled());
                 MailProcessingRoute next = payload.markAsRead() ? MailProcessingRoute.MARK_AS_READ : MailProcessingRoute.NONE;
                 yield new StepResult(next, payload, null, null);
@@ -252,7 +253,7 @@ public class ActionExecutor {
         return new IntakeMailActionPayload(
             response.type().name(),
             buildIntakePayload(email, response, agentPrompt, agentRawResult),
-            response.emailId(),
+            resolveStoredEmailId(email, response.emailId()),
             runtime.processedFolder(),
             runtime.moveProcessedMail(),
             markAsRead
@@ -309,6 +310,13 @@ public class ActionExecutor {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String resolveStoredEmailId(Email email, String candidate) {
+        if (hasText(candidate)) {
+            return candidate;
+        }
+        return email.id();
     }
 
     private String normalizeMultiline(String value) {
