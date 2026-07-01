@@ -7,6 +7,21 @@ async function openSearchResult(page, query, title) {
   await resultLink.click();
 }
 
+test.describe('Global Search is a standalone top-level page (CR-MEM-022)', () => {
+  test('/ui/search renders directly, no redirect to Agent Workspace', async ({ page }) => {
+    const response = await page.goto('/ui/search');
+    expect(response.request().redirectedFrom()).toBeNull();
+    await expect(page.locator('h4', { hasText: 'Search LeaderOS' })).toBeVisible();
+  });
+
+  test('Agent Workspace no longer has a Search tab', async ({ page }) => {
+    await page.goto('/ui/agent-workspace');
+    await expect(page.locator('#workspaceTabs a', { hasText: 'Search' })).toHaveCount(0);
+    await expect(page.locator('#workspaceTabs a', { hasText: 'Chat' })).toBeVisible();
+    await expect(page.locator('#workspaceTabs a', { hasText: 'Console' })).toBeVisible();
+  });
+});
+
 test.describe('Global Search UI', () => {
   test('opens task result in task editor', async ({ page, request }) => {
     const today = new Date().toISOString().slice(0, 10);

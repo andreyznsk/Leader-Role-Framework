@@ -71,7 +71,8 @@
                     <!-- 3. Status -->
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Статус</label>
-                        <select name="status" class="form-select" data-testid="task-status-select">
+                        <select name="status" class="form-select" data-testid="task-status-select"
+                                th:attr="data-original-status=${task.status}">
                             <option value="PENDING"     th:selected="${task.status == 'PENDING'}">PENDING</option>
                             <option value="TODO"        th:selected="${task.status == 'TODO'}">TODO</option>
                             <option value="IN_PROGRESS" th:selected="${task.status == 'IN_PROGRESS'}">IN_PROGRESS</option>
@@ -219,6 +220,13 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
         dueDate: formData.get('dueDate') || null
     };
     const description = formData.get('description') || '';
+
+    const statusSelect = form.querySelector('[name="status"]');
+    const originalStatus = statusSelect ? statusSelect.dataset.originalStatus : null;
+    if (metaPayload.status === 'DONE' && originalStatus !== 'DONE'
+        && !window.confirm('Перевести задачу в статус DONE?')) {
+        return;
+    }
 
     try {
         saveStatus.classList.add('d-none');

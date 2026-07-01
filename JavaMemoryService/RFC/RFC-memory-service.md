@@ -766,7 +766,7 @@ Base: `http://localhost:8082/ui`
 - Группировка пунктов:
   - **Операционная работа** — Today, Intake Gateway, Notes, Capture Inbox
   - **Контекст и риски** — People, Risks, Incidents
-  - **Знания** — Global Search (`/ui/search`, релоцирован в `/ui/agent-workspace?tab=search`, CR-MEM-012), Knowledge
+  - **Знания** — Global Search (`/ui/search`, standalone-страница; была временно релоцирована в `/ui/agent-workspace?tab=search` в CR-MEM-012, вынесена обратно отдельной top-level страницей в CR-MEM-022), Knowledge
   - **Автоматизация** — Agent Workspace, Control Plane (Settings), Usage Stats
   - **Система** — Presentation
 - Корневой элемент — `<nav data-testid="leaderos-sidebar">`, используется как navigation marker в E2E smoke-тестах.
@@ -775,6 +775,12 @@ Base: `http://localhost:8082/ui`
 ### Страницы
 
 **`/ui/today`** — Главная страница
+
+Сайдбар: пункт «Today» разделён на две вкладки, оба ведут на один и тот же route/контроллер (CR-MEM-025):
+- **ToDo** (`/ui/today`) — активные задачи, `DONE` всегда скрыт
+- **Done** (`/ui/today?status=DONE`) — только задачи со статусом `DONE`
+
+Toggle «No Done» убран — раньше `hideDone` был отдельным query-параметром формы, теперь видимость `DONE` полностью определяется тем, какая вкладка активна (`status` параметр).
 
 Секции страницы (порядок сверху вниз):
 1. **Сводка** — 4 карточки: задач сегодня / ожидают подтверждения / открытые инциденты / выполнено
@@ -810,7 +816,7 @@ Base: `http://localhost:8082/ui`
 
 | Элемент | Действие | HTTP |
 |---------|----------|------|
-| Чекбокс | `DONE` / снять | `POST /api/tasks/{id}/done` |
+| Чекбокс | `DONE` / снять (запрашивает `confirm()` перед переводом в `DONE`, CR-MEM-024) | `POST /api/tasks/{id}/toggle-done` |
 | Иконка флага | циклически менять приоритет | `PUT /api/tasks/{id}` |
 | Название задачи | открыть форму редактирования | `GET /ui/tasks/{id}/edit` |
 | Кнопка `Завтра` | сдвинуть дедлайн на +1 день | `PUT /api/tasks/{id}` |
@@ -864,6 +870,8 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 | 2 | `due_date` | date input | `tasks.due_date` |
 | 3 | `status` | select (`data-testid="task-status-select"`) | `tasks.status`: `PENDING`, `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `ARCHIVED` (`DELETED` не показывается — legacy) |
 | 4 | Action buttons | `💾 Сохранить` (value=`save`, остаётся на странице), `✅ Сохранить и закрыть` (value=`save_close`, редирект на `/ui/today`), `🗄 Архивировать` (`btn-danger`, destructive) | сохранение через `PUT /api/tasks/{id}` + `PUT /api/tasks/{id}/description`; archive через `DELETE /api/tasks/{id}` |
+
+Если при сохранении (`#3`) выбран статус `DONE`, а исходный статус задачи был другим — перед отправкой формы запрашивается `confirm()` (CR-MEM-024). Отмена не отправляет форму.
 | 5 | Timeline (`data-testid="task-timeline"`) | последние 5 событий + счётчик, ниже — форма добавления комментария | `GET /api/tasks/{id}/timeline` |
 
 `source` (readonly badge) и `email_id` отображаются в заголовке страницы, а не в control panel.
@@ -926,6 +934,13 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 - stdout/stderr отображаются потоково с временными метками
 - Закрытие вкладки / WebSocket завершает процесс
 - `xterm.js` не используется в этом CR (простая браузерная консоль)
+
+**`/ui/search`** — Global Search (CR-MEM-009/015, un-relocated from Agent Workspace in CR-MEM-022)
+
+Standalone top-level страница, обслуживается `SearchViewController`, рендерит `search.html`.
+Параметры: `q` (query), `mode` (`QUICK`/`DEEP`), `layers` (multi), `preset` (`notice`/`everything`/`documentation`/`people_tasks`).
+Форма — обычный `GET`, полная перезагрузка страницы (без AJAX). Результаты группируются по layer (`resultsByLayer`), AI Summary показывается только в `DEEP` mode.
+`/ui/agent-workspace` больше не содержит Search-вкладку — только `Chat` и `Console`.
 
 **Global Search → edit-flow navigation**
 - Результат `TASK` обязан вести сразу в `/ui/tasks/{id}/edit`.
@@ -1224,6 +1239,12 @@ Mail routing в первом этапе выглядит так:
 
 **Агент через MCP участвует в intake-потоке** — его write-tools создают proposal в `intake_items`, а пользователь подтверждает их через `/ui/intake`.
 `NOTICE` письма в этот поток попадают как intake items со `suggestedRoute=RAG`; до ручного Apply они не становятся RAG-документами.
+
+**Bulk-действия (CR-MEM-026):** на каждой карточке intake item есть чекбокс выбора + чекбокс «Выбрать все» в шапке списка. При выбранных элементах доступны:
+- **«Подтвердить выбранные»** — bulk apply: для каждого выбранного id вызывается `POST /api/intake/{id}/apply` с его текущим `finalRoute`/`finalPayload` (эквивалент одиночного `Apply`).
+- **«Отклонить выбранные»** — bulk reject: для каждого выбранного id вызывается `POST /api/intake/{id}/reject` с `reason: 'noise'` (эквивалент одиночного `Reject`).
+
+Оба действия выполняются последовательно на фронтенде (без новых endpoint'ов) и требуют подтверждения через `confirm()`. Физического удаления intake-записей по-прежнему не существует — ни одиночного, ни массового.
 
 ---
 
