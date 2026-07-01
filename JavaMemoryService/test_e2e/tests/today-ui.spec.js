@@ -52,14 +52,14 @@ test.describe('Today UI', () => {
 
       const description = page.locator('#md-input');
       await description.fill('Draft state');
-      await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
+      await page.locator('button[value="save"]').click();
 
       await expect(page).toHaveURL(new RegExp(`/ui/tasks/${task.id}/edit$`));
       await expect(page.locator('#save-status')).toContainText('Задача сохранена');
       await expect(description).toHaveValue('Draft state');
 
       await description.fill('Final state');
-      await page.getByRole('button', { name: 'Сохранить и закрыть' }).click();
+      await page.locator('button[value="save_close"]').click();
 
       await expect(page).toHaveURL(/\/ui\/today$/);
 
