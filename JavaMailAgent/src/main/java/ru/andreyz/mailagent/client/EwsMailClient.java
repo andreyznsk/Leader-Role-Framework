@@ -8,6 +8,7 @@ import microsoft.exchange.webservices.data.core.enumeration.search.LogicalOperat
 import microsoft.exchange.webservices.data.core.enumeration.property.WellKnownFolderName;
 import microsoft.exchange.webservices.data.core.enumeration.search.FolderTraversal;
 import microsoft.exchange.webservices.data.core.enumeration.service.ConflictResolutionMode;
+import microsoft.exchange.webservices.data.core.exception.service.local.ServiceObjectPropertyException;
 import microsoft.exchange.webservices.data.core.service.folder.Folder;
 import microsoft.exchange.webservices.data.core.service.item.EmailMessage;
 import microsoft.exchange.webservices.data.core.service.item.Item;
@@ -429,6 +430,8 @@ public class EwsMailClient implements MailClient {
             if (mb != null) {
                 return MessageBody.getStringFromMessageBody(mb);
             }
+        } catch (ServiceObjectPropertyException e) {
+            log.debug("body not loaded via FindItem — fall through to lazy load: {}", e.toString());
         } catch (Exception e) {
             log.error("", e);
             // body not loaded via FindItem — fall through to lazy load
