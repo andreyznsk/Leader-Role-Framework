@@ -27,7 +27,7 @@
 | CR-MEM-020        | [2026-06-30_CR-MEM-020-intake-route-automation.md](2026-06-30_CR-MEM-020-intake-route-automation.md) | Draft | 2026-06-30 |
 | CR-MEM-021        | [2026-06-30_CR-MEM-021-intake-rollback-reapply.md](2026-06-30_CR-MEM-021-intake-rollback-reapply.md) | Draft | 2026-06-30 |
 | CR-MEM-022        | [2026-06-30_CR-MEM-022-left-sidebar-navigation.md](2026-06-30_CR-MEM-022-left-sidebar-navigation.md) | Draft | 2026-06-30 |
-| CR-MEM-023        | [2026-06-30_CR-MEM-023-task-edit-right-control-panel.md](2026-06-30_CR-MEM-023-task-edit-right-control-panel.md) | Draft | 2026-06-30 |
+| CR-MEM-023        | [2026-06-30_CR-MEM-023-task-edit-right-control-panel.md](2026-06-30_CR-MEM-023-task-edit-right-control-panel.md) | Implemented | 2026-06-30 |
 | CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md) | Draft | —          |
 
 ---

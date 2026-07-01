@@ -98,6 +98,55 @@ Workaround: использовать `python3 json.loads(strict=False)` вмес
 - Docker Ollama: 11435 (недоступен, не используется)
 - Модели: mxbai-embed-large, zylonai/multilingual-e5-large, qwen3:8b
 
+## JavaMemoryService — Playwright layer (test_e2e/tests/*.spec.js)
+
+Отдельный слой от markdown-сценариев (test_e2e/*.md). Настоящий browser E2E через Playwright.
+
+- Расположение: `JavaMemoryService/test_e2e/tests/*.spec.js`, конфиг `JavaMemoryService/test_e2e/playwright.config.js`
+- Запуск: `cd JavaMemoryService/test_e2e && npx playwright test tests/<file>.spec.js --reporter=list` (сервис должен быть уже поднят на 8082, профиль local)
+- `npx playwright install chromium` — обычно уже установлен, быстрая no-op проверка не помешает
+- baseURL по умолчанию `http://127.0.0.1:8082`, переопределяется `PLAYWRIGHT_BASE_URL`
+
+### Дефект теста task-timeline-ui.spec.js (обнаружен 2026-07-01, CR MEM-023 branch)
+
+`page.getByRole('button', { name: /Сохранить/, exact: true }).click()` падает с strict mode violation —
+regex `/Сохранить/` матчит ОБА кнопки: "💾 Сохранить" (value="save") и "✅ Сохранить и закрыть" (value="save_close"),
+т.к. `exact: true` не действует на regex-матчер в Playwright (exact применяется только к строкам).
+Обе кнопки существуют в `task-edit.html` (строки ~87-92) намеренно — это ожидаемая структура.
+
+**Why:** Дефект в самом тесте (task-timeline-ui.spec.js:34), не в приложении. Это не связано с CR-MEM-023 изменениями напрямую, но тест был обновлён "for new HTML structure" в рамках той же ветки и не обновлён до конца.
+**How to apply:** Рекомендуемый фикс — использовать более специфичный локатор, например `page.locator('button[value="save"]')` (как в task-edit-right-control-panel.spec.js) вместо `getByRole` с неточным regex.
+
+### CR-MEM-023 прогон (2026-07-01, branch feature/MEM-023-2026-06-30)
+
+- task-edit-right-control-panel.spec.js: все 9 тестов PASS (data-testid="task-control-panel", data-testid="task-status-select", data-testid="task-timeline", #delete-btn — все селекторы найдены и работают)
+- task-timeline-ui.spec.js: 1/1 FAIL — исключительно из-за regex-локатора выше, сервер не логировал ошибок
+- Билд JavaMemoryService прошёл чисто, `mvn package -q -DskipTests`, JAR стартовал за ~2.6 сек
+- Замечен warning при старте: `Schema "memory" has a version (19) that is newer than the latest available migration (18)` — БД опережает миграции в коде ветки; не блокирует тесты, но стоит проверить при мердже
+
+### РЕАЛЬНЫЙ баг приложения найден за regex-локатором (2026-07-01, CR-MEM-023)
+
+После фикса regex-локатора тест всё равно падал: `#task-timeline-list .border-bottom` находил 2 элемента вместо 5 (комментарии не добавлялись).
+
+**Root cause:** в `task-edit.html` `<form id="timeline-comment-form">` (блок комментария в Timeline) был вложен ВНУТРЬ основной `<form id="task-edit-form">`. HTML5 не допускает вложенные формы — браузер молча игнорирует открывающий тег внутренней формы при парсинге, поэтому:
+1. `document.getElementById('timeline-comment-form')` возвращает `null` → обработчик `submit` в `<script>` никогда не навешивается.
+2. Кнопка "Добавить" (`type="submit"`) фактически принадлежит ВНЕШНЕЙ форме (браузер ищет ближайшего предка `<form>`), поэтому клик сабмитит основную edit-форму (`PUT /ui/tasks/{id}/edit`) вместо `POST /api/tasks/{id}/timeline/comment`.
+3. Комментарии никогда не создаются, `#task-timeline-list` не растёт.
+
+Проверено вручную через `page.evaluate` в headless Chromium: `document.getElementById('timeline-comment-form')` → `null`, `button.form.id` → `"task-edit-form"`.
+
+**Фикс:** заменить `<form id="timeline-comment-form">` на `<div id="timeline-comment-form">`, кнопку — на `type="button"` с явным `id="timeline-comment-submit"`, обработчик — на `click` вместо `submit` (без `event.preventDefault()`, он больше не нужен).
+
+**Why:** это баг приложения, а не только теста — обнаруживается только через реальный браузерный рендеринг (curl/статический HTML-парсинг его не покажет, т.к. разметка "выглядит" валидной без учёта правил авто-закрытия вложенных форм).
+**How to apply:** при рефакторинге task-edit.html (или любого шаблона с несколькими `<form>` на странице) — проверять, что комментарий/побочные формы НЕ вложены в основную форму. Быстрая диагностика: `page.evaluate(() => document.getElementById('<id>'))` возвращает `null`, если элемент "потерялся" при парсинге.
+
+### Финальный прогон всего test_e2e/tests/*.spec.js после фикса (2026-07-01)
+
+- 53/54 PASS. Единственный FAIL: `capturebot-ui.spec.js` — "clicking filter button reloads history with correct status" (таймаут `waitForResponse`).
+- Этот тест падает и при полном прогоне, и при `--workers=1`, но проходит при запуске в изоляции (`-g` только этот тест) — предсуществующий order-dependent флейк в `capturebot-ui.spec.js`, НЕ связан с изменениями CR-MEM-023 (файл не менялся в этой ветке).
+- Дополнительно найден и исправлен `today-ui.spec.js` (не входил в исходный diff CR, но сломан теми же иконками на кнопках Save/Save-close): `getByRole('button', { name: 'Сохранить', exact: true })` не матчит `"💾 Сохранить"` — заменено на `button[value="save"]` / `button[value="save_close"]`, тот же паттерн что и в task-timeline-ui.spec.js.
+- Сервис нужно перезапускать через `./test-runner/start-services.sh --service JavaMemoryService --profile local` (не голым `java -jar`) — иначе поднимается на дефолтном H2 без профиля `local`, что ломает Flyway-миграции (`JSONB` не поддерживается H2 → CRASH при старте).
+
 ## MailAgent E2E — инфраструктурные паттерны (2026-06-25)
 
 ### Maildev доступ

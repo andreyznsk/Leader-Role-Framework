@@ -822,21 +822,35 @@ Base: `http://localhost:8082/ui`
 | `dueDateFrom` + `dueDateTo` | Диапазон (пресет *This Week*) |
 | (отсутствует) | Без фильтра по дате |
 
-**`/ui/tasks/{id}/edit`** — Форма редактирования задачи
+**`/ui/tasks/{id}/edit`** — Форма редактирования задачи (CR-MEM-023: two-column layout)
+
+Двухколоночный layout: слева основное содержимое, справа `<aside data-testid="task-control-panel">` — единая control panel + timeline. На узком экране (mobile) колонки складываются в одну: сначала форма, затем control panel с timeline.
+
+Левая колонка — основное содержимое:
 
 | Поле | Тип | Источник данных |
 |------|-----|----------------|
 | `title` | text input | `tasks.title` (PostgreSQL) |
 | `description` | Markdown textarea | `memory.task_descriptions.content_md` |
-| `priority` | select | `tasks.priority` |
-| `due_date` | date input | `tasks.due_date` |
-| `status` | radio-пилюли | `tasks.status` |
-| `source` | readonly badge | `tasks.source` + `tasks.email_id` |
 
 Markdown-редактор — две вкладки: `markdown` (raw, monospace) и `preview` (HTML-рендер через JS, без библиотек).
 Под textarea — кнопка `Export MD`, которая скачивает `TASK-{id}.md`, сгенерированный из БД.
 
-Удаление на странице edit — двойное подтверждение: первый клик меняет текст на "точно удалить?" (3 сек), второй — `DELETE /api/tasks/{id}`.
+Правая колонка (`task-control-panel`) — элементы строго в порядке:
+
+| # | Поле/блок | Тип | Источник данных |
+|---|-----------|-----|----------------|
+| 1 | `priority` | select | `tasks.priority` |
+| 2 | `due_date` | date input | `tasks.due_date` |
+| 3 | `status` | select (`data-testid="task-status-select"`) | `tasks.status`: `PENDING`, `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `ARCHIVED` (`DELETED` не показывается — legacy) |
+| 4 | Action buttons | `💾 Сохранить` (value=`save`, остаётся на странице), `✅ Сохранить и закрыть` (value=`save_close`, редирект на `/ui/today`), `🗄 Архивировать` (`btn-danger`, destructive) | сохранение через `PUT /api/tasks/{id}` + `PUT /api/tasks/{id}/description`; archive через `DELETE /api/tasks/{id}` |
+| 5 | Timeline (`data-testid="task-timeline"`) | последние 5 событий + счётчик, ниже — форма добавления комментария | `GET /api/tasks/{id}/timeline` |
+
+`source` (readonly badge) и `email_id` отображаются в заголовке страницы, а не в control panel.
+
+Удаление (archive) — двойное подтверждение: первый клик меняет текст кнопки на "Точно архивировать?" (3 сек), второй — `DELETE /api/tasks/{id}`.
+
+Блок добавления комментария в timeline — это `<div>` (не `<form>`), т.к. он физически расположен внутри основной `<form id="task-edit-form">`; вложенные HTML-формы невалидны и браузер молча ломает DOM/JS-обработчики. Кнопка `Добавить` — `type="button"` с явным `click`-обработчиком, не `submit`.
 
 **`/ui/incidents`** — Активные инциденты
 - Список с severity badge (P1/P2/P3)

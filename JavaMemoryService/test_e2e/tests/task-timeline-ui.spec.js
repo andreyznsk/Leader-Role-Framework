@@ -22,21 +22,26 @@ test.describe('Task timeline UI', () => {
       await page.goto(`/ui/tasks/${task.id}/edit`);
 
       await expect(page.getByRole('heading', { name: /Задача #/ })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Timeline' })).toBeVisible();
-      await expect(page.locator('.list-group')).toContainText('Задача создана');
+
+      const controlPanel = page.locator('[data-testid="task-control-panel"]');
+      await expect(controlPanel).toBeVisible();
+
+      const timelineSection = page.locator('[data-testid="task-timeline"]');
+      await expect(timelineSection).toBeVisible();
+      await expect(timelineSection).toContainText('Задача создана');
 
       await page.locator('#md-input').fill('Updated from Playwright timeline test');
-      await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
+      await page.locator('button[value="save"]').click();
 
       await expect(page.locator('#save-status')).toContainText('Задача сохранена');
       await page.reload();
-      await expect(page.locator('.list-group')).toContainText('Описание обновлено');
+      await expect(page.locator('[data-testid="task-timeline"]')).toContainText('Описание обновлено');
 
       await page.locator('#timeline-comment').fill('Playwright timeline comment');
       await page.getByRole('button', { name: 'Добавить' }).click();
 
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.list-group')).toContainText('Комментарий добавлен');
+      await expect(page.locator('[data-testid="task-timeline"]')).toContainText('Комментарий добавлен');
 
       for (let i = 0; i < 5; i += 1) {
         await page.locator('#timeline-comment').fill(`Playwright extra timeline comment ${i}`);
@@ -47,11 +52,11 @@ test.describe('Task timeline UI', () => {
       const timelineList = page.locator('#task-timeline-list');
       await expect(timelineList).toBeVisible();
       await expect(timelineList).toHaveCSS('overflow-y', 'auto');
-      await expect(page.locator('#task-timeline-list .list-group-item')).toHaveCount(5);
-      await expect(page.locator('.card-header .text-muted.small')).toContainText('Последние 5');
+      await expect(page.locator('#task-timeline-list .border-bottom')).toHaveCount(5);
+      await expect(page.locator('[data-testid="task-timeline"] .justify-content-between .text-muted.small')).toContainText('Последние 5');
 
       const archiveButton = page.locator('#delete-btn');
-      await expect(archiveButton).toHaveText('Архивировать');
+      await expect(archiveButton).toHaveText(/Архивировать/);
       await archiveButton.click();
       await expect(archiveButton).toHaveText('Точно архивировать?');
       await archiveButton.click();

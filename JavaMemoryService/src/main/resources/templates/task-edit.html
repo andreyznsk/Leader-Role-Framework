@@ -16,119 +16,133 @@
           th:attr="data-task-id=${task.id}">
         <input type="hidden" name="_method" value="PUT">
 
-        <!-- Title -->
-        <div class="mb-3">
-            <label class="form-label fw-semibold">Название</label>
-            <input type="text" name="title" class="form-control"
-                   th:value="${task.title}" required/>
-        </div>
+        <div class="row g-4">
 
-        <!-- Description with markdown editor -->
-        <div class="mb-3">
-            <label class="form-label fw-semibold">Описание</label>
-            <textarea id="md-input" name="description" class="form-control"
-                      rows="25" style="font-family:monospace"
-                      th:text="${description}"></textarea>
-            <!-- Links preview (CR-MEM-009) -->
-            <div id="task-editor-links" class="task-editor-links mt-2 d-none">
-                <div class="task-editor-links-label">Ссылки из описания:</div>
-                <ul id="task-editor-links-list"></ul>
-            </div>
-            <div class="mt-1">
-                <a class="btn btn-sm btn-outline-secondary" th:href="${exportUrl}">Export MD</a>
-            </div>
-        </div>
+            <!-- ── Left column: main content ── -->
+            <div class="col-12 col-md-8">
 
-        <!-- Metadata row -->
-        <div class="row g-3 mb-3">
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Приоритет</label>
-                <select name="priority" class="form-select">
-                    <option value="LOW" th:selected="${task.priority == 'LOW'}">LOW</option>
-                    <option value="NORMAL" th:selected="${task.priority == 'NORMAL'}">NORMAL</option>
-                    <option value="HIGH" th:selected="${task.priority == 'HIGH'}">HIGH</option>
-                    <option value="CRITICAL" th:selected="${task.priority == 'CRITICAL'}">CRITICAL</option>
-                </select>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Дедлайн</label>
-                <input type="date" name="dueDate" class="form-control"
-                       th:value="${task.dueDate}"/>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold d-block">Статус</label>
-                <div class="d-flex flex-wrap gap-1 pt-1">
-                    <th:block th:each="s : ${ {'TODO','IN_PROGRESS','BLOCKED','DONE'} }">
-                        <label class="mb-0">
-                            <input type="radio" name="status" th:value="${s}"
-                                   th:checked="${task.status == s}" class="visually-hidden status-radio"/>
-                            <span class="badge px-2 py-1 status-option"
-                                  th:text="${s}"
-                                  th:classappend="${(s == 'TODO' ? ' status-option--todo' : (s == 'IN_PROGRESS' ? ' status-option--in-progress' : (s == 'BLOCKED' ? ' status-option--blocked' : ' status-option--done'))) + (task.status == s ? ' is-selected' : '')}"></span>
-                        </label>
-                    </th:block>
+                <!-- Title -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Название</label>
+                    <input type="text" name="title" class="form-control"
+                           th:value="${task.title}" required/>
                 </div>
-            </div>
-        </div>
 
-        <!-- Buttons -->
-        <div id="save-status" class="alert alert-success py-2 px-3 mb-3 d-none" role="status"></div>
-        <div class="d-flex justify-content-between">
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary" name="action" value="save">Сохранить</button>
-                <button type="submit" class="btn btn-outline-primary" name="action" value="save_close" data-close-after-save="true">Сохранить и закрыть</button>
-            </div>
-            <button type="button" class="btn btn-outline-danger"
-                    id="delete-btn"
-                    th:data-api-url=@{/api/tasks/{id}(id=${task.id})}
-                    onclick="confirmDelete(this)">
-                Архивировать
-            </button>
-        </div>
-    </form>
-
-    <div class="card mt-4">
-        <div class="card-header">
-            <div class="d-flex align-items-center justify-content-between">
-                <h5 class="mb-0">Timeline</h5>
-                <span class="text-muted small"
-                      th:text="${timelineTotalCount > 5 ? 'Последние 5 из ' + timelineTotalCount : timelineTotalCount + ' events'}">0 events</span>
-            </div>
-        </div>
-        <div class="card-body">
-            <div th:if="${#lists.isEmpty(timeline)}" class="text-muted">Событий пока нет.</div>
-            <div th:unless="${#lists.isEmpty(timeline)}"
-                 class="list-group list-group-flush"
-                 id="task-timeline-list"
-                 style="max-height: 320px; overflow-y: auto;">
-                <div th:each="event : ${timeline}" class="list-group-item px-0">
-                    <div class="d-flex justify-content-between align-items-start gap-3">
-                        <div>
-                            <div class="fw-semibold" th:text="${event.summary}">Событие</div>
-                            <div class="small text-muted">
-                                <span th:text="${event.eventType}">EVENT_TYPE</span>
-                                <span th:if="${event.actorType}" th:text="${' · ' + event.actorType}"></span>
-                                <span th:if="${event.sourceType}" th:text="${' · ' + event.sourceType}"></span>
-                            </div>
-                        </div>
-                        <div class="small text-muted text-nowrap"
-                             th:text="${#temporals.format(event.createdAt.atZone(T(java.time.ZoneId).systemDefault()), 'yyyy-MM-dd HH:mm')}">
-                            2026-06-29 15:30
-                        </div>
+                <!-- Description with markdown editor -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Описание</label>
+                    <textarea id="md-input" name="description" class="form-control"
+                              rows="25" style="font-family:monospace"
+                              th:text="${description}"></textarea>
+                    <!-- Links preview (CR-MEM-009) -->
+                    <div id="task-editor-links" class="task-editor-links mt-2 d-none">
+                        <div class="task-editor-links-label">Ссылки из описания:</div>
+                        <ul id="task-editor-links-list"></ul>
+                    </div>
+                    <div class="mt-1">
+                        <a class="btn btn-sm btn-outline-secondary" th:href="${exportUrl}">Export MD</a>
                     </div>
                 </div>
+
             </div>
 
-            <form id="timeline-comment-form" class="mt-3" th:attr="data-task-id=${task.id}">
-                <label for="timeline-comment" class="form-label fw-semibold">Комментарий</label>
-                <textarea id="timeline-comment" class="form-control" rows="3" placeholder="Добавить комментарий в timeline"></textarea>
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                    <div id="timeline-comment-status" class="small text-success d-none">Комментарий добавлен</div>
-                    <button type="submit" class="btn btn-sm btn-outline-primary">Добавить</button>
-                </div>
-            </form>
-        </div>
-    </div>
+            <!-- ── Right column: task control panel ── -->
+            <div class="col-12 col-md-4">
+                <aside data-testid="task-control-panel" class="task-control-panel">
+
+                    <!-- 1. Priority -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Приоритет</label>
+                        <select name="priority" class="form-select">
+                            <option value="LOW"      th:selected="${task.priority == 'LOW'}">LOW</option>
+                            <option value="NORMAL"   th:selected="${task.priority == 'NORMAL'}">NORMAL</option>
+                            <option value="HIGH"     th:selected="${task.priority == 'HIGH'}">HIGH</option>
+                            <option value="CRITICAL" th:selected="${task.priority == 'CRITICAL'}">CRITICAL</option>
+                        </select>
+                    </div>
+
+                    <!-- 2. Deadline -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Дедлайн</label>
+                        <input type="date" name="dueDate" class="form-control"
+                               th:value="${task.dueDate}"/>
+                    </div>
+
+                    <!-- 3. Status -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Статус</label>
+                        <select name="status" class="form-select" data-testid="task-status-select">
+                            <option value="PENDING"     th:selected="${task.status == 'PENDING'}">PENDING</option>
+                            <option value="TODO"        th:selected="${task.status == 'TODO'}">TODO</option>
+                            <option value="IN_PROGRESS" th:selected="${task.status == 'IN_PROGRESS'}">IN_PROGRESS</option>
+                            <option value="BLOCKED"     th:selected="${task.status == 'BLOCKED'}">BLOCKED</option>
+                            <option value="DONE"        th:selected="${task.status == 'DONE'}">DONE</option>
+                            <option value="ARCHIVED"    th:selected="${task.status == 'ARCHIVED'}">ARCHIVED</option>
+                        </select>
+                    </div>
+
+                    <!-- 4. Action buttons -->
+                    <div id="save-status" class="alert alert-success py-2 px-3 mb-2 d-none" role="status"></div>
+                    <div class="d-grid gap-2 mb-3">
+                        <button type="submit" class="btn btn-primary" name="action" value="save">
+                            💾 Сохранить
+                        </button>
+                        <button type="submit" class="btn btn-outline-primary" name="action" value="save_close"
+                                data-close-after-save="true">
+                            ✅ Сохранить и закрыть
+                        </button>
+                    </div>
+                    <div class="d-grid">
+                        <button type="button" class="btn btn-danger"
+                                id="delete-btn"
+                                th:data-api-url="@{/api/tasks/{id}(id=${task.id})}"
+                                onclick="confirmDelete(this)">
+                            🗄 Архивировать
+                        </button>
+                    </div>
+
+                    <!-- 5. Timeline -->
+                    <section data-testid="task-timeline" class="mt-4">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="mb-0 fw-semibold">Timeline</h6>
+                            <span class="text-muted small"
+                                  th:text="${timelineTotalCount > 5 ? 'Последние 5 из ' + timelineTotalCount : timelineTotalCount + ' events'}">0 events</span>
+                        </div>
+
+                        <div th:if="${#lists.isEmpty(timeline)}" class="text-muted small">Событий пока нет.</div>
+                        <div th:unless="${#lists.isEmpty(timeline)}"
+                             id="task-timeline-list"
+                             style="max-height: 280px; overflow-y: auto;">
+                            <div th:each="event : ${timeline}" class="border-bottom pb-2 mb-2">
+                                <div class="fw-semibold small" th:text="${event.summary}">Событие</div>
+                                <div class="small text-muted">
+                                    <span th:text="${event.eventType}">EVENT_TYPE</span>
+                                    <span th:if="${event.actorType}" th:text="${' · ' + event.actorType}"></span>
+                                    <span th:if="${event.sourceType}" th:text="${' · ' + event.sourceType}"></span>
+                                </div>
+                                <div class="small text-muted"
+                                     th:text="${#temporals.format(event.createdAt.atZone(T(java.time.ZoneId).systemDefault()), 'yyyy-MM-dd HH:mm')}">
+                                    2026-06-29 15:30
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="timeline-comment-form" class="mt-3" th:attr="data-task-id=${task.id}">
+                            <label for="timeline-comment" class="form-label fw-semibold small">Комментарий</label>
+                            <textarea id="timeline-comment" class="form-control form-control-sm" rows="2"
+                                      placeholder="Добавить комментарий"></textarea>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <div id="timeline-comment-status" class="small text-success d-none">Комментарий добавлен</div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="timeline-comment-submit">Добавить</button>
+                            </div>
+                        </div>
+                    </section>
+
+                </aside>
+            </div>
+
+        </div><!-- /row -->
+    </form>
 
     <!-- Hidden delete form -->
     <form id="delete-form" method="post" th:action="@{/ui/tasks/{id}/delete(id=${task.id})}"></form>
@@ -164,7 +178,7 @@ function updateLinksPreview() {
     container.classList.remove('d-none');
 }
 
-// Double-confirm delete
+// Double-confirm archive
 let deleteTimer = null;
 function confirmDelete(btn) {
     if (btn.dataset.confirmed === 'true') {
@@ -178,32 +192,15 @@ function confirmDelete(btn) {
     btn.dataset.confirmed = 'true';
     const original = btn.textContent;
     btn.textContent = 'Точно архивировать?';
-    btn.classList.replace('btn-outline-danger', 'btn-danger');
     deleteTimer = setTimeout(() => {
         btn.dataset.confirmed = 'false';
         btn.textContent = original;
-        btn.classList.replace('btn-danger', 'btn-outline-danger');
     }, 3000);
 }
 
-// Wire links preview to textarea changes and initial load
 document.addEventListener('DOMContentLoaded', function() {
     updateLinksPreview();
     document.getElementById('md-input').addEventListener('input', updateLinksPreview);
-});
-
-// Status radio pill styling
-document.querySelectorAll('.status-radio').forEach(radio => {
-    radio.addEventListener('change', () => {
-        document.querySelectorAll('.status-radio').forEach(r => {
-            const pill = r.nextElementSibling;
-            if (r.checked) {
-                pill.classList.add('is-selected');
-            } else {
-                pill.classList.remove('is-selected');
-            }
-        });
-    });
 });
 
 document.getElementById('task-edit-form').addEventListener('submit', async function (event) {
@@ -261,10 +258,8 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
     }
 });
 
-document.getElementById('timeline-comment-form')?.addEventListener('submit', async function (event) {
-    event.preventDefault();
-
-    const form = event.currentTarget;
+document.getElementById('timeline-comment-submit')?.addEventListener('click', async function () {
+    const form = document.getElementById('timeline-comment-form');
     const taskId = form.dataset.taskId;
     const textarea = document.getElementById('timeline-comment');
     const status = document.getElementById('timeline-comment-status');
