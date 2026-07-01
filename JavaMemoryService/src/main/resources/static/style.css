@@ -83,6 +83,13 @@ body {
 }
 
 .los-nav-group-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  background: none;
   font-family: var(--mono);
   font-size: 12px;
   color: var(--text3);
@@ -90,6 +97,32 @@ body {
   letter-spacing: .08em;
   padding: 4px 12px;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.los-nav-group-label:hover {
+  color: var(--text2);
+}
+
+.los-nav-group-toggle-icon {
+  display: inline-block;
+  font-size: 10px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: transform .15s ease;
+}
+
+.los-nav-group.is-collapsed .los-nav-group-toggle-icon {
+  transform: rotate(-90deg);
+}
+
+.los-nav-group.is-collapsed .los-nav-group-items {
+  display: none;
+}
+
+/* Icon-only mode ignores per-group collapse: labels are hidden anyway */
+html.los-collapsed .los-nav-group.is-collapsed .los-nav-group-items {
+  display: block;
 }
 
 .los-brand {

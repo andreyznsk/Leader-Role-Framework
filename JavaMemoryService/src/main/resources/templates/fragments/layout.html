@@ -45,8 +45,12 @@
         </button>
     </div>
     <div class="los-sidebar-nav">
-        <div class="los-nav-group">
-            <div class="los-nav-group-label">Операционная работа</div>
+        <div class="los-nav-group" data-group-key="operational">
+            <button type="button" class="los-nav-group-label" aria-expanded="true">
+                <span class="los-nav-group-label-text">Операционная работа</span>
+                <span class="los-nav-group-toggle-icon">&#8964;</span>
+            </button>
+            <div class="los-nav-group-items">
             <a href="/ui/today" class="los-nav-item" data-nav-title="Today">
                 <span class="los-nav-icon">&#128203;</span>
                 <span class="los-nav-label">Today</span>
@@ -67,9 +71,14 @@
                 <span class="los-nav-icon">&#128228;</span>
                 <span class="los-nav-label">Capture Inbox</span>
             </a>
+            </div>
         </div>
-        <div class="los-nav-group">
-            <div class="los-nav-group-label">Контекст и риски</div>
+        <div class="los-nav-group" data-group-key="context-risks">
+            <button type="button" class="los-nav-group-label" aria-expanded="true">
+                <span class="los-nav-group-label-text">Контекст и риски</span>
+                <span class="los-nav-group-toggle-icon">&#8964;</span>
+            </button>
+            <div class="los-nav-group-items">
             <a href="/ui/people" class="los-nav-item" data-nav-title="People">
                 <span class="los-nav-icon">&#128101;</span>
                 <span class="los-nav-label">People</span>
@@ -82,9 +91,14 @@
                 <span class="los-nav-icon">&#128293;</span>
                 <span class="los-nav-label">Incidents</span>
             </a>
+            </div>
         </div>
-        <div class="los-nav-group">
-            <div class="los-nav-group-label">Знания</div>
+        <div class="los-nav-group" data-group-key="knowledge">
+            <button type="button" class="los-nav-group-label" aria-expanded="true">
+                <span class="los-nav-group-label-text">Знания</span>
+                <span class="los-nav-group-toggle-icon">&#8964;</span>
+            </button>
+            <div class="los-nav-group-items">
             <a href="/ui/search" class="los-nav-item" data-nav-title="Global Search">
                 <span class="los-nav-icon">&#128269;</span>
                 <span class="los-nav-label">Global Search</span>
@@ -93,9 +107,14 @@
                 <span class="los-nav-icon">&#128218;</span>
                 <span class="los-nav-label">Knowledge</span>
             </a>
+            </div>
         </div>
-        <div class="los-nav-group">
-            <div class="los-nav-group-label">Автоматизация</div>
+        <div class="los-nav-group" data-group-key="automation">
+            <button type="button" class="los-nav-group-label" aria-expanded="true">
+                <span class="los-nav-group-label-text">Автоматизация</span>
+                <span class="los-nav-group-toggle-icon">&#8964;</span>
+            </button>
+            <div class="los-nav-group-items">
             <a href="/ui/agent-workspace" class="los-nav-item" data-nav-title="Agent Workspace">
                 <span class="los-nav-icon">&#129302;</span>
                 <span class="los-nav-label">Agent Workspace</span>
@@ -108,13 +127,19 @@
                 <span class="los-nav-icon">&#128200;</span>
                 <span class="los-nav-label">Usage Stats</span>
             </a>
+            </div>
         </div>
-        <div class="los-nav-group">
-            <div class="los-nav-group-label">Система</div>
+        <div class="los-nav-group" data-group-key="system">
+            <button type="button" class="los-nav-group-label" aria-expanded="true">
+                <span class="los-nav-group-label-text">Система</span>
+                <span class="los-nav-group-toggle-icon">&#8964;</span>
+            </button>
+            <div class="los-nav-group-items">
             <a href="/ui/presentation" target="_blank" class="los-nav-item" data-nav-title="Presentation">
                 <span class="los-nav-icon">&#128421;</span>
                 <span class="los-nav-label">Presentation</span>
             </a>
+            </div>
         </div>
     </div>
 </nav>
@@ -158,6 +183,46 @@
                 setMobileOpen(false);
             });
         }
+
+        var GROUPS_KEY = 'leaderos.sidebar.collapsedGroups';
+
+        function getCollapsedGroups() {
+            try {
+                var raw = window.localStorage.getItem(GROUPS_KEY);
+                return raw ? JSON.parse(raw) : [];
+            } catch (ignored) {
+                return [];
+            }
+        }
+
+        function setGroupCollapsed(groupEl, collapsed) {
+            groupEl.classList.toggle('is-collapsed', collapsed);
+            var label = groupEl.querySelector('.los-nav-group-label');
+            if (label) label.setAttribute('aria-expanded', String(!collapsed));
+        }
+
+        var collapsedGroups = getCollapsedGroups();
+        document.querySelectorAll('.los-sidebar .los-nav-group').forEach(function (groupEl) {
+            var key = groupEl.dataset.groupKey;
+            if (collapsedGroups.indexOf(key) !== -1) {
+                setGroupCollapsed(groupEl, true);
+            }
+            var label = groupEl.querySelector('.los-nav-group-label');
+            if (label) {
+                label.addEventListener('click', function () {
+                    var collapsed = !groupEl.classList.contains('is-collapsed');
+                    setGroupCollapsed(groupEl, collapsed);
+                    var current = getCollapsedGroups();
+                    var idx = current.indexOf(key);
+                    if (collapsed && idx === -1) current.push(key);
+                    if (!collapsed && idx !== -1) current.splice(idx, 1);
+                    try {
+                        window.localStorage.setItem(GROUPS_KEY, JSON.stringify(current));
+                    } catch (ignored) {
+                    }
+                });
+            }
+        });
 
         document.querySelectorAll('.los-sidebar .los-nav-item').forEach(function (a) {
             if (a.target !== '_blank') {
