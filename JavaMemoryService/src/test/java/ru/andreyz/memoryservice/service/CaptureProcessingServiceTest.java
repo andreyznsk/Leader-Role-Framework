@@ -11,6 +11,7 @@ import ru.andreyz.common.agent.AgentException;
 import ru.andreyz.memoryservice.domain.Capture;
 import ru.andreyz.memoryservice.dto.CaptureRequest;
 import ru.andreyz.memoryservice.dto.ClassifiedCapture;
+import ru.andreyz.memoryservice.service.CaptureClassifierAgent.ClassificationBatch;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -70,8 +71,8 @@ class CaptureProcessingServiceTest {
         Capture saved = captureService.save(new CaptureRequest("needs classification", "cli"));
         String file = captureService.findTodayFiles().get(0).file();
 
-        when(classifierAgent.classifyFiles(anyList(), anyString()))
-                .thenReturn(List.of(new ClassifiedCapture(
+        when(classifierAgent.classifyFilesWithTrace(anyList(), anyString()))
+                .thenReturn(batchOf(new ClassifiedCapture(
                         saved.id(), file, "NOTE", "Classification note", "context", "capture", "NORMAL")));
 
         CaptureProcessingService.ProcessResult result = processingService.processToday();
@@ -85,8 +86,8 @@ class CaptureProcessingServiceTest {
         Capture saved = captureService.save(new CaptureRequest("mark processed test", "cli"));
         String file = captureService.findTodayFiles().get(0).file();
 
-        when(classifierAgent.classifyFiles(anyList(), anyString()))
-                .thenReturn(List.of(new ClassifiedCapture(
+        when(classifierAgent.classifyFilesWithTrace(anyList(), anyString()))
+                .thenReturn(batchOf(new ClassifiedCapture(
                         saved.id(), file, "NOTE", "Q title", "Q body", "capture", "LOW")));
 
         processingService.processToday();
@@ -106,8 +107,8 @@ class CaptureProcessingServiceTest {
         Capture saved = captureService.save(new CaptureRequest("move processed test", "cli"));
         String file = captureService.findTodayFiles().get(0).file();
 
-        when(classifierAgent.classifyFiles(anyList(), anyString()))
-                .thenReturn(List.of(new ClassifiedCapture(
+        when(classifierAgent.classifyFilesWithTrace(anyList(), anyString()))
+                .thenReturn(batchOf(new ClassifiedCapture(
                         saved.id(), file, "NOTE", "Moved", "move processed test", "capture", "NORMAL")));
 
         processingService.processToday();
@@ -123,7 +124,7 @@ class CaptureProcessingServiceTest {
     void processToday_classifierThrows_returnsZeroRouted() throws Exception {
         captureService.save(new CaptureRequest("will fail classification", "cli"));
 
-        when(classifierAgent.classifyFiles(anyList(), anyString()))
+        when(classifierAgent.classifyFilesWithTrace(anyList(), anyString()))
                 .thenThrow(new AgentException("claude not found"));
 
         CaptureProcessingService.ProcessResult result = processingService.processToday();
@@ -136,15 +137,19 @@ class CaptureProcessingServiceTest {
     void processToday_passesTodayPendingCaptureToAgent() throws Exception {
         captureService.save(new CaptureRequest("agent receives this", "cli"));
 
-        when(classifierAgent.classifyFiles(anyList(), anyString())).thenReturn(List.of());
+        when(classifierAgent.classifyFilesWithTrace(anyList(), anyString())).thenReturn(batchOf());
 
         processingService.processToday();
 
-        verify(classifierAgent).classifyFiles(
+        verify(classifierAgent).classifyFilesWithTrace(
                 org.mockito.ArgumentMatchers.argThat(list ->
                         list.stream().anyMatch(c -> c.text().equals("agent receives this"))
                 ),
                 anyString()
         );
+    }
+
+    private ClassificationBatch batchOf(ClassifiedCapture... items) {
+        return new ClassificationBatch(List.of(items), "test-prompt", "[]", "test");
     }
 }

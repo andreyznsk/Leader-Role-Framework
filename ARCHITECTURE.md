@@ -94,12 +94,12 @@ agent:
 
 | Тип | Действие |
 |-----|----------|
-| `REQUEST` | `PLAN_APPEND` -> POST `/api/tasks/pending` -> move в `processed/` |
+| `REQUEST` | POST `/api/intake` (suggestedRoute=`TASK`) -> move в `processed/` |
 | `DRAFT` | move в `processed/` |
-| `NOISE` | move в `processed/` -> `MARK_AS_READ` |
-| `CAPTURE` | POST `/api/capture` -> move в `processed/` |
-| `NOTICE` | записать NOTICE markdown -> move в `processed/` -> `MARK_AS_READ` |
-| `NOTE` | POST `/api/notes` (поля: `title`, `text`, `tags`, `source`) -> move в `processed/` |
+| `NOISE` | POST `/api/intake` (suggestedRoute=`NOISE`) -> move в `processed/` -> `MARK_AS_READ` |
+| `CAPTURE` | POST `/api/intake` (suggestedRoute=`NOTE`) -> move в `processed/` |
+| `NOTICE` | POST `/api/intake` (suggestedRoute=`RAG`) -> move в `processed/` -> `MARK_AS_READ` |
+| `NOTE` | POST `/api/intake` (suggestedRoute=`NOTE`) -> move в `processed/` |
 
 **Трекинг обработанных писем:** таблица `mailagent.processed_emails` теперь хранит не только dedup, но и checkpoint state-machine:
 - `status`: `NEW | PROCESSING | ERROR | PROCESSED`
@@ -111,9 +111,7 @@ agent:
 **Scheduler:** polling запускается через `@Scheduled(fixedDelayString = "#{${mail.poll-interval-seconds:60} * 1000}")`. Параметр `mail.poll-interval-seconds` читается из application properties при старте приложения.
 
 **Исходящие вызовы:**
-- `POST http://localhost:8082/api/tasks/pending` — создать PENDING задачу
-- `POST http://localhost:8082/api/capture` — создать raw capture
-- `POST http://localhost:8082/api/notes` — создать operational note
+- `POST http://localhost:8082/api/intake` — создать intake item для mail-derived action
 
 **UI:** `http://localhost:8080/ui/status` — статус агента, счётчики, последние логи
 
@@ -244,11 +242,12 @@ MemoryService выступает единой точкой управления 
 
 **Capture Bot:** `POST /api/capture` сохраняет заметку без интерпретации.
 `CaptureScheduler` по `capture.scheduler.cron` пакетно читает `capture-inbox/YYYY-MM-DD/*.md`,
-добавляет контекст дня, вызывает `AgentClient` из `common` и маршрутизирует результат:
-`TASK → tasks/pending`, `RISK → risks`, `NOTE → notes`, `QUESTION → questions`,
-`PERSON_NOTE → person_notes`, `KNOWLEDGE → JavaRagService/rag-inbox/captures`,
-`JOURNAL → workspace/08_daily_journal`.
-После успешной обработки файл переносится в `capture-inbox/processed/YYYY-MM-DD/`.
+добавляет контекст дня, вызывает `AgentClient` из `common` и создаёт intake items для ручного review:
+`TASK → suggestedRoute=TASK`, `RISK → suggestedRoute=RISK`, `NOTE/QUESTION/JOURNAL → suggestedRoute=NOTE`,
+`PERSON_NOTE → suggestedRoute=PERSON`, `KNOWLEDGE → suggestedRoute=RAG`.
+После успешного создания intake item файл переносится в `capture-inbox/processed/YYYY-MM-DD/`.
+
+**Важно:** agent-originated MCP writes (`createTask`, `createIncident`, `addRisk` и т.п.) пока не маршрутизируются через Intake Gateway. Это отдельный follow-up CR.
 
 **Usage Statistics:** Memory Service владеет таблицей `memory.usage_events` и пишет события
 из task, pending task, capture, capture processing и knowledge search flow. Агрегаты доступны через

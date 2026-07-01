@@ -35,7 +35,11 @@ User Review
 Apply to target receiver
 ```
 
-На первом этапе все элементы проходят через ручной режим:
+На первом этапе через Intake Gateway проходят только входящие автоматические сигналы, которым нужен ручной review перед финальной маршрутизацией.
+
+Ручной пользовательский ввод в этот gateway не входит: если пользователь сам создает задачу, заметку, риск или другой объект вручную, он делает это напрямую в целевой сущности без дополнительной intake-очереди.
+
+Для intake-элементов используется ручной review:
 
 ```text
 NEW → REVIEWING → APPLIED | REJECTED
@@ -43,14 +47,17 @@ NEW → REVIEWING → APPLIED | REJECTED
 
 RAG становится не прямым приёмником `NOTICE`, а одним из доступных target receiver-ов.
 
-## Основные источники
+## Основные источники первого этапа
 
 | Источник | Как попадает в Intake Gateway |
 |---------|-------------------------------|
-| `MAIL` | JavaMailAgent отправляет результат классификации в MemoryService `/api/intake` вместо прямой записи NOTICE в RAG |
+| `MAIL` | JavaMailAgent отправляет результат классификации в MemoryService `/api/intake` |
 | `CAPTURE` | Capture Bot после предварительной классификации создаёт intake item |
-| `AGENT_MCP` | Agent Workspace / MCP tools создают intake item для предложений агента |
-| `MANUAL` | пользователь вручную добавляет текст в gateway |
+
+### Вне scope первого этапа
+
+- `MANUAL`: ручной пользовательский ввод не проходит через Intake Gateway;
+- `AGENT_MCP`: отдельный producer flow для Agent Workspace / MCP tools будет добавлен позже.
 
 ## Target receivers
 
@@ -58,8 +65,8 @@ RAG становится не прямым приёмником `NOTICE`, а о�
 
 | Route | Действие при Apply |
 |------|---------------------|
-| `RAG` | создать knowledge document candidate и передать в Knowledge Gateway / JavaRagService |
-| `TASK` | создать задачу или pending task |
+| `RAG` | после Apply записать knowledge markdown в `JavaRagService/rag-inbox/intake` |
+| `TASK` | создать pending task |
 | `NOTE` | создать operational note |
 | `INCIDENT` | создать или обновить incident |
 | `RISK` | создать или обновить risk |
@@ -123,6 +130,8 @@ Actions:
 ```
 
 Важно: `agentPrompt` и `agentResult` должны быть видны пользователю, но свернуты по умолчанию.
+
+На этом этапе UI предназначен для review уже созданных intake items. Отдельная форма ручного создания intake item пользователем не требуется.
 
 ## Изменения в API
 
@@ -246,14 +255,14 @@ idx_intake_items_source_id
 
 ### JavaMailAgent
 
+- MailAgent отправляет intake item в MemoryService.
 - `NOTICE` больше не должен напрямую писать файл в `rag-inbox`.
-- MailAgent должен отправлять intake item в MemoryService.
-- Для `REQUEST` на первом этапе допустимо оставить старый flow, но желательно также поддержать route через Intake Gateway под feature flag.
+- В текущей реализации через Intake Gateway может идти не только `NOTICE`, но и другие классифицированные типы (`REQUEST`, `CAPTURE`, `NOTE`, `NOISE`) с suggested route.
 
 ### JavaRagService
 
-- Не принимает сырые кандидаты напрямую.
-- Получает только подтвержденные knowledge documents через MemoryService proxy.
+- Не должен получать сырой `NOTICE` до ручного Apply.
+- После ручного Apply knowledge-кандидат появляется в `rag-inbox/intake` и дальше обрабатывается существующим RAG ingestion flow.
 
 ### common
 
@@ -273,9 +282,9 @@ idx_intake_items_source_id
 
 1. Отправить письмо, классифицированное как `NOTICE`.
 2. Проверить, что оно появилось в `/ui/intake`.
-3. Проверить, что до Apply в RAG ничего не проиндексировано.
+3. Проверить, что до Apply в `rag-inbox/intake` ничего не создано.
 4. Нажать Apply → `RAG`.
-5. Проверить, что документ появился в Knowledge Gateway / RAG status.
+5. Проверить, что markdown-файл появился в `JavaRagService/rag-inbox/intake`.
 
 ### UI smoke
 
@@ -293,7 +302,13 @@ idx_intake_items_source_id
 - [ ] Пользователь видит `sourcePayload`, `agentPrompt`, `agentResult`, `suggestedRoute`.
 - [ ] Пользователь может поменять route и применить.
 - [ ] Apply создаёт сущность в выбранном target receiver.
-- [ ] До ручного Apply данные не попадают в RAG.
+- [ ] До ручного Apply knowledge markdown не попадает в `rag-inbox/intake`.
+
+## Scope Notes
+
+- Этот CR не добавляет ручное создание intake item через UI.
+- Этот CR не добавляет отдельный producer flow для `AGENT_MCP`.
+- Для `RAG` в рамках текущей реализации используется file-based handoff через `rag-inbox/intake`.
 
 ## После подтверждения пользователя
 

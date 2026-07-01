@@ -947,6 +947,8 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 Task timeline доступен через `GET /api/tasks/{id}/timeline`; любые значимые изменения задачи создают immutable event в `task_events`.
 Today UI также поддерживает inline-смену даты задачи через `PATCH /api/tasks/{id}/date` и batch-операцию `POST /api/tasks/move-overdue-to-today`.
 
+Важно: текущие MCP write-tools ещё не используют Intake Gateway. Agent-originated writes через MCP будут вынесены в отдельный CR.
+
 ### Правило подтверждения (ОБЯЗАТЕЛЬНО в CLAUDE.md агента)
 
 Перед вызовом `createTask`, `createIncident`, `addRisk` агент ВСЕГДА показывает:
@@ -1136,13 +1138,20 @@ POST /api/capture/process-now
 
 | Type | Действие |
 |------|----------|
-| `TASK` | `TaskService.createPending(...)`, статус `PENDING`, подтверждение в `/ui/today` |
-| `RISK` | `RiskService.create(...)`, probability/impact по умолчанию `MEDIUM` |
-| `NOTE` | `NoteService.create(..., source="capture")` |
-| `QUESTION` | `QuestionService.create(...)` |
-| `PERSON_NOTE` | `person_notes` по имени через `PersonNameNoteRepository` |
-| `KNOWLEDGE` | Markdown-файл в `${app.rag.inbox-dir}/captures/` |
-| `JOURNAL` | append в `${app.workspace.dir}/08_daily_journal/YYYY-MM-DD.md` |
+| `TASK` | создать intake item со `suggestedRoute=TASK` |
+| `RISK` | создать intake item со `suggestedRoute=RISK` |
+| `NOTE` | создать intake item со `suggestedRoute=NOTE` |
+| `QUESTION` | создать intake item со `suggestedRoute=NOTE` |
+| `PERSON_NOTE` | создать intake item со `suggestedRoute=PERSON` |
+| `KNOWLEDGE` | создать intake item со `suggestedRoute=RAG` |
+| `JOURNAL` | создать intake item со `suggestedRoute=NOTE` |
+
+После ручного Apply intake item создаёт финальную сущность:
+- `TASK` → pending task
+- `RISK` → risk
+- `NOTE` / `QUESTION` / `JOURNAL` → operational note
+- `PERSON_NOTE` → person note
+- `KNOWLEDGE` → markdown-файл в `${app.rag.inbox-dir}/intake/`
 
 ---
 
@@ -1166,8 +1175,8 @@ Content-Type: application/json
 Задача создаётся со статусом `PENDING`.
 Далее пользователь видит её в UI `/ui/today` в секции "Ожидают подтверждения" и нажимает [Принять] / [Изменить] / [Отклонить].
 
-**Агент через MCP не участвует в этом потоке** — PENDING задачи подтверждаются только через UI.
-`NOTICE` письма в этот поток не попадают: они сразу становятся RAG-документами в Knowledge Gateway.
+**Агент через MCP не участвует в intake-потоке** — его write-tools пока создают сущности напрямую, это отдельный follow-up CR.
+`NOTICE` письма в этот поток попадают как intake items со `suggestedRoute=RAG`; до ручного Apply они не становятся RAG-документами.
 
 ---
 
