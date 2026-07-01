@@ -111,6 +111,18 @@ public class MemoryServiceClient {
         }
     }
 
+    public void createIntake(Map<String, Object> payload) {
+        if (!enabled) {
+            log.debug("memory-service disabled, skipping intake");
+            return;
+        }
+        try {
+            postJson("/api/intake", payload, "Intake item created in memory-service");
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to create intake item in memory-service", e);
+        }
+    }
+
     public boolean isHealthy() {
         if (!enabled) return false;
         try {

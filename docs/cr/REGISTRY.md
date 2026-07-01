@@ -23,6 +23,11 @@
 | CR-MEM-016        | [2026-06-29_CR-MEM-016-agent-workspace-ui.md](2026-06-29_CR-MEM-016-agent-workspace-ui.md) | Implemented | 2026-06-29 |
 | CR-MEM-017        | [2026-06-29_CR-MEM-017-task-timeline-audit.md](2026-06-29_CR-MEM-017-task-timeline-audit.md) | Implemented | 2026-06-29 |
 | CR-MEM-018        | [2026-06-30_CR-MEM-018-move-overdue-tasks-to-today.md](2026-06-30_CR-MEM-018-move-overdue-tasks-to-today.md) | DONE | 2026-06-30 |
+| CR-MEM-019        | [2026-06-30_CR-MEM-019-intake-gateway-manual-routing.md](2026-06-30_CR-MEM-019-intake-gateway-manual-routing.md) | DONE | 2026-06-30 |
+| CR-MEM-020        | [2026-06-30_CR-MEM-020-intake-route-automation.md](2026-06-30_CR-MEM-020-intake-route-automation.md) | Draft | 2026-06-30 |
+| CR-MEM-021        | [2026-06-30_CR-MEM-021-intake-rollback-reapply.md](2026-06-30_CR-MEM-021-intake-rollback-reapply.md) | Draft | 2026-06-30 |
+| CR-MEM-022        | [2026-06-30_CR-MEM-022-left-sidebar-navigation.md](2026-06-30_CR-MEM-022-left-sidebar-navigation.md) | Implemented | 2026-06-30 |
+| CR-MEM-023        | [2026-06-30_CR-MEM-023-task-edit-right-control-panel.md](2026-06-30_CR-MEM-023-task-edit-right-control-panel.md) | Implemented | 2026-06-30 |
 | CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md) | Draft | —          |
 
 ---
@@ -67,5 +72,5 @@
 
 ---
 
-_Следующий свободный номер в MEM серии: **CR-MEM-019**_  
+_Следующий свободный номер в MEM серии: **CR-MEM-024**_  
 _Последнее обновление реестра: 2026-06-30_

@@ -94,12 +94,12 @@ agent:
 
 | Тип | Действие |
 |-----|----------|
-| `REQUEST` | `PLAN_APPEND` -> POST `/api/tasks/pending` -> move в `processed/` |
-| `DRAFT` | move в `processed/` |
-| `NOISE` | move в `processed/` -> `MARK_AS_READ` |
-| `CAPTURE` | POST `/api/capture` -> move в `processed/` |
-| `NOTICE` | записать NOTICE markdown -> move в `processed/` -> `MARK_AS_READ` |
-| `NOTE` | POST `/api/notes` (поля: `title`, `text`, `tags`, `source`) -> move в `processed/` |
+| `REQUEST` | POST `/api/intake` (suggestedRoute=`TASK`) -> move в `processed/` |
+| `DRAFT` | POST `/api/intake` (suggestedRoute=`NOISE`) -> move в `processed/` |
+| `NOISE` | POST `/api/intake` (suggestedRoute=`NOISE`) -> move в `processed/` -> `MARK_AS_READ` |
+| `CAPTURE` | POST `/api/intake` (suggestedRoute=`NOTE`) -> move в `processed/` |
+| `NOTICE` | POST `/api/intake` (suggestedRoute=`RAG`) -> move в `processed/` -> `MARK_AS_READ` |
+| `NOTE` | POST `/api/intake` (suggestedRoute=`NOTE`) -> move в `processed/` |
 
 **Трекинг обработанных писем:** таблица `mailagent.processed_emails` теперь хранит не только dedup, но и checkpoint state-machine:
 - `status`: `NEW | PROCESSING | ERROR | PROCESSED`
@@ -111,9 +111,7 @@ agent:
 **Scheduler:** polling запускается через `@Scheduled(fixedDelayString = "#{${mail.poll-interval-seconds:60} * 1000}")`. Параметр `mail.poll-interval-seconds` читается из application properties при старте приложения.
 
 **Исходящие вызовы:**
-- `POST http://localhost:8082/api/tasks/pending` — создать PENDING задачу
-- `POST http://localhost:8082/api/capture` — создать raw capture
-- `POST http://localhost:8082/api/notes` — создать operational note
+- `POST http://localhost:8082/api/intake` — создать intake item для mail-derived action
 
 **UI:** `http://localhost:8080/ui/status` — статус агента, счётчики, последние логи
 
@@ -190,7 +188,13 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 |-------|------|----------|
 | `GET` | `/api/context` | Контекст сессии: today/tomorrow, open incidents/risks, recent people notes |
 | `POST` | `/api/tasks` | Создать подтверждённую задачу; UI создаёт title, description, priority, status, dueDate, date |
-| `POST` | `/api/tasks/pending` | Создать задачу со статусом PENDING |
+| `POST` | `/api/tasks/pending` | Создать задачу со статусом PENDING напрямую; mail/capture flow сюда больше не пишет напрямую |
+| `POST` | `/api/intake` | Создать intake item для mail/capture/manual producer |
+| `GET` | `/api/intake?status=NEW` | Список intake items с фильтрами по status/sourceType/suggestedRoute |
+| `GET` | `/api/intake/{id}` | Детальная карточка intake item |
+| `PUT` | `/api/intake/{id}` | Сохранить finalRoute/finalPayload, статус `REVIEWING` |
+| `POST` | `/api/intake/{id}/apply` | Применить item в target receiver (`TASK`, `NOTE`, `RAG`, `RISK`, `INCIDENT`, `PERSON`, `NOISE`) |
+| `POST` | `/api/intake/{id}/reject` | Отклонить item, статус `REJECTED` |
 | `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `ARCHIVED` и legacy `DELETED` по умолчанию |
 | `PATCH` | `/api/tasks/{id}/status` | Изменить статус задачи |
 | `POST` | `/api/capture` | Сохранить raw capture в БД и `capture-inbox/` |
@@ -207,6 +211,7 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `GET` | `/ui/notes` | Web UI: Operational Notes |
 | `GET` | `/ui/captures` | Web UI: Capture Inbox |
 | `GET` | `/ui/knowledge` | Web UI: Knowledge Gateway для RAG lifecycle |
+| `GET` | `/ui/intake` | Web UI: Intake Gateway для ручного review автоматических входящих сигналов |
 | `GET` | `/ui/stats` | Web UI: статистика использования и saved time |
 | `GET` | `/ui/settings` | Web UI: Control Plane — настройки плагинов (descriptor-driven UI) |
 | `GET` | `/ui/agent-workspace` | Web UI: Agent Workspace — Chat и Console режимы работы с агентом (CR-MEM-012) |
@@ -244,11 +249,12 @@ MemoryService выступает единой точкой управления 
 
 **Capture Bot:** `POST /api/capture` сохраняет заметку без интерпретации.
 `CaptureScheduler` по `capture.scheduler.cron` пакетно читает `capture-inbox/YYYY-MM-DD/*.md`,
-добавляет контекст дня, вызывает `AgentClient` из `common` и маршрутизирует результат:
-`TASK → tasks/pending`, `RISK → risks`, `NOTE → notes`, `QUESTION → questions`,
-`PERSON_NOTE → person_notes`, `KNOWLEDGE → JavaRagService/rag-inbox/captures`,
-`JOURNAL → workspace/08_daily_journal`.
-После успешной обработки файл переносится в `capture-inbox/processed/YYYY-MM-DD/`.
+добавляет контекст дня, вызывает `AgentClient` из `common` и создаёт intake items для ручного review:
+`TASK → suggestedRoute=TASK`, `RISK → suggestedRoute=RISK`, `NOTE/QUESTION/JOURNAL → suggestedRoute=NOTE`,
+`PERSON_NOTE → suggestedRoute=PERSON`, `KNOWLEDGE → suggestedRoute=RAG`.
+После успешного создания intake item файл переносится в `capture-inbox/processed/YYYY-MM-DD/`.
+
+**Важно:** agent-originated MCP writes (`createTask`, `createIncident`, `addRisk` и т.п.) пока не маршрутизируются через Intake Gateway. Это отдельный follow-up CR.
 
 **Usage Statistics:** Memory Service владеет таблицей `memory.usage_events` и пишет события
 из task, pending task, capture, capture processing и knowledge search flow. Агрегаты доступны через
@@ -438,7 +444,7 @@ SPRING_PROFILES_ACTIVE=local java -jar JavaMailAgent/target/mail-agent.jar
 ## Связи между сервисами
 
 ```
-JavaMailAgent  ──POST /api/tasks/pending──→  JavaMemoryService
+JavaMailAgent  ──POST /api/intake──→  JavaMemoryService
 JavaMailAgent  ──AgentClient──→  common
 JavaMemoryService ──capture KNOWLEDGE файл──→  JavaRagService/rag-inbox/captures
 JavaMemoryService ──AgentClient──→  common
@@ -706,7 +712,7 @@ docker compose up -d
 | `04_poll_cycle_request.md` | HIGH | дедлайн → REQUEST → today.md + unread |
 | `05_deduplication.md` | HIGH | письмо обрабатывается ровно один раз |
 | `06_multiple_emails.md` | MEDIUM | 3 типа за один poll + корректные read-статусы |
-| `07_integration_memory_service.md` | HIGH | REQUEST → POST /api/tasks/pending → PENDING |
+| `07_integration_memory_service.md` | HIGH | REQUEST/NOTICE/CAPTURE/... → POST /api/intake → NEW intake item |
 
 #### JavaRagService (`test_e2e/`)
 

@@ -49,6 +49,11 @@ public class TaskController {
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<Task> getTask(@PathVariable Long id) {
+        return ResponseEntity.ok(taskService.findById(id));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<Task> editTask(@PathVariable Long id, @RequestBody EditTaskRequest req) {
         return ResponseEntity.ok(taskService.edit(id, req));

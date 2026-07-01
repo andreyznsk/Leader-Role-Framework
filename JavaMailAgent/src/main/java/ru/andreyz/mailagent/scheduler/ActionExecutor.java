@@ -1,6 +1,7 @@
 package ru.andreyz.mailagent.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.config.MailConfig;
@@ -9,7 +10,6 @@ import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.MailProcessingRoute;
-import ru.andreyz.mailagent.model.PendingTaskRequest;
 import ru.andreyz.mailagent.model.ProcessedEmail;
 import ru.andreyz.mailagent.service.MailProcessingStateService;
 import ru.andreyz.mailagent.service.MailRuntimeConfig;
@@ -19,7 +19,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 
@@ -36,11 +37,17 @@ public class ActionExecutor {
     private final MailRuntimeConfigService runtimeConfigService;
     private final MailProcessingStateService processingStateService;
     private final ObjectMapper objectMapper;
+    @Value("${agent.provider:unknown}")
+    private String agentProvider;
 
     public void execute(Email email, AgentResponse response) throws Exception {
+        execute(email, response, null, null);
+    }
+
+    public void execute(Email email, AgentResponse response, String agentPrompt, String agentRawResult) throws Exception {
         MailRuntimeConfig runtime = runtimeConfigService.snapshot();
         ProcessedEmail state = processingStateService.start(email, response.type().name());
-        Object payload = buildPayload(email, response, runtime);
+        Object payload = buildPayload(email, response, runtime, agentPrompt, agentRawResult);
         executeChain(state, email, response.type(), initialRoute(response.type()), payload);
     }
 
@@ -73,13 +80,7 @@ public class ActionExecutor {
                 actionResultJson
             );
             try {
-                StepResult result = switch (responseType) {
-                    case REQUEST -> executeRequestRoute(route, (RequestActionPayload) routePayload);
-                    case CAPTURE -> executeCaptureRoute(route, (CaptureActionPayload) routePayload);
-                    case NOTICE -> executeNoticeRoute(route, email, (NoticeActionPayload) routePayload);
-                    case NOTE -> executeNoteRoute(route, email, (NoteActionPayload) routePayload);
-                    case NOISE, DRAFT -> executeMailSideEffectRoute(route, email, (MailSideEffectPayload) routePayload);
-                };
+                StepResult result = executeMailIntakeRoute(route, email, (IntakeMailActionPayload) routePayload);
                 route = result.nextRoute();
                 routePayload = result.nextPayload();
                 if (result.outputPath() != null) {
@@ -108,118 +109,27 @@ public class ActionExecutor {
         return Path.of(target, sanitize(emailId) + ".json");
     }
 
-    private StepResult executeRequestRoute(MailProcessingRoute route, RequestActionPayload payload) throws Exception {
+    private StepResult executeMailIntakeRoute(MailProcessingRoute route,
+                                              Email email,
+                                              IntakeMailActionPayload payload) throws Exception {
         return switch (route) {
-            case PLAN_APPEND -> {
-                if (shouldAppendPlan(payload)) {
-                    Path planFile = Path.of(payload.planPath());
-                    if (planFile.getParent() != null) {
-                        Files.createDirectories(planFile.getParent());
-                    }
-                    Files.writeString(planFile, "\n" + payload.taskLine(),
-                        StandardOpenOption.APPEND, StandardOpenOption.CREATE);
-                }
-                yield new StepResult(MailProcessingRoute.MEMORY_PENDING_TASK, payload, null, null);
-            }
-            case MEMORY_PENDING_TASK -> {
-                memoryServiceClient.createPendingTask(payload.pendingTaskRequest());
-                log.info("REQUEST → plan + memory-service: {}", payload.taskLine());
-                yield new StepResult(MailProcessingRoute.MOVE_TO_PROCESSED, payload, null, null);
-            }
-            case MOVE_TO_PROCESSED -> {
-                moveToProcessedIfEnabled(resolveInbox(payload.pendingTaskRequest().emailId()),
-                    resolveProcessed(payload.pendingTaskRequest().emailId(), payload.processedFolder()),
-                    payload.moveEnabled());
-                yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
-            }
-            default -> throw new IllegalStateException("Unsupported REQUEST route: " + route);
-        };
-    }
-
-    private StepResult executeCaptureRoute(MailProcessingRoute route, CaptureActionPayload payload) throws Exception {
-        return switch (route) {
-            case MEMORY_CAPTURE -> {
-                memoryServiceClient.createCapture(payload.text(), payload.source(), payload.sourceId());
-                log.info("CAPTURE → memory-service: {}", payload.text());
+            case INTAKE_WRITE -> {
+                memoryServiceClient.createIntake(payload.intakeRequest());
+                log.info("{} → memory-service intake: {}", payload.responseType(), email.id());
                 yield new StepResult(MailProcessingRoute.MOVE_TO_PROCESSED, payload, null, null);
             }
             case MOVE_TO_PROCESSED -> {
                 moveToProcessedIfEnabled(resolveInbox(payload.sourceId()),
                     resolveProcessed(payload.sourceId(), payload.processedFolder()),
-                    payload.moveEnabled());
-                yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
-            }
-            default -> throw new IllegalStateException("Unsupported CAPTURE route: " + route);
-        };
-    }
-
-    private StepResult executeNoticeRoute(MailProcessingRoute route,
-                                          Email email,
-                                          NoticeActionPayload payload) throws Exception {
-        return switch (route) {
-            case NOTICE_WRITE -> {
-                Path noticePath = noticeDocumentWriter.write(email, payload.note());
-                log.info("NOTICE → rag-inbox: {}", noticePath);
-                yield new StepResult(
-                    MailProcessingRoute.MOVE_TO_PROCESSED,
-                    payload,
-                    noticePath.toString(),
-                    objectMapper.writeValueAsString(new NoticeActionResult(noticePath.toString()))
-                );
-            }
-            case MOVE_TO_PROCESSED -> {
-                moveToProcessedIfEnabled(resolveInbox(email.id()),
-                    resolveProcessed(email.id(), payload.processedFolder()),
-                    payload.moveEnabled());
-                yield new StepResult(MailProcessingRoute.MARK_AS_READ, payload, null, null);
-            }
-            case MARK_AS_READ -> {
-                markAsReadIfEnabled(email, payload.markAsRead(), "NOTICE");
-                yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
-            }
-            default -> throw new IllegalStateException("Unsupported NOTICE route: " + route);
-        };
-    }
-
-    private StepResult executeNoteRoute(MailProcessingRoute route,
-                                        Email email,
-                                        NoteActionPayload payload) throws Exception {
-        return switch (route) {
-            case MEMORY_NOTE -> {
-                memoryServiceClient.createNote(payload.title(), payload.text(), payload.tags(), payload.source());
-                log.info("NOTE → memory-service notes: {}", payload.title());
-                yield new StepResult(MailProcessingRoute.MOVE_TO_PROCESSED, payload, null, null);
-            }
-            case MOVE_TO_PROCESSED -> {
-                moveToProcessedIfEnabled(resolveInbox(payload.sourceId()),
-                    resolveProcessed(payload.sourceId(), payload.processedFolder()),
-                    payload.moveEnabled());
-                yield new StepResult(MailProcessingRoute.MARK_AS_READ, payload, null, null);
-            }
-            case MARK_AS_READ -> {
-                markAsReadIfEnabled(email, true, "NOTE");
-                yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
-            }
-            default -> throw new IllegalStateException("Unsupported NOTE route: " + route);
-        };
-    }
-
-    private StepResult executeMailSideEffectRoute(MailProcessingRoute route,
-                                                  Email email,
-                                                  MailSideEffectPayload payload) throws Exception {
-        return switch (route) {
-            case MOVE_TO_PROCESSED -> {
-                moveToProcessedIfEnabled(resolveInbox(email.id()),
-                    resolveProcessed(email.id(), payload.processedFolder()),
                     payload.moveEnabled());
                 MailProcessingRoute next = payload.markAsRead() ? MailProcessingRoute.MARK_AS_READ : MailProcessingRoute.NONE;
                 yield new StepResult(next, payload, null, null);
             }
             case MARK_AS_READ -> {
-                markAsReadIfEnabled(email, payload.markAsRead(), "NOISE");
+                markAsReadIfEnabled(email, payload.markAsRead(), payload.responseType());
                 yield new StepResult(MailProcessingRoute.NONE, payload, null, null);
             }
-            default -> throw new IllegalStateException("Unsupported mail side-effect route: " + route);
+            default -> throw new IllegalStateException("Unsupported intake mail route: " + route);
         };
     }
 
@@ -236,66 +146,117 @@ public class ActionExecutor {
         mailClient.markAsRead(email.id(), email.folder());
     }
 
-    private Object buildPayload(Email email, AgentResponse response, MailRuntimeConfig runtime) {
-        return switch (response.type()) {
-            case REQUEST -> new RequestActionPayload(
-                response.taskLine(),
-                pathProperties.getPlan(),
-                new PendingTaskRequest(
-                    response.taskTitle(),
-                    buildPendingTaskDescription(email, response),
-                    response.emailId(),
-                    response.sender(),
-                    response.priority(),
-                    response.pendingType(),
-                    response.suggestedTaskId(),
-                    response.agentConfidence(),
-                    response.agentReason(),
-                    "EMAIL",
-                    email.subject(),
-                    email.from(),
-                    response.proposedDescriptionAppend()
-                ),
-                runtime.processedFolder(),
-                runtime.moveProcessedMail()
-            );
-            case CAPTURE -> new CaptureActionPayload(
-                response.captureText() != null && !response.captureText().isBlank()
-                    ? response.captureText()
-                    : (response.note() != null ? response.note() : ""),
-                "email",
-                response.emailId(),
-                runtime.processedFolder(),
-                runtime.moveProcessedMail()
-            );
-            case NOTICE -> new NoticeActionPayload(
-                response.note(),
-                runtime.processedFolder(),
-                runtime.moveProcessedMail(),
-                true
-            );
-            case NOTE -> new NoteActionPayload(
-                response.noteTitle(),
-                response.noteText() != null && !response.noteText().isBlank()
-                    ? response.noteText()
-                    : (response.note() != null ? response.note() : ""),
-                "email",
-                "mail,email",
-                response.emailId(),
-                runtime.processedFolder(),
-                runtime.moveProcessedMail()
-            );
-            case NOISE -> new MailSideEffectPayload(
-                runtime.processedFolder(),
-                runtime.moveProcessedMail(),
-                runtime.markNoiseAsRead()
-            );
-            case DRAFT -> new MailSideEffectPayload(
-                runtime.processedFolder(),
-                runtime.moveProcessedMail(),
-                false
-            );
+    private Map<String, Object> buildIntakePayload(Email email,
+                                                   AgentResponse response,
+                                                   String agentPrompt,
+                                                   String agentRawResult) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("sourceType", "MAIL");
+        request.put("sourceId", email.messageId() != null && !email.messageId().isBlank() ? email.messageId() : email.id());
+        request.put("sourcePayload", buildMailSourcePayload(email));
+        request.put("agentProvider", agentProvider);
+        request.put("agentPrompt", agentPrompt);
+        request.put("agentResult", agentRawResult);
+        request.put("suggestedRoute", suggestedRoute(response.type()));
+        request.put("suggestedPayload", buildSuggestedPayload(email, response));
+        request.put("confidence", response.agentConfidence());
+        request.put("createdBy", "mail-agent");
+        return request;
+    }
+
+    private Map<String, Object> buildMailSourcePayload(Email email) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("emailId", email.id());
+        payload.put("messageId", email.messageId());
+        payload.put("conversationId", email.conversationId());
+        payload.put("inReplyTo", email.inReplyTo());
+        payload.put("folder", email.folder());
+        payload.put("from", email.from());
+        payload.put("recipients", email.recipients());
+        payload.put("subject", email.subject());
+        payload.put("body", email.body());
+        payload.put("receivedAt", email.receivedAt() != null ? email.receivedAt().toString() : null);
+        return payload;
+    }
+
+    private String suggestedRoute(AgentResponseType type) {
+        return switch (type) {
+            case REQUEST -> "TASK";
+            case CAPTURE, NOTE -> "NOTE";
+            case NOTICE -> "RAG";
+            case NOISE, DRAFT -> "NOISE";
         };
+    }
+
+    private Map<String, Object> buildSuggestedPayload(Email email, AgentResponse response) {
+        return switch (response.type()) {
+            case REQUEST -> buildTaskSuggestedPayload(email, response);
+            case CAPTURE -> buildCaptureSuggestedPayload(email, response);
+            case NOTICE -> buildNoticeSuggestedPayload(email, response);
+            case NOTE -> buildNoteSuggestedPayload(email, response);
+            case NOISE, DRAFT -> buildNoiseSuggestedPayload(email, response);
+        };
+    }
+
+    private Map<String, Object> buildTaskSuggestedPayload(Email email, AgentResponse response) {
+        Map<String, Object> suggested = new LinkedHashMap<>();
+        suggested.put("title", response.taskTitle());
+        suggested.put("description", buildPendingTaskDescription(email, response));
+        suggested.put("emailId", response.emailId());
+        suggested.put("sender", response.sender());
+        suggested.put("priority", response.priority());
+        suggested.put("subject", email.subject());
+        return suggested;
+    }
+
+    private Map<String, Object> buildCaptureSuggestedPayload(Email email, AgentResponse response) {
+        Map<String, Object> suggested = new LinkedHashMap<>();
+        suggested.put("title", hasText(email.subject()) ? email.subject().trim() : "Capture from mail");
+        suggested.put("text", hasText(response.captureText()) ? response.captureText() : fallbackMailSummary(email, response));
+        suggested.put("tags", "mail,capture");
+        return suggested;
+    }
+
+    private Map<String, Object> buildNoticeSuggestedPayload(Email email, AgentResponse response) {
+        Map<String, Object> suggested = new LinkedHashMap<>();
+        suggested.put("docType", "NOTICE");
+        suggested.put("title", hasText(email.subject()) ? email.subject().trim() : "Notice");
+        suggested.put("body", fallbackMailSummary(email, response));
+        suggested.put("subject", email.subject());
+        suggested.put("sender", email.from());
+        suggested.put("receivedAt", email.receivedAt() != null ? email.receivedAt().toString() : null);
+        return suggested;
+    }
+
+    private Map<String, Object> buildNoteSuggestedPayload(Email email, AgentResponse response) {
+        Map<String, Object> suggested = new LinkedHashMap<>();
+        suggested.put("title", hasText(response.noteTitle()) ? response.noteTitle() : email.subject());
+        suggested.put("text", hasText(response.noteText()) ? response.noteText() : fallbackMailSummary(email, response));
+        suggested.put("tags", "mail,email");
+        return suggested;
+    }
+
+    private Map<String, Object> buildNoiseSuggestedPayload(Email email, AgentResponse response) {
+        Map<String, Object> suggested = new LinkedHashMap<>();
+        suggested.put("title", hasText(email.subject()) ? email.subject().trim() : "Noise");
+        suggested.put("text", fallbackMailSummary(email, response));
+        return suggested;
+    }
+
+    private Object buildPayload(Email email, AgentResponse response, MailRuntimeConfig runtime, String agentPrompt, String agentRawResult) {
+        boolean markAsRead = switch (response.type()) {
+            case NOTICE, NOTE -> true;
+            case NOISE -> runtime.markNoiseAsRead();
+            case REQUEST, CAPTURE, DRAFT -> false;
+        };
+        return new IntakeMailActionPayload(
+            response.type().name(),
+            buildIntakePayload(email, response, agentPrompt, agentRawResult),
+            response.emailId(),
+            runtime.processedFolder(),
+            runtime.moveProcessedMail(),
+            markAsRead
+        );
     }
 
     private String buildPendingTaskDescription(Email email, AgentResponse response) {
@@ -305,6 +266,19 @@ public class ActionExecutor {
             return rawEmail;
         }
         return agentSummary + "\n\n---\n\n" + rawEmail;
+    }
+
+    private String fallbackMailSummary(Email email, AgentResponse response) {
+        if (hasText(response.note())) {
+            return response.note().strip();
+        }
+        if (hasText(response.noteText())) {
+            return response.noteText().strip();
+        }
+        if (hasText(response.captureText())) {
+            return response.captureText().strip();
+        }
+        return buildRawEmailBlock(email);
     }
 
     private String buildRawEmailBlock(Email email) {
@@ -337,14 +311,6 @@ public class ActionExecutor {
         return value != null && !value.isBlank();
     }
 
-    private boolean shouldAppendPlan(RequestActionPayload payload) {
-        String pendingType = payload.pendingTaskRequest().pendingType();
-        return pendingType == null
-                || pendingType.isBlank()
-                || "NEW_TASK".equalsIgnoreCase(pendingType)
-                || "REQUEST_CONFIRMATION".equalsIgnoreCase(pendingType);
-    }
-
     private String normalizeMultiline(String value) {
         if (!hasText(value)) {
             return null;
@@ -353,23 +319,11 @@ public class ActionExecutor {
     }
 
     private Object payloadFor(AgentResponseType responseType, String payloadJson) {
-        return switch (responseType) {
-            case REQUEST -> processingStateService.deserialize(payloadJson, RequestActionPayload.class);
-            case CAPTURE -> processingStateService.deserialize(payloadJson, CaptureActionPayload.class);
-            case NOTICE -> processingStateService.deserialize(payloadJson, NoticeActionPayload.class);
-            case NOTE -> processingStateService.deserialize(payloadJson, NoteActionPayload.class);
-            case NOISE, DRAFT -> processingStateService.deserialize(payloadJson, MailSideEffectPayload.class);
-        };
+        return processingStateService.deserialize(payloadJson, IntakeMailActionPayload.class);
     }
 
     private MailProcessingRoute initialRoute(AgentResponseType responseType) {
-        return switch (responseType) {
-            case REQUEST -> MailProcessingRoute.PLAN_APPEND;
-            case CAPTURE -> MailProcessingRoute.MEMORY_CAPTURE;
-            case NOTICE -> MailProcessingRoute.NOTICE_WRITE;
-            case NOTE -> MailProcessingRoute.MEMORY_NOTE;
-            case NOISE, DRAFT -> MailProcessingRoute.MOVE_TO_PROCESSED;
-        };
+        return MailProcessingRoute.INTAKE_WRITE;
     }
 
     private Email loadStoredEmail(String emailId, String processedFolder) throws IOException {
@@ -385,20 +339,8 @@ public class ActionExecutor {
     }
 
     private String processedFolderFor(Object payload) {
-        if (payload instanceof RequestActionPayload requestPayload) {
-            return requestPayload.processedFolder();
-        }
-        if (payload instanceof CaptureActionPayload capturePayload) {
-            return capturePayload.processedFolder();
-        }
-        if (payload instanceof NoticeActionPayload noticePayload) {
-            return noticePayload.processedFolder();
-        }
-        if (payload instanceof NoteActionPayload notePayload) {
-            return notePayload.processedFolder();
-        }
-        if (payload instanceof MailSideEffectPayload mailPayload) {
-            return mailPayload.processedFolder();
+        if (payload instanceof IntakeMailActionPayload intakePayload) {
+            return intakePayload.processedFolder();
         }
         return null;
     }
@@ -421,44 +363,12 @@ public class ActionExecutor {
         String actionResultJson
     ) {}
 
-    public record RequestActionPayload(
-        String taskLine,
-        String planPath,
-        PendingTaskRequest pendingTaskRequest,
-        String processedFolder,
-        boolean moveEnabled
-    ) {}
-
-    public record CaptureActionPayload(
-        String text,
-        String source,
+    public record IntakeMailActionPayload(
+        String responseType,
+        Map<String, Object> intakeRequest,
         String sourceId,
-        String processedFolder,
-        boolean moveEnabled
-    ) {}
-
-    public record NoticeActionPayload(
-        String note,
         String processedFolder,
         boolean moveEnabled,
         boolean markAsRead
     ) {}
-
-    public record NoteActionPayload(
-        String title,
-        String text,
-        String source,
-        String tags,
-        String sourceId,
-        String processedFolder,
-        boolean moveEnabled
-    ) {}
-
-    public record MailSideEffectPayload(
-        String processedFolder,
-        boolean moveEnabled,
-        boolean markAsRead
-    ) {}
-
-    public record NoticeActionResult(String outputPath) {}
 }
