@@ -760,6 +760,7 @@ Base: `http://localhost:8082/ui`
 - **Expanded** (`~264px`): логотип `LeaderOS`, группы с заголовками, иконка + label у каждого пункта.
 - **Collapsed** (`72px`, кнопка `#los-collapse-btn`): только иконки, hover-tooltip с названием пункта. Main content расширяется (offset считается через CSS-переменную `--los-sidebar-w`, переключается классом `html.los-collapsed`).
 - Состояние collapse хранится в `localStorage` (`leaderos.sidebar.collapsed`) и применяется до первого рендера страницы (anti-FOUC inline script в `head`-фрагменте), чтобы избежать скачка layout при переходах между страницами.
+- **Per-group accordion:** заголовок каждой группы (`.los-nav-group-label`) кликабелен и сворачивает/разворачивает свои пункты (`.los-nav-group-items`) независимо от остальных групп и от общего collapse сайдбара. Состояние хранится в `localStorage` (`leaderos.sidebar.collapsedGroups`, JSON-массив ключей групп: `operational`, `context-risks`, `knowledge`, `automation`, `system`) и переживает переходы между страницами. В icon-only (collapsed) режиме sidebar per-group состояние игнорируется — все иконки группы остаются видимыми, т.к. заголовки групп там не показываются.
 - **Mobile** (`<992px`): sidebar скрыт по умолчанию, показывается кнопка-гамбургер (`#los-mobile-toggle`) в слим top bar; открывается как overlay drawer с backdrop; клик по пункту меню закрывает drawer.
 - Активный пункт подсвечивается по `window.location.pathname` (JS в фрагменте, класс `.los-nav-item.active`).
 - Группировка пунктов:
