@@ -3,6 +3,16 @@
 <head th:fragment="head(title)">
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <script>
+        (function () {
+            try {
+                if (window.localStorage.getItem('leaderos.sidebar.collapsed') === 'true') {
+                    document.documentElement.classList.add('los-collapsed');
+                }
+            } catch (ignored) {
+            }
+        })();
+    </script>
     <title th:text="${title} + ' — LeaderOS'">LeaderOS</title>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
@@ -11,45 +21,155 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body>
-<nav th:fragment="nav" class="los-navbar">
-    <a class="los-brand" href="/ui/today">
+<th:block th:fragment="sidebar">
+<div class="los-mobile-topbar">
+    <button type="button" class="los-mobile-toggle" id="los-mobile-toggle"
+            aria-label="Открыть меню" aria-expanded="false" aria-controls="los-sidebar">
+        <span class="los-mobile-toggle-icon">&#9776;</span>
+    </button>
+    <a class="los-brand los-mobile-brand" href="/ui/today">
         <div class="los-dot"></div>
         <span class="los-title">Leader<span class="los-accent">OS</span></span>
     </a>
-    <div class="los-links">
-        <span class="los-group">Operational Memory</span>
-        <a href="/ui/today" class="los-nav-link-with-indicator">
-            <span>Today</span>
-            <span th:if="${pendingCount != null and pendingCount > 0}" class="los-nav-alert-dot"
-                  th:title="|Есть pending задачи: ${pendingCount}|"></span>
+</div>
+<div class="los-sidebar-backdrop" id="los-sidebar-backdrop"></div>
+<nav class="los-sidebar" id="los-sidebar" data-testid="leaderos-sidebar">
+    <div class="los-sidebar-header">
+        <a class="los-brand" href="/ui/today">
+            <div class="los-dot"></div>
+            <span class="los-title">Leader<span class="los-accent">OS</span></span>
         </a>
-        <a href="/ui/notes">Notes</a>
-        <a href="/ui/intake" class="los-nav-link-with-indicator">
-            <span>Intake Gateway</span>
-            <span th:if="${newIntakeCount != null and newIntakeCount > 0}" class="los-nav-alert-dot"
-                  th:title="|Есть новые intake items: ${newIntakeCount}|"></span>
-        </a>
-        <a href="/ui/captures">Capture Inbox</a>
-        <a href="/ui/risks">Risks</a>
-        <a href="/ui/incidents">Incidents</a>
-        <a href="/ui/people">People</a>
-        <span class="los-group">Knowledge Gateway</span>
-        <a href="/ui/knowledge">RAG Knowledge</a>
-        <span class="los-group">Statistics</span>
-        <a href="/ui/stats">Usage Stats</a>
-        <span class="los-group">Agent</span>
-        <a href="/ui/agent-workspace">Agent Workspace</a>
-        <span class="los-group">Settings</span>
-        <a href="/ui/settings">Control Plane</a>
-        <a href="/ui/presentation" target="_blank">Presentation</a>
+        <button type="button" class="los-collapse-btn" id="los-collapse-btn"
+                aria-label="Свернуть меню" aria-expanded="true" title="Свернуть / развернуть меню">
+            <span class="los-collapse-btn-icon">&#8249;</span>
+        </button>
     </div>
-    <script>
-        document.querySelectorAll('.los-links a').forEach(function(a) {
-            if (a.target === '_blank') return;
-            if (window.location.pathname === a.getAttribute('href') ||
-                window.location.pathname.startsWith(a.getAttribute('href') + '/')) {
-                a.classList.add('active');
+    <div class="los-sidebar-nav">
+        <div class="los-nav-group">
+            <div class="los-nav-group-label">Операционная работа</div>
+            <a href="/ui/today" class="los-nav-item" data-nav-title="Today">
+                <span class="los-nav-icon">&#128203;</span>
+                <span class="los-nav-label">Today</span>
+                <span th:if="${pendingCount != null and pendingCount > 0}" class="los-nav-alert-dot"
+                      th:title="|Есть pending задачи: ${pendingCount}|"></span>
+            </a>
+            <a href="/ui/intake" class="los-nav-item" data-nav-title="Intake Gateway">
+                <span class="los-nav-icon">&#128229;</span>
+                <span class="los-nav-label">Intake Gateway</span>
+                <span th:if="${newIntakeCount != null and newIntakeCount > 0}" class="los-nav-alert-dot"
+                      th:title="|Есть новые intake items: ${newIntakeCount}|"></span>
+            </a>
+            <a href="/ui/notes" class="los-nav-item" data-nav-title="Notes">
+                <span class="los-nav-icon">&#128220;</span>
+                <span class="los-nav-label">Notes</span>
+            </a>
+            <a href="/ui/captures" class="los-nav-item" data-nav-title="Capture Inbox">
+                <span class="los-nav-icon">&#128228;</span>
+                <span class="los-nav-label">Capture Inbox</span>
+            </a>
+        </div>
+        <div class="los-nav-group">
+            <div class="los-nav-group-label">Контекст и риски</div>
+            <a href="/ui/people" class="los-nav-item" data-nav-title="People">
+                <span class="los-nav-icon">&#128101;</span>
+                <span class="los-nav-label">People</span>
+            </a>
+            <a href="/ui/risks" class="los-nav-item" data-nav-title="Risks">
+                <span class="los-nav-icon">&#9888;</span>
+                <span class="los-nav-label">Risks</span>
+            </a>
+            <a href="/ui/incidents" class="los-nav-item" data-nav-title="Incidents">
+                <span class="los-nav-icon">&#128293;</span>
+                <span class="los-nav-label">Incidents</span>
+            </a>
+        </div>
+        <div class="los-nav-group">
+            <div class="los-nav-group-label">Знания</div>
+            <a href="/ui/search" class="los-nav-item" data-nav-title="Global Search">
+                <span class="los-nav-icon">&#128269;</span>
+                <span class="los-nav-label">Global Search</span>
+            </a>
+            <a href="/ui/knowledge" class="los-nav-item" data-nav-title="Knowledge">
+                <span class="los-nav-icon">&#128218;</span>
+                <span class="los-nav-label">Knowledge</span>
+            </a>
+        </div>
+        <div class="los-nav-group">
+            <div class="los-nav-group-label">Автоматизация</div>
+            <a href="/ui/agent-workspace" class="los-nav-item" data-nav-title="Agent Workspace">
+                <span class="los-nav-icon">&#129302;</span>
+                <span class="los-nav-label">Agent Workspace</span>
+            </a>
+            <a href="/ui/settings" class="los-nav-item" data-nav-title="Control Plane">
+                <span class="los-nav-icon">&#9881;</span>
+                <span class="los-nav-label">Control Plane</span>
+            </a>
+            <a href="/ui/stats" class="los-nav-item" data-nav-title="Usage Stats">
+                <span class="los-nav-icon">&#128200;</span>
+                <span class="los-nav-label">Usage Stats</span>
+            </a>
+        </div>
+        <div class="los-nav-group">
+            <div class="los-nav-group-label">Система</div>
+            <a href="/ui/presentation" target="_blank" class="los-nav-item" data-nav-title="Presentation">
+                <span class="los-nav-icon">&#128421;</span>
+                <span class="los-nav-label">Presentation</span>
+            </a>
+        </div>
+    </div>
+</nav>
+<script>
+    (function () {
+        var COLLAPSE_KEY = 'leaderos.sidebar.collapsed';
+        var html = document.documentElement;
+        var collapseBtn = document.getElementById('los-collapse-btn');
+        var mobileToggle = document.getElementById('los-mobile-toggle');
+        var backdrop = document.getElementById('los-sidebar-backdrop');
+
+        function setCollapsed(collapsed) {
+            html.classList.toggle('los-collapsed', collapsed);
+            if (collapseBtn) collapseBtn.setAttribute('aria-expanded', String(!collapsed));
+            try {
+                window.localStorage.setItem(COLLAPSE_KEY, collapsed ? 'true' : 'false');
+            } catch (ignored) {
             }
+        }
+
+        if (collapseBtn) {
+            collapseBtn.setAttribute('aria-expanded', String(!html.classList.contains('los-collapsed')));
+            collapseBtn.addEventListener('click', function () {
+                setCollapsed(!html.classList.contains('los-collapsed'));
+            });
+        }
+
+        function setMobileOpen(open) {
+            html.classList.toggle('los-mobile-open', open);
+            if (mobileToggle) mobileToggle.setAttribute('aria-expanded', String(open));
+        }
+
+        if (mobileToggle) {
+            mobileToggle.addEventListener('click', function () {
+                setMobileOpen(!html.classList.contains('los-mobile-open'));
+            });
+        }
+
+        if (backdrop) {
+            backdrop.addEventListener('click', function () {
+                setMobileOpen(false);
+            });
+        }
+
+        document.querySelectorAll('.los-sidebar .los-nav-item').forEach(function (a) {
+            if (a.target !== '_blank') {
+                var href = a.getAttribute('href');
+                if (window.location.pathname === href ||
+                    window.location.pathname.startsWith(href + '/')) {
+                    a.classList.add('active');
+                }
+            }
+            a.addEventListener('click', function () {
+                setMobileOpen(false);
+            });
         });
 
         window.LeaderUiApi = {
@@ -75,7 +195,6 @@
                     try {
                         console.log('Request body:', typeof body === 'string' ? JSON.parse(body) : body);
                     } catch (ignored) {
-                        console.log('Request body:', body);
                     }
                 }
 
@@ -193,11 +312,12 @@
         document.addEventListener('DOMContentLoaded', function () {
             window.LeaderUiApi.bindApiForms('form[data-api-url]');
         });
-    </script>
-</nav>
+    })();
+</script>
+</th:block>
 <div id="leader-ui-debug-banner"
      class="alert alert-info rounded-0 border-0 text-center py-2 px-3 mb-0 d-none"
-     style="position:sticky;top:56px;z-index:999;">
+     style="position:sticky;top:0;z-index:999;">
     UI debug mode enabled
 </div>
 </body>

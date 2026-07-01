@@ -1,7 +1,7 @@
 # 2026-06-30_CR-MEM-022: Left Sidebar Navigation
 
 **Дата:** 2026-06-30  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MEM / JavaMemoryService UI  
 **Тип:** UI / Navigation  
 **Ветка:** `feature/MEM-019-2026-06-30`
@@ -136,16 +136,16 @@ Sidebar шириной примерно `64–72px`:
 
 ## Acceptance Criteria
 
-- [ ] На всех основных страницах MemoryService UI отображается единый левый sidebar.
-- [ ] Верхнее глобальное меню удалено или сведено к минимальному header без дублирования навигации.
-- [ ] Разделы меню сгруппированы по темам.
-- [ ] Активный пункт меню подсвечивается по текущему URL.
-- [ ] Sidebar можно свернуть и развернуть.
-- [ ] Состояние collapse сохраняется между переходами страниц через `localStorage`.
-- [ ] В collapsed mode основной контент занимает дополнительное место.
-- [ ] На узком экране sidebar не ломает контент и работает как drawer / overlay или автоматически скрывается.
-- [ ] Существующие UI страницы продолжают открываться по старым URL.
-- [ ] Нет изменений в REST API и схеме БД.
+- [x] На всех основных страницах MemoryService UI отображается единый левый sidebar.
+- [x] Верхнее глобальное меню удалено или сведено к минимальному header без дублирования навигации.
+- [x] Разделы меню сгруппированы по темам.
+- [x] Активный пункт меню подсвечивается по текущему URL.
+- [x] Sidebar можно свернуть и развернуть.
+- [x] Состояние collapse сохраняется между переходами страниц через `localStorage`.
+- [x] В collapsed mode основной контент занимает дополнительное место.
+- [x] На узком экране sidebar не ломает контент и работает как drawer / overlay или автоматически скрывается.
+- [x] Существующие UI страницы продолжают открываться по старым URL.
+- [x] Нет изменений в REST API и схеме БД.
 
 ## Как тестировать
 
@@ -183,3 +183,12 @@ Sidebar шириной примерно `64–72px`:
 ## После реализации
 
 После подтверждения пользователя перевести этот CR в статус `DONE` / `Implemented` и обновить реестр `docs/cr/REGISTRY.md`.
+
+## Реализация (2026-07-01)
+
+- `fragments/layout.html` — `nav`-фрагмент заменён на `sidebar` (collapse/expand, localStorage, mobile drawer, active-highlight); `head`-фрагмент получил anti-FOUC inline script.
+- `static/style.css` — `.los-navbar`/`.los-links` удалены, добавлены `.los-sidebar`/`.los-nav-item` и CSS-переменная `--los-sidebar-w`; `.presentation-container`/body offset пересчитаны под sidebar-layout.
+- Все 14 UI-шаблонов подключены к `fragments/layout :: sidebar`.
+- Проверено вручную в браузере (Playwright, desktop 1440px и mobile 390px): рендер, collapse без layout jump, mobile drawer, active state.
+- E2E: `test_e2e/20_ui_smoke_sidebar.md` (номер `11` был занят `11_capture_bot_improvements.md`, взят следующий свободный) + `test_e2e/tests/sidebar-navigation.spec.js` (14/14 PASS). Полный regression suite прогнан через `e2e-test-runner` — регрессий от этого CR не найдено (см. `.claude/agent-memory/e2e-test-runner/project_test_patterns.md`).
+- RFC обновлён: `JavaMemoryService/RFC/RFC-memory-service.md` — добавлена секция "Глобальная навигация (CR-MEM-022)".
