@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
-<head th:replace="fragments/layout :: head('Intake Gateway')"></head>
+<head th:replace="~{fragments/layout :: head('Intake Gateway')}"></head>
 <body>
-<div th:replace="fragments/layout :: sidebar"></div>
+<div th:replace="~{fragments/layout :: sidebar}"></div>
 
 <main class="container-fluid py-3 px-4">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
