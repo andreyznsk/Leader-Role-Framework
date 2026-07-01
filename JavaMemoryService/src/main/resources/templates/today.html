@@ -202,14 +202,13 @@
                      class="d-flex align-items-center border-bottom px-3 py-2 task-row">
 
                     <!-- Done checkbox -->
-                    <form method="post" th:action="@{/ui/tasks/{id}/toggle-done(id=${task.id})}" class="me-2"
-                          th:attr="data-api-url=@{/api/tasks/{id}/toggle-done(id=${task.id})},data-api-method='POST',data-api-success='reload'">
-                        <button type="submit"
-                                class="btn btn-sm p-0 border-0"
-                                th:title="${task.status == 'DONE'} ? 'Снять отметку' : 'Выполнено'">
-                            <span th:text="${task.status == 'DONE'} ? '☑' : '☐'" style="font-size:1.2rem"></span>
-                        </button>
-                    </form>
+                    <button type="button"
+                            class="btn btn-sm p-0 border-0 me-2"
+                            th:attr="data-id=${task.id},data-status=${task.status}"
+                            th:title="${task.status == 'DONE'} ? 'Снять отметку' : 'Выполнено'"
+                            onclick="toggleDone(this)">
+                        <span th:text="${task.status == 'DONE'} ? '☑' : '☐'" style="font-size:1.2rem"></span>
+                    </button>
 
                     <!-- Priority flag -->
                     <button type="button" class="btn btn-sm p-0 border-0 me-2"
@@ -772,6 +771,16 @@ function toggleStatus(btn) {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({status: nextStatus})
+    }).then(() => reloadTodayKeepingFilters());
+}
+
+function toggleDone(btn) {
+    const isDone = btn.dataset.status === 'DONE';
+    if (!isDone && !window.confirm('Отметить задачу как выполненную?')) {
+        return;
+    }
+    window.LeaderUiApi.request('/api/tasks/' + btn.dataset.id + '/toggle-done', {
+        method: 'POST'
     }).then(() => reloadTodayKeepingFilters());
 }
 
