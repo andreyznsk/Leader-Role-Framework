@@ -130,7 +130,7 @@ public class MailAgentJob {
         return Math.max(1, Runtime.getRuntime().availableProcessors());
     }
 
-    private AgentResponse processEmail(Email email) throws Exception {
+    private MailProcessingResult processEmail(Email email) throws Exception {
         log.info("Processing email {} from {}: \"{}\" [{}]",
             email.id(), email.from(), email.subject(), email.folder());
         saveToInbox(email);
@@ -139,7 +139,7 @@ public class MailAgentJob {
         AgentResponse resp = mailLinkingService.apply(email, parseAgentResponse(raw));
         log.info("Classified as {}{}", resp.type(),
             resp.priority() != null ? ", priority " + resp.priority() : "");
-        return resp;
+        return new MailProcessingResult(resp, prompt, raw);
     }
 
     private ProcessingBatchResult processBatch(List<Email> emails) {
@@ -185,9 +185,9 @@ public class MailAgentJob {
 
     private ProcessingOutcome processSingleEmail(Email email) {
         try {
-            AgentResponse resp = processEmail(email);
-            actionExecutor.execute(email, resp);
-            return new ProcessingOutcome(email.id(), resp.type().name(), null);
+            MailProcessingResult result = processEmail(email);
+            actionExecutor.execute(email, result.response(), result.prompt(), result.rawResult());
+            return new ProcessingOutcome(email.id(), result.response().type().name(), null);
         } catch (Exception e) {
             log.error("", e);
             return new ProcessingOutcome(email.id(), null, e.getMessage());
@@ -272,5 +272,8 @@ public class MailAgentJob {
     }
 
     private record ProcessingBatchResult(int errors, int[] counts) {
+    }
+
+    private record MailProcessingResult(AgentResponse response, String prompt, String rawResult) {
     }
 }

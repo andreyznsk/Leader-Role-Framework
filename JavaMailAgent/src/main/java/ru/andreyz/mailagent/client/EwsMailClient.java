@@ -8,6 +8,7 @@ import microsoft.exchange.webservices.data.core.enumeration.search.LogicalOperat
 import microsoft.exchange.webservices.data.core.enumeration.property.WellKnownFolderName;
 import microsoft.exchange.webservices.data.core.enumeration.search.FolderTraversal;
 import microsoft.exchange.webservices.data.core.enumeration.service.ConflictResolutionMode;
+import microsoft.exchange.webservices.data.core.exception.service.local.ServiceObjectPropertyException;
 import microsoft.exchange.webservices.data.core.service.folder.Folder;
 import microsoft.exchange.webservices.data.core.service.item.EmailMessage;
 import microsoft.exchange.webservices.data.core.service.item.Item;
@@ -429,6 +430,8 @@ public class EwsMailClient implements MailClient {
             if (mb != null) {
                 return MessageBody.getStringFromMessageBody(mb);
             }
+        } catch (ServiceObjectPropertyException e) {
+            log.debug("body not loaded via FindItem — fall through to lazy load: {}", e.toString());
         } catch (Exception e) {
             log.error("", e);
             // body not loaded via FindItem — fall through to lazy load
@@ -447,6 +450,9 @@ public class EwsMailClient implements MailClient {
 
     private String fromAddress(EmailMessage message) throws Exception {
         EmailAddress from = message.getFrom();
+        if (from == null) {
+            from = loadAddressCollectionMessage(message).getFrom();
+        }
         if (from == null) {
             return "unknown";
         }
@@ -472,7 +478,28 @@ public class EwsMailClient implements MailClient {
         recipients.addAll(addressesViaReflection(message, "getToRecipients"));
         recipients.addAll(addressesViaReflection(message, "getCcRecipients"));
         recipients.addAll(addressesViaReflection(message, "getBccRecipients"));
+        if (recipients.isEmpty()) {
+            try {
+                EmailMessage loaded = loadAddressCollectionMessage(message);
+                recipients.addAll(addressesViaReflection(loaded, "getToRecipients"));
+                recipients.addAll(addressesViaReflection(loaded, "getCcRecipients"));
+                recipients.addAll(addressesViaReflection(loaded, "getBccRecipients"));
+            } catch (Exception e) {
+                log.debug("Could not load recipients for EWS email: {}", e.getMessage());
+            }
+        }
         return recipients.stream().distinct().toList();
+    }
+
+    private EmailMessage loadAddressCollectionMessage(EmailMessage message) throws Exception {
+        PropertySet recipientsOnly = new PropertySet(
+                BasePropertySet.IdOnly,
+                EmailMessageSchema.From,
+                EmailMessageSchema.ToRecipients,
+                EmailMessageSchema.CcRecipients,
+                EmailMessageSchema.BccRecipients
+        );
+        return EmailMessage.bind(service, message.getId(), recipientsOnly);
     }
 
     private String internetMessageId(EmailMessage message) {
@@ -555,10 +582,7 @@ public class EwsMailClient implements MailClient {
                 ItemSchema.ConversationId,
                 EmailMessageSchema.From,
                 EmailMessageSchema.IsRead,
-                EmailMessageSchema.InternetMessageId,
-                EmailMessageSchema.ToRecipients,
-                EmailMessageSchema.CcRecipients,
-                EmailMessageSchema.BccRecipients);
+                EmailMessageSchema.InternetMessageId);
         return propertySet;
     }
 

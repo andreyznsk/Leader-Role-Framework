@@ -660,9 +660,17 @@ GET  /api/tasks/{id}/description/export-md
 GET  /api/tasks/{id}/timeline            # audit timeline событий задачи
 POST /api/tasks/{id}/timeline/comment    # добавить ручной комментарий в timeline
 
+# Intake Gateway
+POST /api/intake                         # создать intake item (mail/capture/manual producer)
+GET  /api/intake?status=NEW             # очередь intake items
+GET  /api/intake/{id}                   # детальная карточка intake item
+PUT  /api/intake/{id}                   # сохранить finalRoute/finalPayload, статус -> REVIEWING
+POST /api/intake/{id}/apply             # применить item в target receiver, статус -> APPLIED
+POST /api/intake/{id}/reject            # отклонить item, статус -> REJECTED
+
 # Очередь подтверждения (PENDING)
 GET  /api/tasks/pending                  # все задачи со статусом PENDING
-POST /api/tasks/pending                  # создать PENDING задачу (вызывает mail-agent)
+POST /api/tasks/pending                  # создать PENDING задачу напрямую (UI/manual flow or intake apply)
 POST /api/tasks/{id}/confirm             # PENDING → TODO
 POST /api/tasks/{id}/reject              # PENDING → ARCHIVED
 
@@ -744,6 +752,26 @@ Endpoint: `/ws/agent-console`
 
 Base: `http://localhost:8082/ui`
 
+### Глобальная навигация (CR-MEM-022: Left Sidebar)
+
+Все `/ui/*` страницы используют общий Thymeleaf-фрагмент `fragments/layout.html :: sidebar` —
+левое боковое меню вместо верхнего navbar.
+
+- **Expanded** (`~264px`): логотип `LeaderOS`, группы с заголовками, иконка + label у каждого пункта.
+- **Collapsed** (`72px`, кнопка `#los-collapse-btn`): только иконки, hover-tooltip с названием пункта. Main content расширяется (offset считается через CSS-переменную `--los-sidebar-w`, переключается классом `html.los-collapsed`).
+- Состояние collapse хранится в `localStorage` (`leaderos.sidebar.collapsed`) и применяется до первого рендера страницы (anti-FOUC inline script в `head`-фрагменте), чтобы избежать скачка layout при переходах между страницами.
+- **Per-group accordion:** заголовок каждой группы (`.los-nav-group-label`) кликабелен и сворачивает/разворачивает свои пункты (`.los-nav-group-items`) независимо от остальных групп и от общего collapse сайдбара. Состояние хранится в `localStorage` (`leaderos.sidebar.collapsedGroups`, JSON-массив ключей групп: `operational`, `context-risks`, `knowledge`, `automation`, `system`) и переживает переходы между страницами. В icon-only (collapsed) режиме sidebar per-group состояние игнорируется — все иконки группы остаются видимыми, т.к. заголовки групп там не показываются.
+- **Mobile** (`<992px`): sidebar скрыт по умолчанию, показывается кнопка-гамбургер (`#los-mobile-toggle`) в слим top bar; открывается как overlay drawer с backdrop; клик по пункту меню закрывает drawer.
+- Активный пункт подсвечивается по `window.location.pathname` (JS в фрагменте, класс `.los-nav-item.active`).
+- Группировка пунктов:
+  - **Операционная работа** — Today, Intake Gateway, Notes, Capture Inbox
+  - **Контекст и риски** — People, Risks, Incidents
+  - **Знания** — Global Search (`/ui/search`, релоцирован в `/ui/agent-workspace?tab=search`, CR-MEM-012), Knowledge
+  - **Автоматизация** — Agent Workspace, Control Plane (Settings), Usage Stats
+  - **Система** — Presentation
+- Корневой элемент — `<nav data-testid="leaderos-sidebar">`, используется как navigation marker в E2E smoke-тестах.
+- Верхний navbar (`.los-navbar` / `.los-links`) удалён из `style.css`, заменён на `.los-sidebar` / `.los-nav-item`.
+
 ### Страницы
 
 **`/ui/today`** — Главная страница
@@ -814,21 +842,35 @@ Base: `http://localhost:8082/ui`
 | `dueDateFrom` + `dueDateTo` | Диапазон (пресет *This Week*) |
 | (отсутствует) | Без фильтра по дате |
 
-**`/ui/tasks/{id}/edit`** — Форма редактирования задачи
+**`/ui/tasks/{id}/edit`** — Форма редактирования задачи (CR-MEM-023: two-column layout)
+
+Двухколоночный layout: слева основное содержимое, справа `<aside data-testid="task-control-panel">` — единая control panel + timeline. На узком экране (mobile) колонки складываются в одну: сначала форма, затем control panel с timeline.
+
+Левая колонка — основное содержимое:
 
 | Поле | Тип | Источник данных |
 |------|-----|----------------|
 | `title` | text input | `tasks.title` (PostgreSQL) |
 | `description` | Markdown textarea | `memory.task_descriptions.content_md` |
-| `priority` | select | `tasks.priority` |
-| `due_date` | date input | `tasks.due_date` |
-| `status` | radio-пилюли | `tasks.status` |
-| `source` | readonly badge | `tasks.source` + `tasks.email_id` |
 
 Markdown-редактор — две вкладки: `markdown` (raw, monospace) и `preview` (HTML-рендер через JS, без библиотек).
 Под textarea — кнопка `Export MD`, которая скачивает `TASK-{id}.md`, сгенерированный из БД.
 
-Удаление на странице edit — двойное подтверждение: первый клик меняет текст на "точно удалить?" (3 сек), второй — `DELETE /api/tasks/{id}`.
+Правая колонка (`task-control-panel`) — элементы строго в порядке:
+
+| # | Поле/блок | Тип | Источник данных |
+|---|-----------|-----|----------------|
+| 1 | `priority` | select | `tasks.priority` |
+| 2 | `due_date` | date input | `tasks.due_date` |
+| 3 | `status` | select (`data-testid="task-status-select"`) | `tasks.status`: `PENDING`, `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`, `ARCHIVED` (`DELETED` не показывается — legacy) |
+| 4 | Action buttons | `💾 Сохранить` (value=`save`, остаётся на странице), `✅ Сохранить и закрыть` (value=`save_close`, редирект на `/ui/today`), `🗄 Архивировать` (`btn-danger`, destructive) | сохранение через `PUT /api/tasks/{id}` + `PUT /api/tasks/{id}/description`; archive через `DELETE /api/tasks/{id}` |
+| 5 | Timeline (`data-testid="task-timeline"`) | последние 5 событий + счётчик, ниже — форма добавления комментария | `GET /api/tasks/{id}/timeline` |
+
+`source` (readonly badge) и `email_id` отображаются в заголовке страницы, а не в control panel.
+
+Удаление (archive) — двойное подтверждение: первый клик меняет текст кнопки на "Точно архивировать?" (3 сек), второй — `DELETE /api/tasks/{id}`.
+
+Блок добавления комментария в timeline — это `<div>` (не `<form>`), т.к. он физически расположен внутри основной `<form id="task-edit-form">`; вложенные HTML-формы невалидны и браузер молча ломает DOM/JS-обработчики. Кнопка `Добавить` — `type="button"` с явным `click`-обработчиком, не `submit`.
 
 **`/ui/incidents`** — Активные инциденты
 - Список с severity badge (P1/P2/P3)
@@ -898,7 +940,7 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 
 ### Технические требования UI
 - Bootstrap 5 CDN + `static/style.css`
-- Thymeleaf fragments: `fragments/layout.html` (nav + head)
+- Thymeleaf fragments: `fragments/layout.html` (`head` + `sidebar`, CR-MEM-022 — левый sidebar вместо верхнего navbar)
 - Формы через POST (не AJAX) — проще и надёжнее для MVP
 - Для PUT из HTML-форм включён `spring.mvc.hiddenmethod.filter.enabled=true`
   и используется hidden input `_method=PUT`
@@ -946,6 +988,8 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 `getTaskDescription` реализован поверх `GET /api/tasks/{id}/description`; source of truth — `memory.task_descriptions`, а markdown-файл создаётся только через export endpoint.
 Task timeline доступен через `GET /api/tasks/{id}/timeline`; любые значимые изменения задачи создают immutable event в `task_events`.
 Today UI также поддерживает inline-смену даты задачи через `PATCH /api/tasks/{id}/date` и batch-операцию `POST /api/tasks/move-overdue-to-today`.
+
+Важно: текущие MCP write-tools ещё не используют Intake Gateway. Agent-originated writes через MCP будут вынесены в отдельный CR.
 
 ### Правило подтверждения (ОБЯЗАТЕЛЬНО в CLAUDE.md агента)
 
@@ -1136,38 +1180,72 @@ POST /api/capture/process-now
 
 | Type | Действие |
 |------|----------|
-| `TASK` | `TaskService.createPending(...)`, статус `PENDING`, подтверждение в `/ui/today` |
-| `RISK` | `RiskService.create(...)`, probability/impact по умолчанию `MEDIUM` |
-| `NOTE` | `NoteService.create(..., source="capture")` |
-| `QUESTION` | `QuestionService.create(...)` |
-| `PERSON_NOTE` | `person_notes` по имени через `PersonNameNoteRepository` |
-| `KNOWLEDGE` | Markdown-файл в `${app.rag.inbox-dir}/captures/` |
-| `JOURNAL` | append в `${app.workspace.dir}/08_daily_journal/YYYY-MM-DD.md` |
+| `TASK` | создать intake item со `suggestedRoute=TASK` |
+| `RISK` | создать intake item со `suggestedRoute=RISK` |
+| `NOTE` | создать intake item со `suggestedRoute=NOTE` |
+| `QUESTION` | создать intake item со `suggestedRoute=NOTE` |
+| `PERSON_NOTE` | создать intake item со `suggestedRoute=PERSON` |
+| `KNOWLEDGE` | создать intake item со `suggestedRoute=RAG` |
+| `JOURNAL` | создать intake item со `suggestedRoute=NOTE` |
+
+После ручного Apply intake item создаёт финальную сущность:
+- `TASK` → pending task
+- `RISK` → risk
+- `NOTE` / `QUESTION` / `JOURNAL` → operational note
+- `PERSON_NOTE` → person note
+- `KNOWLEDGE` → markdown-файл в `${app.rag.inbox-dir}/intake/`
 
 ---
 
 ## 13. Интеграция с java-mail-agent
 
-Когда mail-agent классифицировал письмо как `REQUEST` и извлёк задачу:
+Когда mail-agent классифицировал письмо как `REQUEST`, `CAPTURE`, `NOTE`, `NOTICE`, `NOISE` или `DRAFT`,
+он больше не создаёт конечную сущность напрямую. Вместо этого он создаёт intake item в MemoryService:
 
 ```
-POST /api/tasks/pending
+POST /api/intake
 Content-Type: application/json
 
 {
-  "title":       "Обсудить архитектуру payments",
-  "description": "Письмо от Иванова: нужно обсудить до пятницы",
-  "emailId":     "<message-id из письма>",
-  "sender":      "ivanov@company.ru",
-  "priority":    "HIGH"
+  "sourceType": "MAIL",
+  "sourceId": "<message-id из письма>",
+  "sourcePayload": {
+    "subject": "Обсудить архитектуру payments",
+    "from": "ivanov@company.ru",
+    "body": "Письмо от Иванова: нужно обсудить до пятницы"
+  },
+  "agentProvider": "mock|ollama|...",
+  "agentPrompt": "<prompt>",
+  "agentResult": "<raw result>",
+  "suggestedRoute": "TASK",
+  "suggestedPayload": {
+    "title": "Обсудить архитектуру payments",
+    "description": "Письмо от Иванова: нужно обсудить до пятницы",
+    "emailId": "<message-id из письма>",
+    "sender": "ivanov@company.ru",
+    "priority": "HIGH"
+  }
 }
 ```
 
-Задача создаётся со статусом `PENDING`.
-Далее пользователь видит её в UI `/ui/today` в секции "Ожидают подтверждения" и нажимает [Принять] / [Изменить] / [Отклонить].
+Mail routing в первом этапе выглядит так:
 
-**Агент через MCP не участвует в этом потоке** — PENDING задачи подтверждаются только через UI.
-`NOTICE` письма в этот поток не попадают: они сразу становятся RAG-документами в Knowledge Gateway.
+| Mail type | Suggested route | Что происходит до ручного Apply |
+|-----------|------------------|----------------------------------|
+| `REQUEST` | `TASK` | создаётся intake item, задача ещё не появляется |
+| `CAPTURE` | `NOTE` | создаётся intake item |
+| `NOTE` | `NOTE` | создаётся intake item |
+| `NOTICE` | `RAG` | создаётся intake item, markdown в `rag-inbox/intake` ещё не создаётся |
+| `NOISE` | `NOISE` | создаётся intake item |
+| `DRAFT` | `NOISE` | создаётся intake item для ручного review |
+
+Пользователь открывает `/ui/intake`, видит `sourcePayload`, `agentPrompt`, `agentResult`,
+при необходимости меняет `finalRoute`/`finalPayload` и только затем нажимает `Apply`.
+Если итоговый route = `TASK`, intake apply создаёт pending task, который дальше живёт обычным потоком
+`PENDING -> TODO -> IN_PROGRESS -> DONE`.
+
+**Агент через MCP не участвует в intake-потоке** — его write-tools пока создают сущности напрямую, это отдельный follow-up CR.
+`NOTICE` письма в этот поток попадают как intake items со `suggestedRoute=RAG`; до ручного Apply они не становятся RAG-документами.
 
 ---
 

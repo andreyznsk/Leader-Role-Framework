@@ -12,6 +12,12 @@
   --text3:   #6E7681;
   --mono:    'JetBrains Mono', monospace;
   --sans:    'Inter', sans-serif;
+  --los-sidebar-w: 264px;
+  --los-mobile-topbar-h: 56px;
+}
+
+html.los-collapsed {
+  --los-sidebar-w: 72px;
 }
 
 [data-bs-theme="dark"] {
@@ -33,25 +39,90 @@ body {
   color: var(--text);
   font-family: var(--sans);
   font-size: 19px;
-  padding-top: 56px;
+  padding-left: var(--los-sidebar-w);
+  transition: padding-left .15s ease;
 }
 
 .los-page-content {
   padding-top: 20px;
 }
 
-/* ─── NAVBAR ─────────────────────────────────────── */
-.los-navbar {
+/* ─── SIDEBAR ─────────────────────────────────────── */
+.los-sidebar {
   position: fixed;
-  top: 0; left: 0; right: 0;
-  height: 56px;
+  top: 0; left: 0; bottom: 0;
+  width: var(--los-sidebar-w);
   background: var(--bg2);
-  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  transition: width .15s ease;
+  overflow: hidden;
+}
+
+.los-sidebar-header {
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  gap: 24px;
-  z-index: 1000;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.los-sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 8px;
+}
+
+.los-nav-group {
+  margin-bottom: 12px;
+}
+
+.los-nav-group-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  background: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 4px 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.los-nav-group-label:hover {
+  color: var(--text2);
+}
+
+.los-nav-group-toggle-icon {
+  display: inline-block;
+  font-size: 10px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: transform .15s ease;
+}
+
+.los-nav-group.is-collapsed .los-nav-group-toggle-icon {
+  transform: rotate(-90deg);
+}
+
+.los-nav-group.is-collapsed .los-nav-group-items {
+  display: none;
+}
+
+/* Icon-only mode ignores per-group collapse: labels are hidden anyway */
+html.los-collapsed .los-nav-group.is-collapsed .los-nav-group-items {
+  display: block;
 }
 
 .los-brand {
@@ -60,6 +131,7 @@ body {
   gap: 8px;
   flex-shrink: 0;
   text-decoration: none;
+  overflow: hidden;
 }
 
 .los-dot {
@@ -67,6 +139,7 @@ body {
   border-radius: 50%;
   background: var(--accent);
   animation: los-pulse 2s infinite;
+  flex-shrink: 0;
 }
 
 @keyframes los-pulse {
@@ -80,51 +153,74 @@ body {
   font-weight: 700;
   color: var(--text);
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .los-accent { color: var(--accent); }
 
-.los-links {
+.los-collapse-btn {
   display: flex;
   align-items: center;
-  gap: 2px;
-  flex: 1;
-  flex-wrap: wrap;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg3);
+  color: var(--text2);
+  cursor: pointer;
+  transition: color .15s, background .15s;
 }
 
-.los-group {
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--text3);
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  padding: 0 8px 0 12px;
+.los-collapse-btn:hover {
+  color: var(--text);
+  background: var(--bg);
 }
 
-.los-links a {
+.los-collapse-btn-icon {
+  display: inline-block;
+  transition: transform .15s ease;
+}
+
+html.los-collapsed .los-collapse-btn-icon {
+  transform: rotate(180deg);
+}
+
+.los-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 16px;
   color: var(--text2);
   text-decoration: none;
-  padding: 5px 10px;
+  padding: 8px 12px;
   border-radius: 6px;
   transition: color .15s, background .15s;
   white-space: nowrap;
+  position: relative;
 }
 
-.los-links a:hover {
+.los-nav-item:hover {
   color: var(--text);
   background: var(--bg3);
 }
 
-.los-links a.active {
+.los-nav-item.active {
   color: var(--accent);
   background: rgba(0, 212, 170, .08);
 }
 
-.los-nav-link-with-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+.los-nav-icon {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.los-nav-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .los-nav-alert-dot {
@@ -134,6 +230,99 @@ body {
   background: var(--bs-danger);
   box-shadow: 0 0 0 2px rgba(220, 53, 69, .18);
   flex: 0 0 auto;
+}
+
+/* Collapsed state: icons only, hover tooltip */
+html.los-collapsed .los-title,
+html.los-collapsed .los-nav-group-label,
+html.los-collapsed .los-nav-label {
+  display: none;
+}
+
+html.los-collapsed .los-nav-item {
+  justify-content: center;
+}
+
+html.los-collapsed .los-nav-item:hover::after {
+  content: attr(data-nav-title);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 8px;
+  background: var(--bg3);
+  color: var(--text);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  z-index: 1100;
+  pointer-events: none;
+}
+
+/* ─── MOBILE TOPBAR & DRAWER ──────────────────────── */
+.los-mobile-topbar {
+  display: none;
+}
+
+.los-mobile-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.los-sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 991.98px) {
+  body {
+    padding-left: 0;
+    padding-top: var(--los-mobile-topbar-h);
+  }
+
+  .los-mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: var(--los-mobile-topbar-h);
+    padding: 0 8px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    z-index: 1001;
+  }
+
+  .los-collapse-btn {
+    display: none;
+  }
+
+  .los-sidebar {
+    width: 280px !important;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+  }
+
+  html.los-mobile-open .los-sidebar {
+    transform: translateX(0);
+  }
+
+  html.los-mobile-open .los-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .5);
+    z-index: 999;
+  }
 }
 
 /* ─── CARDS ───────────────────────────────────────── */
@@ -462,9 +651,18 @@ body {
 /* ─── PRESENTATION ────────────────────────────────── */
 .presentation-container {
   position: fixed;
-  top: 56px;
-  left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: var(--los-sidebar-w);
+  right: 0; bottom: 0;
   background: var(--bg);
+  transition: left .15s ease;
+}
+
+@media (max-width: 991.98px) {
+  .presentation-container {
+    top: var(--los-mobile-topbar-h);
+    left: 0;
+  }
 }
 
 .presentation-container iframe {
@@ -539,4 +737,23 @@ body {
 }
 .task-editor-links a:hover {
   color: var(--accent);
+}
+
+/* Task edit: sticky right control panel */
+.task-control-panel {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  padding: 1rem;
+  background: var(--bg2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+@media (max-width: 767px) {
+  .task-control-panel {
+    position: static;
+    max-height: none;
+  }
 }

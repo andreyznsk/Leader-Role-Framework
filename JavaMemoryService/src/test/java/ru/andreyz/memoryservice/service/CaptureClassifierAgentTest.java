@@ -2,6 +2,7 @@ package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 import ru.andreyz.common.agent.AgentClient;
 import ru.andreyz.memoryservice.dto.ClassifiedCapture;
 
@@ -14,7 +15,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CaptureClassifierAgentTest {
 
     private final AgentClient agentClient = prompt -> "[]";
-    private final CaptureClassifierAgent agent = new CaptureClassifierAgent(agentClient, new ObjectMapper());
+    private final CaptureClassifierAgent agent = new CaptureClassifierAgent(
+            agentClient,
+            new ObjectMapper(),
+            new MockEnvironment().withProperty("agent.provider", "mock")
+    );
 
     @Test
     void parseResponse_plainJsonArray() throws IOException {
