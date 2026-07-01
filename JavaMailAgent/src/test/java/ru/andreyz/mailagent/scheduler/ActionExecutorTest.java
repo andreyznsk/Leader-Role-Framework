@@ -12,7 +12,6 @@ import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.MailProcessingRoute;
-import ru.andreyz.mailagent.model.PendingTaskRequest;
 import ru.andreyz.mailagent.model.ProcessedEmail;
 import ru.andreyz.mailagent.service.MailControlAuditStore;
 import ru.andreyz.mailagent.service.MailProcessingStateService;
@@ -98,12 +97,13 @@ class ActionExecutorTest {
 
         executor.execute(email(emailId), response);
 
+        verify(memoryServiceClient).createIntake(any());
         assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
     }
 
     @Test
-    void requestAppendsToplan() throws Exception {
+    void requestCreatesIntakeTaskInsteadOfDirectPlanAppend() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
         String emailId = "test-request-001";
@@ -125,14 +125,13 @@ class ActionExecutorTest {
 
         executor.execute(email(emailId), response);
 
+        verify(memoryServiceClient).createIntake(any());
         Path planFile = tempDir.resolve("plans/today.md");
-        assertTrue(Files.exists(planFile));
-        String content = Files.readString(planFile);
-        assertTrue(content.contains("Review PR #42"));
+        assertFalse(Files.exists(planFile));
     }
 
     @Test
-    void requestSendsAgentSummaryAndRawEmailToPendingTask() throws Exception {
+    void requestCreatesIntakeWithSuggestedTaskPayload() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
         String emailId = "test-request-description-001";
@@ -161,8 +160,12 @@ class ActionExecutorTest {
 
         executor.execute(email, response);
 
-        ArgumentCaptor<PendingTaskRequest> requestCaptor = ArgumentCaptor.forClass(PendingTaskRequest.class);
-        verify(memoryServiceClient).createPendingTask(requestCaptor.capture());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> requestCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(memoryServiceClient).createIntake(requestCaptor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> suggestedPayload = (Map<String, Object>) requestCaptor.getValue().get("suggestedPayload");
+        assertEquals("TASK", requestCaptor.getValue().get("suggestedRoute"));
         assertEquals(
             """
             Нужно проверить обновление пайплайна и дать ответ.
@@ -177,12 +180,13 @@ class ActionExecutorTest {
             нужно проверить новый pipeline до пятницы.
             Спасибо.
             """.strip(),
-            requestCaptor.getValue().description()
+            suggestedPayload.get("description")
         );
+        assertEquals("Проверить обновление пайплайна", suggestedPayload.get("title"));
     }
 
     @Test
-    void requestRetryFromMemoryCheckpointDoesNotDuplicatePlanLine() throws Exception {
+    void requestRetryRepeatsIntakeCreationWithoutPlanSideEffects() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
         String emailId = "test-request-retry-001";
@@ -205,7 +209,7 @@ class ActionExecutorTest {
         doThrow(new IllegalStateException("memory down"))
             .doNothing()
             .when(memoryServiceClient)
-            .createPendingTask(any());
+            .createIntake(any());
 
         assertThrows(IllegalStateException.class, () -> executor.execute(email(emailId), response));
 
@@ -213,19 +217,18 @@ class ActionExecutorTest {
         verify(processedEmailRepository, atLeastOnce()).save(emailCaptor.capture());
         ProcessedEmail errorRecord = emailCaptor.getAllValues().get(emailCaptor.getAllValues().size() - 1);
         assertEquals("REQUEST", errorRecord.responseType());
-        assertEquals(MailProcessingRoute.MEMORY_PENDING_TASK, errorRecord.failedRoute());
+        assertEquals(MailProcessingRoute.INTAKE_WRITE, errorRecord.failedRoute());
         assertEquals("ERROR", errorRecord.status().name());
 
         executor.retry(errorRecord);
 
         Path planFile = tempDir.resolve("plans/today.md");
-        String content = Files.readString(planFile);
-        assertEquals(1, content.lines().filter(line -> line.contains("Review PR #42")).count());
-        verify(memoryServiceClient, times(2)).createPendingTask(any());
+        assertFalse(Files.exists(planFile));
+        verify(memoryServiceClient, times(2)).createIntake(any());
     }
 
     @Test
-    void captureCreatesMemoryCaptureAndMovesEmailToProcessed() throws Exception {
+    void captureCreatesIntakeNoteAndMovesEmailToProcessed() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
         String emailId = "test-capture-001";
@@ -243,13 +246,16 @@ class ActionExecutorTest {
 
         executor.execute(email(emailId), response);
 
-        verify(memoryServiceClient).createCapture("К сведению: переезд на новый кластер с 1 июля", "email", emailId);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> requestCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(memoryServiceClient).createIntake(requestCaptor.capture());
+        assertEquals("NOTE", requestCaptor.getValue().get("suggestedRoute"));
         assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
     }
 
     @Test
-    void noticeCreatesRagDocumentAndMovesEmailToProcessed() throws Exception {
+    void noticeCreatesIntakeItemAndMovesEmailToProcessed() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
         String emailId = "test-notice-001";
@@ -266,16 +272,11 @@ class ActionExecutorTest {
             response
         );
 
+        verify(memoryServiceClient).createIntake(any());
         ArgumentCaptor<ProcessedEmail> emailCaptor = ArgumentCaptor.forClass(ProcessedEmail.class);
         verify(processedEmailRepository, atLeastOnce()).save(emailCaptor.capture());
         ProcessedEmail processed = emailCaptor.getAllValues().get(emailCaptor.getAllValues().size() - 1);
-        assertNotNull(processed.outputPath());
-        Path noticeFile = Path.of(processed.outputPath());
-        assertTrue(Files.exists(noticeFile));
-        String content = Files.readString(noticeFile);
-        assertTrue(content.contains("type: NOTICE"));
-        assertTrue(content.contains("## Контекст"));
-        assertTrue(content.contains("release calendar"));
+        assertNull(processed.outputPath());
         assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
         verify(mailClient).markAsRead(emailId, "INBOX");
@@ -288,7 +289,7 @@ class ActionExecutorTest {
     }
 
     @Test
-    void noteCreatesMemoryNoteAndMovesEmailToProcessed() throws Exception {
+    void noteCreatesIntakeItemAndMovesEmailToProcessed() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
         String emailId = "test-note-001";
@@ -305,12 +306,7 @@ class ActionExecutorTest {
 
         executor.execute(email(emailId), response);
 
-        verify(memoryServiceClient).createNote(
-            "Blue-green rollout",
-            "Посмотреть практики blue-green rollout у соседней команды.",
-            "mail,email",
-            "email"
-        );
+        verify(memoryServiceClient).createIntake(any());
         assertFalse(Files.exists(inbox.resolve(emailId + ".json")));
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
         verify(mailClient).markAsRead(emailId, "INBOX");

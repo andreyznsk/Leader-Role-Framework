@@ -660,9 +660,17 @@ GET  /api/tasks/{id}/description/export-md
 GET  /api/tasks/{id}/timeline            # audit timeline событий задачи
 POST /api/tasks/{id}/timeline/comment    # добавить ручной комментарий в timeline
 
+# Intake Gateway
+POST /api/intake                         # создать intake item (mail/capture/manual producer)
+GET  /api/intake?status=NEW             # очередь intake items
+GET  /api/intake/{id}                   # детальная карточка intake item
+PUT  /api/intake/{id}                   # сохранить finalRoute/finalPayload, статус -> REVIEWING
+POST /api/intake/{id}/apply             # применить item в target receiver, статус -> APPLIED
+POST /api/intake/{id}/reject            # отклонить item, статус -> REJECTED
+
 # Очередь подтверждения (PENDING)
 GET  /api/tasks/pending                  # все задачи со статусом PENDING
-POST /api/tasks/pending                  # создать PENDING задачу (вызывает mail-agent)
+POST /api/tasks/pending                  # создать PENDING задачу напрямую (UI/manual flow or intake apply)
 POST /api/tasks/{id}/confirm             # PENDING → TODO
 POST /api/tasks/{id}/reject              # PENDING → ARCHIVED
 
@@ -947,6 +955,8 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 Task timeline доступен через `GET /api/tasks/{id}/timeline`; любые значимые изменения задачи создают immutable event в `task_events`.
 Today UI также поддерживает inline-смену даты задачи через `PATCH /api/tasks/{id}/date` и batch-операцию `POST /api/tasks/move-overdue-to-today`.
 
+Важно: текущие MCP write-tools ещё не используют Intake Gateway. Agent-originated writes через MCP будут вынесены в отдельный CR.
+
 ### Правило подтверждения (ОБЯЗАТЕЛЬНО в CLAUDE.md агента)
 
 Перед вызовом `createTask`, `createIncident`, `addRisk` агент ВСЕГДА показывает:
@@ -1136,38 +1146,72 @@ POST /api/capture/process-now
 
 | Type | Действие |
 |------|----------|
-| `TASK` | `TaskService.createPending(...)`, статус `PENDING`, подтверждение в `/ui/today` |
-| `RISK` | `RiskService.create(...)`, probability/impact по умолчанию `MEDIUM` |
-| `NOTE` | `NoteService.create(..., source="capture")` |
-| `QUESTION` | `QuestionService.create(...)` |
-| `PERSON_NOTE` | `person_notes` по имени через `PersonNameNoteRepository` |
-| `KNOWLEDGE` | Markdown-файл в `${app.rag.inbox-dir}/captures/` |
-| `JOURNAL` | append в `${app.workspace.dir}/08_daily_journal/YYYY-MM-DD.md` |
+| `TASK` | создать intake item со `suggestedRoute=TASK` |
+| `RISK` | создать intake item со `suggestedRoute=RISK` |
+| `NOTE` | создать intake item со `suggestedRoute=NOTE` |
+| `QUESTION` | создать intake item со `suggestedRoute=NOTE` |
+| `PERSON_NOTE` | создать intake item со `suggestedRoute=PERSON` |
+| `KNOWLEDGE` | создать intake item со `suggestedRoute=RAG` |
+| `JOURNAL` | создать intake item со `suggestedRoute=NOTE` |
+
+После ручного Apply intake item создаёт финальную сущность:
+- `TASK` → pending task
+- `RISK` → risk
+- `NOTE` / `QUESTION` / `JOURNAL` → operational note
+- `PERSON_NOTE` → person note
+- `KNOWLEDGE` → markdown-файл в `${app.rag.inbox-dir}/intake/`
 
 ---
 
 ## 13. Интеграция с java-mail-agent
 
-Когда mail-agent классифицировал письмо как `REQUEST` и извлёк задачу:
+Когда mail-agent классифицировал письмо как `REQUEST`, `CAPTURE`, `NOTE`, `NOTICE`, `NOISE` или `DRAFT`,
+он больше не создаёт конечную сущность напрямую. Вместо этого он создаёт intake item в MemoryService:
 
 ```
-POST /api/tasks/pending
+POST /api/intake
 Content-Type: application/json
 
 {
-  "title":       "Обсудить архитектуру payments",
-  "description": "Письмо от Иванова: нужно обсудить до пятницы",
-  "emailId":     "<message-id из письма>",
-  "sender":      "ivanov@company.ru",
-  "priority":    "HIGH"
+  "sourceType": "MAIL",
+  "sourceId": "<message-id из письма>",
+  "sourcePayload": {
+    "subject": "Обсудить архитектуру payments",
+    "from": "ivanov@company.ru",
+    "body": "Письмо от Иванова: нужно обсудить до пятницы"
+  },
+  "agentProvider": "mock|ollama|...",
+  "agentPrompt": "<prompt>",
+  "agentResult": "<raw result>",
+  "suggestedRoute": "TASK",
+  "suggestedPayload": {
+    "title": "Обсудить архитектуру payments",
+    "description": "Письмо от Иванова: нужно обсудить до пятницы",
+    "emailId": "<message-id из письма>",
+    "sender": "ivanov@company.ru",
+    "priority": "HIGH"
+  }
 }
 ```
 
-Задача создаётся со статусом `PENDING`.
-Далее пользователь видит её в UI `/ui/today` в секции "Ожидают подтверждения" и нажимает [Принять] / [Изменить] / [Отклонить].
+Mail routing в первом этапе выглядит так:
 
-**Агент через MCP не участвует в этом потоке** — PENDING задачи подтверждаются только через UI.
-`NOTICE` письма в этот поток не попадают: они сразу становятся RAG-документами в Knowledge Gateway.
+| Mail type | Suggested route | Что происходит до ручного Apply |
+|-----------|------------------|----------------------------------|
+| `REQUEST` | `TASK` | создаётся intake item, задача ещё не появляется |
+| `CAPTURE` | `NOTE` | создаётся intake item |
+| `NOTE` | `NOTE` | создаётся intake item |
+| `NOTICE` | `RAG` | создаётся intake item, markdown в `rag-inbox/intake` ещё не создаётся |
+| `NOISE` | `NOISE` | создаётся intake item |
+| `DRAFT` | `NOISE` | создаётся intake item для ручного review |
+
+Пользователь открывает `/ui/intake`, видит `sourcePayload`, `agentPrompt`, `agentResult`,
+при необходимости меняет `finalRoute`/`finalPayload` и только затем нажимает `Apply`.
+Если итоговый route = `TASK`, intake apply создаёт pending task, который дальше живёт обычным потоком
+`PENDING -> TODO -> IN_PROGRESS -> DONE`.
+
+**Агент через MCP не участвует в intake-потоке** — его write-tools пока создают сущности напрямую, это отдельный follow-up CR.
+`NOTICE` письма в этот поток попадают как intake items со `suggestedRoute=RAG`; до ручного Apply они не становятся RAG-документами.
 
 ---
 

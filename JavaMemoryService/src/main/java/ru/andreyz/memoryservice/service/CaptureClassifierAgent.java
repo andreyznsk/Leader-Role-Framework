@@ -2,6 +2,7 @@ package ru.andreyz.memoryservice.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import ru.andreyz.common.agent.AgentClient;
 import ru.andreyz.common.agent.AgentException;
@@ -22,22 +23,36 @@ public class CaptureClassifierAgent {
 
     private final AgentClient agentClient;
     private final ObjectMapper objectMapper;
+    private final Environment environment;
 
     public List<ClassifiedCapture> classify(List<Capture> captures) {
-        String prompt = buildPrompt(captures);
-        return completeAndParse(prompt);
+        return classifyWithTrace(captures).items();
     }
 
     public List<ClassifiedCapture> classifyFiles(List<CaptureService.CaptureFile> files, String dayContext) {
-        String prompt = buildFilePrompt(files, dayContext);
-        return completeAndParse(prompt);
+        return classifyFilesWithTrace(files, dayContext).items();
     }
 
-    private List<ClassifiedCapture> completeAndParse(String prompt) {
+    public ClassificationBatch classifyWithTrace(List<Capture> captures) {
+        String prompt = buildPrompt(captures);
+        return completeWithTrace(prompt);
+    }
+
+    public ClassificationBatch classifyFilesWithTrace(List<CaptureService.CaptureFile> files, String dayContext) {
+        String prompt = buildFilePrompt(files, dayContext);
+        return completeWithTrace(prompt);
+    }
+
+    private ClassificationBatch completeWithTrace(String prompt) {
         try {
             String output = agentClient.complete(prompt);
             log.debug("agent output:\n{}", output);
-            return parseResponse(output);
+            return new ClassificationBatch(
+                    parseResponse(output),
+                    prompt,
+                    output,
+                    environment.getProperty("agent.provider", "unknown")
+            );
         } catch (Exception e) {
             throw new AgentException("Capture classification failed: " + e.getMessage(), e);
         }
@@ -138,4 +153,11 @@ public class CaptureClassifierAgent {
         json = json.substring(start, end + 1);
         return objectMapper.readValue(json, new TypeReference<>() {});
     }
+
+    public record ClassificationBatch(
+            List<ClassifiedCapture> items,
+            String prompt,
+            String rawResult,
+            String agentProvider
+    ) {}
 }

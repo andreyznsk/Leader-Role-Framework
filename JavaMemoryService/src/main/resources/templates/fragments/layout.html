@@ -24,6 +24,11 @@
                   th:title="|Есть pending задачи: ${pendingCount}|"></span>
         </a>
         <a href="/ui/notes">Notes</a>
+        <a href="/ui/intake" class="los-nav-link-with-indicator">
+            <span>Intake Gateway</span>
+            <span th:if="${newIntakeCount != null and newIntakeCount > 0}" class="los-nav-alert-dot"
+                  th:title="|Есть новые intake items: ${newIntakeCount}|"></span>
+        </a>
         <a href="/ui/captures">Capture Inbox</a>
         <a href="/ui/risks">Risks</a>
         <a href="/ui/incidents">Incidents</a>

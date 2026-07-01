@@ -1,135 +1,143 @@
 package ru.andreyz.memoryservice.service;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
-import ru.andreyz.memoryservice.domain.PersonNameNote;
 import ru.andreyz.memoryservice.dto.ClassifiedCapture;
-import ru.andreyz.memoryservice.repository.PersonNameNoteRepository;
+import ru.andreyz.memoryservice.dto.IntakeCreateRequest;
+import ru.andreyz.memoryservice.dto.IntakeItemDto;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
 public class CaptureRouter {
 
+    private final IntakeService intakeService;
+    private final ObjectMapper objectMapper;
 
-    private final TaskService taskService;
-    private final RiskService riskService;
-    private final QuestionService questionService;
-    private final NoteService noteService;
-    private final PersonNameNoteRepository personNameNoteRepository;
-    private final Path ragInboxDir;
-    private final Path workspaceDir;
-
-    public CaptureRouter(
-            TaskService taskService,
-            RiskService riskService,
-            QuestionService questionService,
-            NoteService noteService,
-            PersonNameNoteRepository personNameNoteRepository,
-            @Value("${app.rag.inbox-dir:../JavaRagService/rag-inbox}") String ragInboxDir,
-            @Value("${app.workspace.dir:../workspace}") String workspaceDir) {
-        this.taskService = taskService;
-        this.riskService = riskService;
-        this.questionService = questionService;
-        this.noteService = noteService;
-        this.personNameNoteRepository = personNameNoteRepository;
-        this.ragInboxDir = Path.of(ragInboxDir);
-        this.workspaceDir = Path.of(workspaceDir);
+    public CaptureRouter(IntakeService intakeService, ObjectMapper objectMapper) {
+        this.intakeService = intakeService;
+        this.objectMapper = objectMapper;
     }
 
-    public String route(ClassifiedCapture c) {
-        return switch (c.type()) {
-            case "TASK" -> routeTask(c);
-            case "RISK" -> routeRisk(c);
-            case "NOTE" -> routeNote(c);
-            case "QUESTION" -> routeQuestion(c);
-            case "PERSON_NOTE" -> routePersonNote(c);
-            case "KNOWLEDGE" -> routeKnowledge(c);
-            case "JOURNAL" -> routeJournal(c);
+    public String route(ClassifiedCapture capture,
+                        String sourceText,
+                        String agentPrompt,
+                        String agentResult,
+                        String agentProvider) {
+        String captureType = normalize(capture.type());
+        String suggestedRoute = suggestedRoute(captureType);
+        ObjectNode sourcePayload = JsonNodeFactory.instance.objectNode();
+        if (capture.captureId() != null) {
+            sourcePayload.put("captureId", capture.captureId());
+        }
+        if (capture.file() != null) {
+            sourcePayload.put("file", capture.file());
+        }
+        if (sourceText != null) {
+            sourcePayload.put("text", sourceText);
+        }
+        sourcePayload.put("classification", captureType);
+
+        IntakeItemDto created = intakeService.create(new IntakeCreateRequest(
+                "CAPTURE",
+                capture.captureId() != null ? String.valueOf(capture.captureId()) : capture.file(),
+                sourcePayload,
+                agentProvider,
+                agentPrompt,
+                parseResult(agentResult, capture),
+                suggestedRoute,
+                suggestedPayload(captureType, capture),
+                null,
+                "capture-bot"
+        ));
+        return "intake/" + created.id();
+    }
+
+    private String suggestedRoute(String captureType) {
+        return switch (captureType) {
+            case "TASK" -> "TASK";
+            case "RISK" -> "RISK";
+            case "NOTE", "QUESTION", "JOURNAL" -> "NOTE";
+            case "PERSON_NOTE" -> "PERSON";
+            case "KNOWLEDGE" -> "RAG";
             default -> {
-                log.warn("Unknown capture type: {}", c.type());
-                yield "UNKNOWN";
+                log.warn("Unknown capture type for intake routing: {}", captureType);
+                yield "NOISE";
             }
         };
     }
 
-    private String routeTask(ClassifiedCapture c) {
-        taskService.createPending(c.title(), c.body(), null, null, c.priority(), null, "capture-bot");
-        return "tasks/pending";
-    }
-
-    private String routeRisk(ClassifiedCapture c) {
-        riskService.create(c.title(), c.body(), "MEDIUM", "MEDIUM");
-        return "risks";
-    }
-
-    private String routeNote(ClassifiedCapture c) {
-        noteService.create(c.title(), c.body(), c.tags(), "capture");
-        return "notes";
-    }
-
-    private String routeQuestion(ClassifiedCapture c) {
-        questionService.create(c.title(), c.body());
-        return "questions";
-    }
-
-    private String routePersonNote(ClassifiedCapture c) {
-        PersonNameNote note = new PersonNameNote(null, c.title(), c.body(), Instant.now());
-        personNameNoteRepository.save(note);
-        return "person_notes/" + c.title();
-    }
-
-    private String routeKnowledge(ClassifiedCapture c) {
-        try {
-            Path capturesDir = ragInboxDir.resolve("captures");
-            Files.createDirectories(capturesDir);
-            String filename = LocalDate.now() + "-" + knowledgeFileStem(c) + ".md";
-            String content = "---\ntype: knowledge\nupdated: " + LocalDate.now() + "\n---\n\n# " + c.title() + "\n\n" + c.body() + "\n";
-            Files.writeString(capturesDir.resolve(filename), content, StandardOpenOption.CREATE_NEW);
-            return "rag-inbox/captures/" + filename;
-        } catch (IOException e) {
-            log.error("Failed to write knowledge capture {}: {}", c.captureId(), e.getMessage());
-            log.error("", e);
-            return "rag-inbox/captures/ERROR";
+    private ObjectNode suggestedPayload(String captureType, ClassifiedCapture capture) {
+        ObjectNode payload = JsonNodeFactory.instance.objectNode();
+        switch (captureType) {
+            case "TASK" -> {
+                payload.put("title", capture.title());
+                payload.put("description", capture.body());
+                if (capture.priority() != null) {
+                    payload.put("priority", capture.priority());
+                }
+            }
+            case "RISK" -> {
+                payload.put("title", capture.title());
+                payload.put("description", capture.body());
+                payload.put("probability", "MEDIUM");
+                payload.put("impact", "MEDIUM");
+            }
+            case "NOTE" -> {
+                payload.put("title", capture.title());
+                payload.put("text", capture.body());
+                if (capture.tags() != null) {
+                    payload.put("tags", capture.tags());
+                }
+            }
+            case "QUESTION" -> {
+                payload.put("title", capture.title());
+                payload.put("text", capture.body());
+                payload.put("tags", withTag(capture.tags(), "question"));
+            }
+            case "PERSON_NOTE" -> {
+                payload.put("personName", capture.title());
+                payload.put("note", capture.body());
+            }
+            case "KNOWLEDGE" -> {
+                payload.put("docType", "KNOWLEDGE");
+                payload.put("title", capture.title());
+                payload.put("body", capture.body());
+            }
+            case "JOURNAL" -> {
+                payload.put("title", capture.title());
+                payload.put("text", capture.body());
+                payload.put("tags", withTag(capture.tags(), "journal"));
+            }
+            default -> payload.put("text", capture.body() != null ? capture.body() : capture.title());
         }
+        payload.put("originalCaptureType", captureType);
+        return payload;
     }
 
-    private String knowledgeFileStem(ClassifiedCapture c) {
-        if (c.captureId() != null) {
-            return String.valueOf(c.captureId());
+    private com.fasterxml.jackson.databind.JsonNode parseResult(String agentResult, ClassifiedCapture capture) {
+        if (agentResult != null && !agentResult.isBlank()) {
+            try {
+                return objectMapper.readTree(agentResult);
+            } catch (Exception ignored) {
+            }
         }
-        if (c.file() != null && !c.file().isBlank()) {
-            String filename = Path.of(c.file()).getFileName().toString();
-            int dot = filename.lastIndexOf('.');
-            return dot >= 0 ? filename.substring(0, dot) : filename;
-        }
-        return String.valueOf(System.currentTimeMillis());
+        return objectMapper.valueToTree(capture);
     }
 
-    private String routeJournal(ClassifiedCapture c) {
-        try {
-            Path journalDir = workspaceDir.resolve("08_daily_journal");
-            Files.createDirectories(journalDir);
-            String filename = LocalDate.now() + ".md";
-            Path journalFile = journalDir.resolve(filename);
-
-            String entry = "\n## " + c.title() + "\n" + c.body() + "\n";
-            Files.writeString(journalFile, entry,
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            return "journal/" + filename;
-        } catch (IOException e) {
-            log.error("Failed to append journal for capture {}: {}", c.captureId(), e.getMessage());
-            log.error("", e);
-            return "journal/ERROR";
+    private String withTag(String tags, String extraTag) {
+        if (tags == null || tags.isBlank()) {
+            return extraTag;
         }
+        String normalized = tags.toLowerCase(Locale.ROOT);
+        return normalized.contains(extraTag) ? tags : tags + "," + extraTag;
     }
 
+    private String normalize(String type) {
+        return type == null ? "" : type.trim().toUpperCase(Locale.ROOT);
+    }
 }

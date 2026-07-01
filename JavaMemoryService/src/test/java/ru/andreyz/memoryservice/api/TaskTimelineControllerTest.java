@@ -55,12 +55,12 @@ class TaskTimelineControllerTest {
 
         mockMvc.perform(get("/api/tasks/{id}/timeline", taskId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].eventType").value("TASK_CREATED"))
+                .andExpect(jsonPath("$[0].eventType").value("COMMENT_ADDED"))
+                .andExpect(jsonPath("$[0].newValue.text").value("Need to coordinate release"))
                 .andExpect(jsonPath("$[1].eventType").value("STATUS_CHANGED"))
                 .andExpect(jsonPath("$[1].oldValue.status").value("TODO"))
                 .andExpect(jsonPath("$[1].newValue.status").value("IN_PROGRESS"))
-                .andExpect(jsonPath("$[2].eventType").value("COMMENT_ADDED"))
-                .andExpect(jsonPath("$[2].newValue.text").value("Need to coordinate release"));
+                .andExpect(jsonPath("$[2].eventType").value("TASK_CREATED"));
     }
 
     @Test
@@ -83,7 +83,8 @@ class TaskTimelineControllerTest {
 
         mockMvc.perform(get("/api/tasks/{id}/timeline", taskId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[1].eventType").value("TASK_ARCHIVED"))
-                .andExpect(jsonPath("$[1].newValue.status").value("ARCHIVED"));
+                .andExpect(jsonPath("$[0].eventType").value("TASK_ARCHIVED"))
+                .andExpect(jsonPath("$[0].newValue.status").value("ARCHIVED"))
+                .andExpect(jsonPath("$[1].eventType").value("TASK_CREATED"));
     }
 }
