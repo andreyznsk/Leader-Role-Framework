@@ -1,6 +1,6 @@
 # LeaderOS — Architecture - Мастер-Спека
 
-**Последнее обновление:** 2026-07-01
+**Последнее обновление:** 2026-07-02
 **Статус:** Living document — обновлять при любом изменении контрактов между сервисами
 **git:** https://github.com/andreyznsk/Leader-Role-Framework.git
 ---
@@ -207,12 +207,12 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `PUT` | `/api/notes/{id}` | Обновить заметку (title/text/tags/source) |
 | `DELETE` | `/api/notes/{id}` | Удалить заметку: `204 No Content` / `404 Not Found` (hard delete, CR-MEM-011) |
 | `GET/POST/PUT/DELETE` | `/api/incidents`, `/api/risks`, `/api/people` | CRUD/soft delete рабочих сущностей |
-| `GET` | `/ui/today` | Web UI: план дня |
+| `GET` | `/ui/today` | Web UI: план дня. Сайдбар разделён на вкладки **ToDo** (`/ui/today`, DONE всегда скрыт) и **Done** (`/ui/today?status=DONE`, только DONE); toggle «No Done» убран (CR-MEM-025) |
 | `GET` | `/ui/notes` | Web UI: Operational Notes |
 | `GET` | `/ui/captures` | Web UI: Capture Inbox |
 | `GET` | `/ui/search` | Web UI: Global Search — standalone top-level страница (CR-MEM-022, un-relocated из Agent Workspace) |
 | `GET` | `/ui/knowledge` | Web UI: Knowledge Gateway для RAG lifecycle |
-| `GET` | `/ui/intake` | Web UI: Intake Gateway для ручного review автоматических входящих сигналов |
+| `GET` | `/ui/intake` | Web UI: Intake Gateway для ручного review автоматических входящих сигналов. Поддерживает bulk-выбор карточек чекбоксами + массовый Apply/Reject (CR-MEM-026) |
 | `GET` | `/ui/stats` | Web UI: статистика использования и saved time |
 | `GET` | `/ui/settings` | Web UI: Control Plane — настройки плагинов (descriptor-driven UI) |
 | `GET` | `/ui/agent-workspace` | Web UI: Agent Workspace — Chat и Console режимы работы с агентом (CR-MEM-012) |

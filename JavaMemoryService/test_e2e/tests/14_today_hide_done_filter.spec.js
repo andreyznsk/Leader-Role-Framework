@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-test.describe('CR-MEM-014: Today UI — Hide Done filter', () => {
+test.describe('Today UI — ToDo / Done tabs (replaces CR-MEM-014 hide-done toggle)', () => {
   let todoTask, doneTask;
 
   test.beforeEach(async ({ request }) => {
@@ -27,76 +27,63 @@ test.describe('CR-MEM-014: Today UI — Hide Done filter', () => {
     if (doneTask) await request.delete(`/api/tasks/${doneTask.id}`);
   });
 
-  test('hides DONE tasks by default (hideDone=true)', async ({ page }) => {
+  test('ToDo tab (/ui/today) always hides DONE tasks, no toggle present', async ({ page }) => {
     await page.goto('/ui/today');
-    await expect(page).toHaveTitle(/План дня/);
+    await expect(page).toHaveTitle(/ToDo/);
 
     await expect(page.locator(`.task-row[data-id="${todoTask.id}"]`)).toBeVisible();
     await expect(page.locator(`.task-row[data-id="${doneTask.id}"]`)).not.toBeAttached();
+    await expect(page.locator('#hideDoneToggle')).toHaveCount(0);
   });
 
-  test('shows DONE tasks when hideDone=false via query param', async ({ page }) => {
-    await page.goto('/ui/today?hideDone=false');
-
-    await expect(page.locator(`.task-row[data-id="${todoTask.id}"]`)).toBeVisible();
-    await expect(page.locator(`.task-row[data-id="${doneTask.id}"]`)).toBeVisible();
-  });
-
-  test('shows DONE tasks when status=DONE filter is selected (even with hideDone default)', async ({ page }) => {
+  test('Done tab (/ui/today?status=DONE) shows only DONE tasks', async ({ page }) => {
     await page.goto('/ui/today?status=DONE');
+    await expect(page).toHaveTitle(/Done/);
 
     await expect(page.locator(`.task-row[data-id="${doneTask.id}"]`)).toBeVisible();
     await expect(page.locator(`.task-row[data-id="${todoTask.id}"]`)).not.toBeAttached();
   });
 
-  test('hideDone toggle checkbox is present and checked by default', async ({ page }) => {
+  test('sidebar has separate ToDo and Done nav items with correct active state', async ({ page }) => {
     await page.goto('/ui/today');
+    const todoLink = page.locator('.los-nav-item[href="/ui/today"]');
+    const doneLink = page.locator('.los-nav-item[href="/ui/today?status=DONE"]');
+    await expect(todoLink).toHaveClass(/active/);
+    await expect(doneLink).not.toHaveClass(/active/);
 
-    const toggle = page.locator('#hideDoneToggle');
-    await expect(toggle).toBeVisible();
-    await expect(toggle).toBeChecked();
-  });
-
-  test('clicking toggle shows DONE tasks', async ({ page }) => {
-    await page.goto('/ui/today');
-
-    await expect(page.locator(`.task-row[data-id="${doneTask.id}"]`)).not.toBeAttached();
-
-    await page.locator('#hideDoneToggle').click();
+    await doneLink.click();
     await page.waitForLoadState('networkidle');
-
-    await expect(page.locator(`.task-row[data-id="${doneTask.id}"]`)).toBeVisible();
-    await expect(page.locator('#hideDoneToggle')).not.toBeChecked();
+    await expect(page).toHaveURL(/status=DONE/);
+    await expect(page.locator('.los-nav-item[href="/ui/today"]')).not.toHaveClass(/active/);
+    await expect(page.locator('.los-nav-item[href="/ui/today?status=DONE"]')).toHaveClass(/active/);
   });
 
-  test('reset link restores default hide-done state', async ({ page }) => {
-    await page.goto('/ui/today?hideDone=false');
-    await expect(page.locator(`.task-row[data-id="${doneTask.id}"]`)).toBeVisible();
+  test('reset link on Done tab stays on Done tab', async ({ page }) => {
+    await page.goto('/ui/today?status=DONE&priority=HIGH');
 
     await page.getByRole('link', { name: 'Сбросить' }).click();
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator(`.task-row[data-id="${doneTask.id}"]`)).not.toBeAttached();
-    await expect(page.locator('#hideDoneToggle')).toBeChecked();
+    await expect(page).toHaveURL(/status=DONE/);
+    await expect(page.locator(`.task-row[data-id="${doneTask.id}"]`)).toBeVisible();
   });
 
-  test('priority filter works together with hideDone', async ({ page }) => {
+  test('priority filter works together with the ToDo tab', async ({ page }) => {
     const today = new Date().toISOString().slice(0, 10);
     const r = await page.request.post('/api/tasks', {
-      data: { title: 'MEM014 DONE LOW task', date: today, priority: 'LOW', source: 'MANUAL' }
+      data: { title: 'MEM014 TODO LOW task', date: today, priority: 'LOW', source: 'MANUAL' }
     });
     expect(r.ok()).toBeTruthy();
-    const doneLowTask = await r.json();
-    await page.request.post(`/api/tasks/${doneLowTask.id}/done`);
+    const todoLowTask = await r.json();
 
     try {
-      await page.goto('/ui/today?priority=HIGH&hideDone=false');
+      await page.goto('/ui/today?priority=HIGH');
 
-      await expect(page.locator(`.task-row[data-id="${doneTask.id}"]`)).toBeVisible();
       await expect(page.locator(`.task-row[data-id="${todoTask.id}"]`)).toBeVisible();
-      await expect(page.locator(`.task-row[data-id="${doneLowTask.id}"]`)).not.toBeAttached();
+      await expect(page.locator(`.task-row[data-id="${todoLowTask.id}"]`)).not.toBeAttached();
+      await expect(page.locator(`.task-row[data-id="${doneTask.id}"]`)).not.toBeAttached();
     } finally {
-      await page.request.delete(`/api/tasks/${doneLowTask.id}`);
+      await page.request.delete(`/api/tasks/${todoLowTask.id}`);
     }
   });
 });

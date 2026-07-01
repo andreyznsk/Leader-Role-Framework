@@ -51,11 +51,15 @@
                 <span class="los-nav-group-toggle-icon">&#8964;</span>
             </button>
             <div class="los-nav-group-items">
-            <a href="/ui/today" class="los-nav-item" data-nav-title="Today">
+            <a href="/ui/today" class="los-nav-item" data-nav-title="ToDo">
                 <span class="los-nav-icon">&#128203;</span>
-                <span class="los-nav-label">Today</span>
+                <span class="los-nav-label">ToDo</span>
                 <span th:if="${pendingCount != null and pendingCount > 0}" class="los-nav-alert-dot"
                       th:title="|Есть pending задачи: ${pendingCount}|"></span>
+            </a>
+            <a href="/ui/today?status=DONE" class="los-nav-item" data-nav-title="Done">
+                <span class="los-nav-icon">&#9989;</span>
+                <span class="los-nav-label">Done</span>
             </a>
             <a href="/ui/intake" class="los-nav-item" data-nav-title="Intake Gateway">
                 <span class="los-nav-icon">&#128229;</span>
@@ -224,14 +228,40 @@
             }
         });
 
-        document.querySelectorAll('.los-sidebar .los-nav-item').forEach(function (a) {
-            if (a.target !== '_blank') {
-                var href = a.getAttribute('href');
-                if (window.location.pathname === href ||
-                    window.location.pathname.startsWith(href + '/')) {
+        (function () {
+            var navLinks = Array.prototype.slice.call(document.querySelectorAll('.los-sidebar .los-nav-item'))
+                .filter(function (a) { return a.target !== '_blank'; });
+
+            // Links sharing a pathname (e.g. ToDo/Done both point to /ui/today) are
+            // disambiguated by whichever query params differ between them.
+            var distinguishingKeysByPath = {};
+            navLinks.forEach(function (a) {
+                var url = new URL(a.getAttribute('href'), window.location.origin);
+                a.__losUrl = url;
+                var keys = distinguishingKeysByPath[url.pathname] || [];
+                url.searchParams.forEach(function (_, key) {
+                    if (keys.indexOf(key) === -1) keys.push(key);
+                });
+                distinguishingKeysByPath[url.pathname] = keys;
+            });
+
+            var currentParams = new URLSearchParams(window.location.search);
+
+            navLinks.forEach(function (a) {
+                var url = a.__losUrl;
+                var samePath = window.location.pathname === url.pathname ||
+                    window.location.pathname.startsWith(url.pathname + '/');
+                var keys = distinguishingKeysByPath[url.pathname] || [];
+                var sameQuery = keys.every(function (key) {
+                    return (currentParams.get(key) || '') === (url.searchParams.get(key) || '');
+                });
+                if (samePath && sameQuery) {
                     a.classList.add('active');
                 }
-            }
+            });
+        })();
+
+        document.querySelectorAll('.los-sidebar .los-nav-item').forEach(function (a) {
             a.addEventListener('click', function () {
                 setMobileOpen(false);
             });

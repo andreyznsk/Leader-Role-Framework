@@ -17,7 +17,7 @@
 | CR-MEM-010        | [CR-MEM-010-universal-plugin-control-ui.md](CR-MEM-010-universal-plugin-control-ui.md) | Implemented | —          |
 | CR-MEM-012        | [2026-06-28_CR-MEM-012-capturebot-ui.md](2026-06-28_CR-MEM-012-capturebot-ui.md) | Implemented | 2026-06-28 |
 | CR-MEM-013        | [2026-06-29_CR-MEM-013-task-description-db-storage.md](2026-06-29_CR-MEM-013-task-description-db-storage.md) | Implemented | 2026-06-29 |
-| CR-MEM-014        | [2026-06-29_CR-MEM-014-today-hide-done-filter.md](2026-06-29_CR-MEM-014-today-hide-done-filter.md) | Implemented | 2026-06-29 |
+| CR-MEM-014        | [2026-06-29_CR-MEM-014-today-hide-done-filter.md](2026-06-29_CR-MEM-014-today-hide-done-filter.md) | Superseded by CR-MEM-025 | 2026-06-29 |
 | CR-MEM-014 ⚠️     | [2026-06-29_CR-MEM-014-Today-Calendar-Navigation.md](2026-06-29_CR-MEM-014-Today-Calendar-Navigation.md) | Draft | 2026-06-29 |
 | CR-MEM-015        | [2026-06-29_CR-MEM-015-global-search-tsvector-providers.md](2026-06-29_CR-MEM-015-global-search-tsvector-providers.md) | Implemented | 2026-06-29 |
 | CR-MEM-016        | [2026-06-29_CR-MEM-016-agent-workspace-ui.md](2026-06-29_CR-MEM-016-agent-workspace-ui.md) | Implemented | 2026-06-29 |
@@ -28,6 +28,9 @@
 | CR-MEM-021        | [2026-06-30_CR-MEM-021-intake-rollback-reapply.md](2026-06-30_CR-MEM-021-intake-rollback-reapply.md) | Draft | 2026-06-30 |
 | CR-MEM-022        | [2026-06-30_CR-MEM-022-left-sidebar-navigation.md](2026-06-30_CR-MEM-022-left-sidebar-navigation.md) | Implemented | 2026-06-30 |
 | CR-MEM-023        | [2026-06-30_CR-MEM-023-task-edit-right-control-panel.md](2026-06-30_CR-MEM-023-task-edit-right-control-panel.md) | Implemented | 2026-06-30 |
+| CR-MEM-024        | [2026-07-02_CR-MEM-024-task-done-confirmation.md](2026-07-02_CR-MEM-024-task-done-confirmation.md) | Implemented | 2026-07-02 |
+| CR-MEM-025        | [2026-07-02_CR-MEM-025-today-todo-done-tabs.md](2026-07-02_CR-MEM-025-today-todo-done-tabs.md) | Implemented | 2026-07-02 |
+| CR-MEM-026        | [2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md](2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md) | Implemented | 2026-07-02 |
 | CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md) | Draft | —          |
 
 ---
@@ -72,5 +75,5 @@
 
 ---
 
-_Следующий свободный номер в MEM серии: **CR-MEM-024**_  
-_Последнее обновление реестра: 2026-06-30_
+_Следующий свободный номер в MEM серии: **CR-MEM-027**_  
+_Последнее обновление реестра: 2026-07-02_
