@@ -1,8 +1,1 @@
-ALTER TABLE tasks ADD COLUMN pending_type VARCHAR(40) DEFAULT 'NEW_TASK' NOT NULL;
-ALTER TABLE tasks ADD COLUMN suggested_task_id BIGINT;
-ALTER TABLE tasks ADD COLUMN agent_confidence DOUBLE;
-ALTER TABLE tasks ADD COLUMN agent_reason CLOB;
-ALTER TABLE tasks ADD COLUMN source_type VARCHAR(40);
-ALTER TABLE tasks ADD COLUMN source_subject VARCHAR(500);
-ALTER TABLE tasks ADD COLUMN source_sender VARCHAR(500);
-ALTER TABLE tasks ADD COLUMN proposed_description_append CLOB;
+-- No-op: V17__mail_linking_pending_tasks.sql is now H2-compatible.

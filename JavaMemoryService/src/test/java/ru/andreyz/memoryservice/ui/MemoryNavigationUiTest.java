@@ -49,7 +49,7 @@ class MemoryNavigationUiTest {
         mockMvc.perform(get("/ui/notes"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Operational Notes")))
-                .andExpect(content().string(containsString("Operational Memory")));
+                .andExpect(content().string(containsString("Рабочие заметки Memory Service")));
     }
 
     @Test
