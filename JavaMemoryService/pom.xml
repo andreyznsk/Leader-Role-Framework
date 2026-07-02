@@ -88,6 +88,29 @@
                     <finalName>memory-service</finalName>
                 </configuration>
             </plugin>
+            <!--
+                Runs ru.andreyz.memoryservice.tools.FlywayAdminTool for ad hoc
+                operational commands (info/repair/migrate) against a target
+                database, e.g. via scripts/flyway-repair.sh. Not bound to any
+                build phase, so it never runs during a normal `mvn install`/
+                `mvn test`. Uses the module's own compile-scope classpath
+                (target/classes + dependencies), so it resolves Java-based
+                migrations (V13, V14, V15, V19 under db.migration) the same
+                way the real app does — a plain flyway-maven-plugin/CLI
+                invocation cannot see those classes and will treat them as
+                missing (repair would then delete their history rows).
+                Connection details are read from environment variables only —
+                no secrets are stored here. See scripts/flyway-repair.sh.
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.4.1</version>
+                <configuration>
+                    <mainClass>ru.andreyz.memoryservice.tools.FlywayAdminTool</mainClass>
+                    <classpathScope>runtime</classpathScope>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>
