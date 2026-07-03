@@ -98,12 +98,12 @@ agent:
 | `DRAFT` | POST `/api/intake` (suggestedRoute=`NOISE`) -> move в `processed/` |
 | `NOISE` | POST `/api/intake` (suggestedRoute=`NOISE`) -> move в `processed/` -> `MARK_AS_READ` |
 | `CAPTURE` | POST `/api/intake` (suggestedRoute=`NOTE`) -> move в `processed/` |
-| `NOTICE` | POST `/api/intake` (suggestedRoute=`RAG`) -> move в `processed/` -> `MARK_AS_READ` |
+| `RAG` | POST `/api/intake` (suggestedRoute=`RAG`) -> move в `processed/` -> `MARK_AS_READ` |
 | `NOTE` | POST `/api/intake` (suggestedRoute=`NOTE`) -> move в `processed/` |
 
 **Трекинг обработанных писем:** таблица `mailagent.processed_emails` теперь хранит не только dedup, но и checkpoint state-machine:
 - `status`: `NEW | PROCESSING | ERROR | PROCESSED`
-- `failed_route`: checkpoint следующего side-effect (`PLAN_APPEND`, `MEMORY_PENDING_TASK`, `MEMORY_CAPTURE`, `MEMORY_NOTE`, `NOTICE_WRITE`, `MOVE_TO_PROCESSED`, `MARK_AS_READ`)
+- `failed_route`: checkpoint следующего side-effect (`PLAN_APPEND`, `MEMORY_PENDING_TASK`, `MEMORY_CAPTURE`, `MEMORY_NOTE`, `RAG_INTAKE`, `MOVE_TO_PROCESSED`, `MARK_AS_READ`)
 - `route_payload_json`: сериализованный payload для retry без повторного чтения письма с сервера и без повторного вызова LLM
 
 **Retry flow:** каждый poll сначала обрабатывает очередь `status=ERROR` по `last_attempt_at, created_at`. Пока очередь ошибок не пуста, новые письма не имеют приоритета. При падении любого route batch останавливается, запись письма остаётся в `ERROR`, а следующий запуск продолжает цепочку с сохранённого checkpoint.
@@ -714,7 +714,7 @@ docker compose up -d
 | `04_poll_cycle_request.md` | HIGH | дедлайн → REQUEST → today.md + unread |
 | `05_deduplication.md` | HIGH | письмо обрабатывается ровно один раз |
 | `06_multiple_emails.md` | MEDIUM | 3 типа за один poll + корректные read-статусы |
-| `07_integration_memory_service.md` | HIGH | REQUEST/NOTICE/CAPTURE/... → POST /api/intake → NEW intake item |
+| `07_integration_memory_service.md` | HIGH | REQUEST/RAG/CAPTURE/... → POST /api/intake → NEW intake item |
 
 #### JavaRagService (`test_e2e/`)
 

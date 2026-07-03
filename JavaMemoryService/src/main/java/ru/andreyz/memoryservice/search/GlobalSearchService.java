@@ -23,7 +23,7 @@ public class GlobalSearchService {
     private static final long QUICK_TIMEOUT_MS = 1500;
     private static final long DEEP_TIMEOUT_MS = 5000;
     private static final Set<SearchLayer> AVAILABLE_LAYERS = EnumSet.of(
-            SearchLayer.NOTICE, SearchLayer.TASK, SearchLayer.PEOPLE,
+            SearchLayer.NOTE, SearchLayer.TASK, SearchLayer.PEOPLE,
             SearchLayer.RISK, SearchLayer.INCIDENT, SearchLayer.KNOWLEDGE
     );
 
@@ -71,7 +71,7 @@ public class GlobalSearchService {
 
     public List<LayerInfo> getLayers() {
         return List.of(
-                new LayerInfo("NOTICE", "Notice", true, true),
+                new LayerInfo("NOTE", "Notes", true, true),
                 new LayerInfo("TASK", "Tasks", true, true),
                 new LayerInfo("PEOPLE", "People", true, true),
                 new LayerInfo("RISK", "Risks", true, true),

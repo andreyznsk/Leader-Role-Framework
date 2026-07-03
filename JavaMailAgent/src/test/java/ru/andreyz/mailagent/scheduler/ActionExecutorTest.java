@@ -11,6 +11,7 @@ import ru.andreyz.mailagent.integration.MemoryServiceClient;
 import ru.andreyz.mailagent.model.AgentResponse;
 import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
+import ru.andreyz.mailagent.model.EmailProcessingStatus;
 import ru.andreyz.mailagent.model.MailProcessingRoute;
 import ru.andreyz.mailagent.model.ProcessedEmail;
 import ru.andreyz.mailagent.service.MailControlAuditStore;
@@ -274,24 +275,30 @@ class ActionExecutorTest {
     }
 
     @Test
-    void noticeCreatesIntakeItemAndMovesEmailToProcessed() throws Exception {
+    void ragCreatesIntakeItemAndMovesEmailToProcessed() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
         String emailId = "test-notice-001";
         Files.writeString(inbox.resolve(emailId + ".json"), "{}");
 
         AgentResponse response = new AgentResponse(
-                AgentResponseType.NOTICE, emailId,
+                AgentResponseType.RAG, emailId,
                 "Новая release-практика команды", null, null, null, null, null, null, null, null,
                 null, null, null, null, null
         );
 
         executor.execute(
-            email(emailId, "NOTICE: Новый порядок релизов", "architect@example.com", "Согласование через release calendar"),
+            email(emailId, "RAG: Новый порядок релизов", "architect@example.com", "Согласование через release calendar"),
             response
         );
 
-        verify(memoryServiceClient).createIntake(any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> requestCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(memoryServiceClient).createIntake(requestCaptor.capture());
+        assertEquals("RAG", requestCaptor.getValue().get("suggestedRoute"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> suggestedPayload = (Map<String, Object>) requestCaptor.getValue().get("suggestedPayload");
+        assertEquals("RAG", suggestedPayload.get("docType"));
         ArgumentCaptor<ProcessedEmail> emailCaptor = ArgumentCaptor.forClass(ProcessedEmail.class);
         verify(processedEmailRepository, atLeastOnce()).save(emailCaptor.capture());
         ProcessedEmail processed = emailCaptor.getAllValues().get(emailCaptor.getAllValues().size() - 1);
@@ -332,7 +339,7 @@ class ActionExecutorTest {
     }
 
     @Test
-    void markAsReadDryRunLeavesNoticeUnread() throws Exception {
+    void markAsReadDryRunLeavesRagUnread() throws Exception {
         runtimeConfigService.apply(Map.of("markAsReadEnabled", "false"));
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);
@@ -340,7 +347,7 @@ class ActionExecutorTest {
         Files.writeString(inbox.resolve(emailId + ".json"), "{}");
 
         AgentResponse response = new AgentResponse(
-            AgentResponseType.NOTICE, emailId,
+            AgentResponseType.RAG, emailId,
             "Новая release-практика команды", null, null, null, null, null, null, null, null,
             null, null, null, null, null
         );
@@ -349,6 +356,39 @@ class ActionExecutorTest {
 
         verify(mailClient, never()).markAsRead(anyString(), anyString());
         assertTrue(Files.exists(tempDir.resolve("processed/" + emailId + ".json")));
+    }
+
+    @Test
+    void retryNormalizesLegacyNoticeResponseTypeToRag() throws Exception {
+        Path inbox = tempDir.resolve("inbox");
+        Files.createDirectories(inbox);
+        String emailId = "test-notice-retry-001";
+        Files.writeString(inbox.resolve(emailId + ".json"), "{}");
+        ProcessedEmail legacyState = new ProcessedEmail(
+            null,
+            emailId,
+            "INBOX",
+            "architect@example.com",
+            "Legacy notice mail",
+            "NOTICE",
+            "NOTICE",
+            EmailProcessingStatus.ERROR,
+            MailProcessingRoute.INTAKE_WRITE,
+            "{\"responseType\":\"NOTICE\",\"intakeRequest\":{\"suggestedRoute\":\"RAG\"},\"sourceId\":\"" + emailId + "\",\"processedFolder\":\"" + tempDir.resolve("processed") + "\",\"moveEnabled\":true,\"markAsRead\":true}",
+            null,
+            null,
+            null,
+            1,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        executor.retry(legacyState);
+
+        verify(memoryServiceClient).createIntake(any());
     }
 
     private Email email(String emailId) {

@@ -222,9 +222,12 @@ public class IntakeTargetApplier {
 
     private String normalizeDocType(String raw) {
         if (raw == null || raw.isBlank()) {
-            return "KNOWLEDGE";
+            return "RAG";
         }
-        return raw.trim().toUpperCase();
+        return switch (raw.trim().toUpperCase()) {
+            case "NOTICE", "KNOWLEDGE", "RAG" -> "RAG";
+            default -> raw.trim().toUpperCase();
+        };
     }
 
     private String requiredText(JsonNode payload, String... fieldNames) {

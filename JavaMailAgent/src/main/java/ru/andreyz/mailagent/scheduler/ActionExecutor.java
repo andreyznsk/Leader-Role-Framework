@@ -52,7 +52,7 @@ public class ActionExecutor {
     }
 
     public void retry(ProcessedEmail state) throws Exception {
-        AgentResponseType responseType = AgentResponseType.valueOf(state.responseType());
+        AgentResponseType responseType = AgentResponseType.from(state.responseType());
         Object payload = payloadFor(responseType, state.routePayloadJson());
         Email email = loadStoredEmail(state.emailId(), processedFolderFor(payload));
         MailProcessingRoute route = state.failedRoute() != null ? state.failedRoute() : initialRoute(responseType);
@@ -184,7 +184,7 @@ public class ActionExecutor {
         return switch (type) {
             case REQUEST -> "TASK";
             case CAPTURE, NOTE -> "NOTE";
-            case NOTICE -> "RAG";
+            case RAG -> "RAG";
             case NOISE, DRAFT -> "NOISE";
         };
     }
@@ -193,7 +193,7 @@ public class ActionExecutor {
         return switch (response.type()) {
             case REQUEST -> buildTaskSuggestedPayload(email, response);
             case CAPTURE -> buildCaptureSuggestedPayload(email, response);
-            case NOTICE -> buildNoticeSuggestedPayload(email, response);
+            case RAG -> buildRagSuggestedPayload(email, response);
             case NOTE -> buildNoteSuggestedPayload(email, response);
             case NOISE, DRAFT -> buildNoiseSuggestedPayload(email, response);
         };
@@ -218,10 +218,10 @@ public class ActionExecutor {
         return suggested;
     }
 
-    private Map<String, Object> buildNoticeSuggestedPayload(Email email, AgentResponse response) {
+    private Map<String, Object> buildRagSuggestedPayload(Email email, AgentResponse response) {
         Map<String, Object> suggested = new LinkedHashMap<>();
-        suggested.put("docType", "NOTICE");
-        suggested.put("title", hasText(email.subject()) ? email.subject().trim() : "Notice");
+        suggested.put("docType", "RAG");
+        suggested.put("title", hasText(email.subject()) ? email.subject().trim() : "RAG document");
         suggested.put("body", fallbackMailSummary(email, response));
         suggested.put("subject", email.subject());
         suggested.put("sender", email.from());
@@ -246,7 +246,7 @@ public class ActionExecutor {
 
     private Object buildPayload(Email email, AgentResponse response, MailRuntimeConfig runtime, String agentPrompt, String agentRawResult) {
         boolean markAsRead = switch (response.type()) {
-            case NOTICE, NOTE -> true;
+            case RAG, NOTE -> true;
             case NOISE -> runtime.markNoiseAsRead();
             case REQUEST, CAPTURE, DRAFT -> false;
         };
@@ -327,7 +327,21 @@ public class ActionExecutor {
     }
 
     private Object payloadFor(AgentResponseType responseType, String payloadJson) {
-        return processingStateService.deserialize(payloadJson, IntakeMailActionPayload.class);
+        IntakeMailActionPayload payload = processingStateService.deserialize(payloadJson, IntakeMailActionPayload.class);
+        if (payload == null) {
+            return null;
+        }
+        if (!responseType.name().equals(payload.responseType())) {
+            return new IntakeMailActionPayload(
+                responseType.name(),
+                payload.intakeRequest(),
+                payload.sourceId(),
+                payload.processedFolder(),
+                payload.moveEnabled(),
+                payload.markAsRead()
+            );
+        }
+        return payload;
     }
 
     private MailProcessingRoute initialRoute(AgentResponseType responseType) {

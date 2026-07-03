@@ -25,10 +25,10 @@ class GlobalSearchServiceTest {
                 SearchLayer.TASK,
                 new SearchResultItem(SearchLayer.TASK, "Task A", "blocked", "/ui/today", "1", "TASK", 0.91, Instant.now())
         );
-        SearchProvider noticeProvider = new SearchProvider() {
+        SearchProvider noteProvider = new SearchProvider() {
             @Override
             public SearchLayer layer() {
-                return SearchLayer.NOTICE;
+                return SearchLayer.NOTE;
             }
 
             @Override
@@ -42,7 +42,7 @@ class GlobalSearchServiceTest {
         );
 
         GlobalSearchService service = new GlobalSearchService(
-                List.of(riskProvider, noticeProvider, taskProvider),
+                List.of(riskProvider, noteProvider, taskProvider),
                 promptBuilder,
                 agentClient,
                 parser
@@ -50,7 +50,7 @@ class GlobalSearchServiceTest {
 
         SearchResponse response = service.search(new SearchRequest(
                 "что зависло по релизу платежей",
-                List.of(SearchLayer.TASK, SearchLayer.NOTICE, SearchLayer.RISK),
+                List.of(SearchLayer.TASK, SearchLayer.NOTE, SearchLayer.RISK),
                 SearchMode.QUICK,
                 5
         ));

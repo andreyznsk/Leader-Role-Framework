@@ -254,7 +254,7 @@ CREATE TABLE email_state (
     subject        VARCHAR(1000),
     sender         VARCHAR(500),
     received_at    TIMESTAMP,
-    classification VARCHAR(20),   -- DRAFT | REQUEST | NOISE | CAPTURE | NOTICE
+    classification VARCHAR(20),   -- DRAFT | REQUEST | NOISE | CAPTURE | RAG
     status         VARCHAR(20)  NOT NULL DEFAULT 'NEW',  -- NEW | PROCESSED | IGNORED
     summary        TEXT,
     created_at     TIMESTAMP    NOT NULL DEFAULT NOW()
@@ -651,7 +651,7 @@ GET  /api/knowledge/documents
 GET  /api/knowledge/documents/{id}
 PUT  /api/knowledge/documents/{id}
 POST /api/knowledge/documents/{id}/reindex
-GET  /api/notices                       # legacy alias/filter type=NOTICE
+GET  /api/notices                       # legacy alias/filter type=RAG
 
 # Описания задач (source of truth = PostgreSQL memory.task_descriptions)
 GET  /api/tasks/{id}/description         # JSON TaskDescriptionResponse или text/plain по Accept
@@ -904,7 +904,7 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 - Кнопка `Edit` на каждой карточке открывает Bootstrap modal; сохранение идёт через `PUT /api/notes/{id}`
 - Кнопка `Удалить` на каждой карточке с подтверждением; отправляет `DELETE /api/notes/{id}`
 - Кнопка `→ В задачу` создаёт PENDING задачу через `POST /api/tasks/pending`
-- Operational Notes: это не RAG knowledge и не source of truth для `NOTICE`
+- Operational Notes: это не RAG knowledge и не source of truth для `RAG`
 
 **`/ui/captures`** — Capture Inbox
 - raw captures и их routing state
@@ -912,13 +912,13 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 
 **`/ui/knowledge`** — RAG Knowledge / Knowledge Gateway
 - список документов из JavaRagService REST API
-- фильтры по типам (`NOTICE`, `ADR`, `PROCESS`, `SERVICE_CARD`, `GLOSSARY`)
+- фильтры по типам (`RAG`, `ADR`, `PROCESS`, `SERVICE_CARD`, `GLOSSARY`)
 - edit/reindex без JDBC-доступа к схеме `rag`
 - открытие конкретного документа по `?id={documentId}` и редактирование в правой панели
 
 **`/ui/notice`**
 - не самостоятельный экран
-- redirect на `/ui/knowledge?type=NOTICE`
+- redirect на `/ui/knowledge?type=RAG`
 
 **`/ui/agent-workspace`** — Agent Workspace (CR-MEM-012)
 
@@ -938,7 +938,7 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 **`/ui/search`** — Global Search (CR-MEM-009/015, un-relocated from Agent Workspace in CR-MEM-022)
 
 Standalone top-level страница, обслуживается `SearchViewController`, рендерит `search.html`.
-Параметры: `q` (query), `mode` (`QUICK`/`DEEP`), `layers` (multi), `preset` (`notice`/`everything`/`documentation`/`people_tasks`).
+Параметры: `q` (query), `mode` (`QUICK`/`DEEP`), `layers` (multi), `preset` (`rag`/`everything`/`documentation`/`people_tasks`). Legacy preset `notice` допускается как alias и маппится в knowledge search.
 Форма — обычный `GET`, полная перезагрузка страницы (без AJAX). Результаты группируются по layer (`resultsByLayer`), AI Summary показывается только в `DEEP` mode.
 `/ui/agent-workspace` больше не содержит Search-вкладку — только `Chat` и `Console`.
 
@@ -1192,7 +1192,7 @@ POST /api/capture/process-now
 
 ## 13. Интеграция с java-mail-agent
 
-Когда mail-agent классифицировал письмо как `REQUEST`, `CAPTURE`, `NOTE`, `NOTICE`, `NOISE` или `DRAFT`,
+Когда mail-agent классифицировал письмо как `REQUEST`, `CAPTURE`, `NOTE`, `RAG`, `NOISE` или `DRAFT`,
 он больше не создаёт конечную сущность напрямую. Вместо этого он создаёт intake item в MemoryService:
 
 ```
@@ -1228,7 +1228,7 @@ Mail routing в первом этапе выглядит так:
 | `REQUEST` | `TASK` | создаётся intake item, задача ещё не появляется |
 | `CAPTURE` | `NOTE` | создаётся intake item |
 | `NOTE` | `NOTE` | создаётся intake item |
-| `NOTICE` | `RAG` | создаётся intake item, markdown в `rag-inbox/intake` ещё не создаётся |
+| `RAG` | `RAG` | создаётся intake item, markdown в `rag-inbox/intake` ещё не создаётся |
 | `NOISE` | `NOISE` | создаётся intake item |
 | `DRAFT` | `NOISE` | создаётся intake item для ручного review |
 
@@ -1238,7 +1238,7 @@ Mail routing в первом этапе выглядит так:
 `PENDING -> TODO -> IN_PROGRESS -> DONE`.
 
 **Агент через MCP участвует в intake-потоке** — его write-tools создают proposal в `intake_items`, а пользователь подтверждает их через `/ui/intake`.
-`NOTICE` письма в этот поток попадают как intake items со `suggestedRoute=RAG`; до ручного Apply они не становятся RAG-документами.
+`RAG` письма в этот поток попадают как intake items со `suggestedRoute=RAG`; до ручного Apply они не становятся RAG-документами.
 
 **Bulk-действия (CR-MEM-026):** на каждой карточке intake item есть чекбокс выбора + чекбокс «Выбрать все» в шапке списка. При выбранных элементах доступны:
 - **«Подтвердить выбранные»** — bulk apply: для каждого выбранного id вызывается `POST /api/intake/{id}/apply` с его текущим `finalRoute`/`finalPayload` (эквивалент одиночного `Apply`).
