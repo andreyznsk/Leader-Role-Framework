@@ -33,6 +33,9 @@
 | CR-MEM-026        | [2026-07-02_CR-MEM-025-today-todo-done-tabs.md](2026-07-02_CR-MEM-025-today-todo-done-tabs.md) | Implemented | 2026-07-02 |
 | CR-MEM-027        | [2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md](2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md) | Implemented | 2026-07-02 |
 | CR-MEM-028        | [2026-07-02_CR-MEM-028-live-badge-polling.md](2026-07-02_CR-MEM-028-live-badge-polling.md) | DONE | 2026-07-02 |
+| CR-MEM-029        | [2026-07-02_CR-MEM-029-toastui-task-editor.md](2026-07-02_CR-MEM-029-toastui-task-editor.md) | Draft | 2026-07-02 |
+| CR-MEM-030        | [2026-07-02_CR-MEM-030-task-attachments.md](2026-07-02_CR-MEM-030-task-attachments.md) | Implemented | 2026-07-03 |
+| CR-MEM-031        | [2026-07-02_CR-MEM-031-task-links.md](2026-07-02_CR-MEM-031-task-links.md) | Draft | 2026-07-02 |
 | CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md) | Draft | —          |
 
 ---
@@ -78,6 +81,6 @@
 
 ---
 
-_Следующий свободный номер в MEM серии: **CR-MEM-028**_  
+_Следующий свободный номер в MEM серии: **CR-MEM-032**_  
 _Следующий свободный номер в ARCH серии: **CR-ARCH-008**_  
-_Последнее обновление реестра: 2026-07-02_
+_Последнее обновление реестра: 2026-07-03_

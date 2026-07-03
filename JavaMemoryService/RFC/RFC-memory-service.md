@@ -660,6 +660,13 @@ GET  /api/tasks/{id}/description/export-md
 GET  /api/tasks/{id}/timeline            # audit timeline событий задачи
 POST /api/tasks/{id}/timeline/comment    # добавить ручной комментарий в timeline
 
+# Вложения задач (файлы на ФС workspace/attachments/{taskId}/ + метаданные в PostgreSQL memory.task_attachments, CR-MEM-030)
+GET  /api/tasks/{id}/attachments               # список метаданных вложений (FILE и LINK)
+POST /api/tasks/{id}/attachments               # multipart upload, поле "file" (kind=FILE) → 201
+POST /api/tasks/{id}/attachments/link          # JSON {url, title} (kind=LINK) → 201
+GET  /api/tasks/{id}/attachments/{aid}/content # стриминг файла (только kind=FILE); 404 если файл отсутствует на диске
+DELETE /api/tasks/{id}/attachments/{aid}       # удаление записи + файла с диска
+
 # Intake Gateway
 POST /api/intake                         # создать intake item (mail/capture/manual producer)
 GET  /api/intake?status=NEW             # очередь intake items
@@ -873,12 +880,15 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 
 Если при сохранении (`#3`) выбран статус `DONE`, а исходный статус задачи был другим — перед отправкой формы запрашивается `confirm()` (CR-MEM-024). Отмена не отправляет форму.
 | 5 | Timeline (`data-testid="task-timeline"`) | последние 5 событий + счётчик, ниже — форма добавления комментария | `GET /api/tasks/{id}/timeline` |
+| 6 | Attachments (`data-testid="task-attachments"`, CR-MEM-030) | список вложений (📎 FILE / 🔗 LINK), форма загрузки файла, форма добавления ссылки, кнопка удаления на каждой записи | `GET/POST/DELETE /api/tasks/{id}/attachments*` |
 
 `source` (readonly badge) и `email_id` отображаются в заголовке страницы, а не в control panel.
 
 Удаление (archive) — двойное подтверждение: первый клик меняет текст кнопки на "Точно архивировать?" (3 сек), второй — `DELETE /api/tasks/{id}`.
 
 Блок добавления комментария в timeline — это `<div>` (не `<form>`), т.к. он физически расположен внутри основной `<form id="task-edit-form">`; вложенные HTML-формы невалидны и браузер молча ломает DOM/JS-обработчики. Кнопка `Добавить` — `type="button"` с явным `click`-обработчиком, не `submit`.
+
+**Attachments (CR-MEM-030):** клик по имени FILE-вложения не переходит по прямой ссылке — JS сначала делает `HEAD`-запрос на `contentUrl`; если файл удалён с диска вручную (404), показывается Bootstrap-модалка «Вложение недоступно» вместо перехода на `Whitelabel Error Page`. Загрузка/добавление ссылки/удаление перезагружают страницу при успехе (тот же паттерн, что и timeline-комментарий). Ограничения: `app.attachments.max-file-size` (по умолчанию 20MB), `app.attachments.allowed-mime-prefixes` (по умолчанию `image/,application/pdf,text/`), path traversal в имени файла (`/`, `\`, `..`) отклоняется с 400.
 
 **`/ui/incidents`** — Активные инциденты
 - Список с severity badge (P1/P2/P3)
@@ -1389,7 +1399,8 @@ JavaMemoryService/
     │   │   │   ├── Capture.java
     │   │   │   ├── Note.java
     │   │   │   ├── Question.java
-    │   │   │   └── PersonNameNote.java
+    │   │   │   ├── PersonNameNote.java
+    │   │   │   └── TaskAttachment.java             # kind=FILE|LINK, CR-MEM-030
     │   │   ├── repository/
     │   │   │   ├── DailyPlanRepository.java
     │   │   │   ├── TaskRepository.java
@@ -1400,7 +1411,8 @@ JavaMemoryService/
     │   │   │   ├── CaptureRepository.java
     │   │   │   ├── NoteRepository.java
     │   │   │   ├── QuestionRepository.java
-    │   │   │   └── PersonNameNoteRepository.java
+    │   │   │   ├── PersonNameNoteRepository.java
+    │   │   │   └── TaskAttachmentRepository.java
     │   │   ├── service/
     │   │   │   ├── ContextService.java
     │   │   │   ├── TaskService.java
@@ -1414,11 +1426,14 @@ JavaMemoryService/
     │   │   │   ├── CaptureRouter.java
     │   │   │   ├── CaptureScheduler.java
     │   │   │   ├── NoteService.java
-    │   │   │   └── QuestionService.java
+    │   │   │   ├── QuestionService.java
+    │   │   │   ├── AttachmentStorageService.java   # ФС: workspace/attachments/{taskId}/{uuid}_{filename}, CR-MEM-030
+    │   │   │   └── TaskAttachmentService.java      # валидация filename/MIME/size, CR-MEM-030
     │   │   ├── api/
     │   │   │   ├── ContextController.java
     │   │   │   ├── TaskController.java          # включает /pending, /reorder, /delete endpoints
     │   │   │   ├── TaskDescriptionController.java  # GET/PUT /api/tasks/{id}/description
+    │   │   │   ├── TaskAttachmentController.java   # GET/POST/DELETE /api/tasks/{id}/attachments*, CR-MEM-030
     │   │   │   ├── PlanController.java
     │   │   │   ├── IncidentController.java
     │   │   │   ├── RiskController.java
@@ -1467,7 +1482,9 @@ JavaMemoryService/
     │   │       ├── CaptureResponse.java
     │   │       ├── ClassifiedCapture.java
     │   │       ├── CreateNoteRequest.java           # { title, text?, tags, source }
-    │   │       └── UpdateTaskStatusRequest.java
+    │   │       ├── UpdateTaskStatusRequest.java
+    │   │       ├── TaskAttachmentResponse.java       # CR-MEM-030
+    │   │       └── CreateLinkAttachmentRequest.java  # CR-MEM-030
     │   └── resources/
     │       ├── application.yml
     │       ├── application-local.yml

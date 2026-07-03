@@ -182,6 +182,12 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 |---------|----------|
 | `memory.agent_workspace_runs` | Аудит запусков агента из Agent Workspace (mode, provider, prompt, status, duration_ms) |
 
+**Новые таблицы (CR-MEM-030):**
+
+| Таблица | Описание |
+|---------|----------|
+| `memory.task_attachments` | Вложения задач: kind=FILE (файл на ФС `workspace/attachments/{taskId}/{uuid}_{filename}`, метаданные в БД) или kind=LINK (внешний URL, байты не хранятся). `ON DELETE CASCADE` по `task_id` |
+
 **Ключевые endpoint-ы:**
 
 | Метод | Путь | Описание |
@@ -207,6 +213,7 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `GET/POST` | `/api/notes` | Лента заметок (`POST` → `201 Created`; поля: `title` обязательный, `text` опциональный, `tags`, `source`) |
 | `PUT` | `/api/notes/{id}` | Обновить заметку (title/text/tags/source) |
 | `DELETE` | `/api/notes/{id}` | Удалить заметку: `204 No Content` / `404 Not Found` (hard delete, CR-MEM-011) |
+| `GET/POST/DELETE` | `/api/tasks/{id}/attachments*` | Вложения задачи: список, multipart upload (kind=FILE), внешняя ссылка (kind=LINK), скачивание содержимого, удаление (CR-MEM-030) |
 | `GET/POST/PUT/DELETE` | `/api/incidents`, `/api/risks`, `/api/people` | CRUD/soft delete рабочих сущностей |
 | `GET` | `/ui/today` | Web UI: план дня. Сайдбар разделён на вкладки **ToDo** (`/ui/today`, DONE всегда скрыт) и **Done** (`/ui/today?status=DONE`, только DONE); toggle «No Done» убран (CR-MEM-025) |
 | `GET` | `/ui/notes` | Web UI: Operational Notes |
@@ -384,6 +391,9 @@ Leader-Role-Framework/
 │   ├── tasks/          ← export/backup markdown-файлы задач по id (on demand, not source of truth)
 │   │   ├── TASK-001.md
 │   │   └── TASK-002.md
+│   ├── attachments/    ← файловые вложения задач (CR-MEM-030), source of truth для байтов
+│   │   └── {taskId}/
+│   │       └── {uuid}_{filename}
 │   └── 08_daily_journal/
 │       └── YYYY-MM-DD.md
 ├── JavaRagService/
@@ -696,6 +706,7 @@ docker compose up -d
 | `04_edit_task.md` | HIGH | PUT + PATCH /status + file description |
 | `05_pending_task_flow.md` | HIGH | PENDING → confirm → TODO / reject → ARCHIVED |
 | `17_task_timeline_archive_flow.md` | HIGH | timeline событий задачи + archive flow |
+| `23_task_attachments.md` | HIGH | upload/download/link/delete вложений, отклонение path traversal, недопустимого MIME и превышения размера (CR-MEM-030) |
 | `18_agent_workspace.md` | HIGH | Agent Workspace: UI smoke, Chat mode (mock), аудит в БД, WebSocket upgrade, security whitelist (CR-MEM-012) |
 | `06_incidents.md` | HIGH | OPEN → INVESTIGATING → RESOLVED |
 | `07_risks.md` | MEDIUM | OPEN → MITIGATED + getContext |

@@ -139,6 +139,54 @@
                         </div>
                     </section>
 
+                    <!-- 6. Attachments -->
+                    <section data-testid="task-attachments" class="mt-4" id="task-attachments-section"
+                              th:attr="data-task-id=${task.id}">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="mb-0 fw-semibold">Attachments</h6>
+                            <span class="text-muted small" th:text="${#lists.size(attachments)} + ' items'">0 items</span>
+                        </div>
+
+                        <div th:if="${#lists.isEmpty(attachments)}" class="text-muted small">Вложений пока нет.</div>
+                        <div th:unless="${#lists.isEmpty(attachments)}"
+                             id="task-attachments-list"
+                             style="max-height: 280px; overflow-y: auto;">
+                            <div th:each="attachment : ${attachments}"
+                                 class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-2">
+                                <div>
+                                    <span th:text="${attachment.kind == 'FILE' ? '📎' : '🔗'}"></span>
+                                    <a th:if="${attachment.kind == 'FILE'}" href="#"
+                                       class="attachment-open-link"
+                                       th:attr="data-content-url=${attachment.contentUrl}"
+                                       th:text="${attachment.filename}">file.png</a>
+                                    <a th:if="${attachment.kind == 'LINK'}" th:href="${attachment.url}"
+                                       target="_blank" rel="noopener noreferrer"
+                                       th:text="${attachment.title != null and !attachment.title.isBlank() ? attachment.title : attachment.url}">link</a>
+                                    <div class="small text-muted"
+                                         th:if="${attachment.kind == 'FILE' and attachment.fileSize != null}"
+                                         th:text="${#numbers.formatDecimal(attachment.fileSize / 1024.0, 1, 1)} + ' KB'">0 KB</div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger attachment-delete-btn"
+                                        th:attr="data-attachment-id=${attachment.id}">✕</button>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <label class="form-label fw-semibold small">Загрузить файл</label>
+                            <input type="file" id="attachment-file-input" class="form-control form-control-sm mb-2"/>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="attachment-upload-btn">Upload</button>
+                        </div>
+
+                        <div class="mt-3">
+                            <label class="form-label fw-semibold small">Добавить ссылку</label>
+                            <input type="text" id="attachment-link-title" class="form-control form-control-sm mb-1" placeholder="Название"/>
+                            <input type="text" id="attachment-link-url" class="form-control form-control-sm mb-2" placeholder="https://..."/>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="attachment-link-btn">Add link</button>
+                        </div>
+
+                        <div id="attachment-status" class="small text-danger d-none mt-2"></div>
+                    </section>
+
                 </aside>
             </div>
 
@@ -147,6 +195,24 @@
 
     <!-- Hidden delete form -->
     <form id="delete-form" method="post" th:action="@{/ui/tasks/{id}/delete(id=${task.id})}"></form>
+
+    <!-- Attachment error modal -->
+    <div class="modal fade" id="attachment-error-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Вложение недоступно</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="attachment-error-modal-body">Файл вложения не найден.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -283,6 +349,89 @@ document.getElementById('timeline-comment-submit')?.addEventListener('click', as
         status.classList.remove('d-none');
         window.location.reload();
     } catch (error) {}
+});
+
+document.getElementById('attachment-upload-btn')?.addEventListener('click', async function () {
+    const section = document.getElementById('task-attachments-section');
+    const taskId = section.dataset.taskId;
+    const input = document.getElementById('attachment-file-input');
+    const status = document.getElementById('attachment-status');
+    if (!input.files.length) return;
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+    status.classList.add('d-none');
+    try {
+        await window.LeaderUiApi.request('/api/tasks/' + taskId + '/attachments', {
+            method: 'POST',
+            body: formData
+        });
+        window.location.reload();
+    } catch (error) {
+        status.textContent = 'Не удалось загрузить файл';
+        status.classList.remove('d-none');
+    }
+});
+
+document.getElementById('attachment-link-btn')?.addEventListener('click', async function () {
+    const section = document.getElementById('task-attachments-section');
+    const taskId = section.dataset.taskId;
+    const url = document.getElementById('attachment-link-url').value.trim();
+    const title = document.getElementById('attachment-link-title').value.trim();
+    const status = document.getElementById('attachment-status');
+    if (!url) return;
+    status.classList.add('d-none');
+    try {
+        await window.LeaderUiApi.request('/api/tasks/' + taskId + '/attachments/link', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url: url, title: title || null})
+        });
+        window.location.reload();
+    } catch (error) {
+        status.textContent = 'Не удалось добавить ссылку';
+        status.classList.remove('d-none');
+    }
+});
+
+function showAttachmentErrorModal(message) {
+    document.getElementById('attachment-error-modal-body').textContent = message;
+    const modalEl = document.getElementById('attachment-error-modal');
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+document.querySelectorAll('.attachment-open-link').forEach(function (link) {
+    link.addEventListener('click', async function (event) {
+        event.preventDefault();
+        const url = link.dataset.contentUrl;
+        try {
+            const response = await fetch(url, {method: 'HEAD'});
+            if (response.status === 404) {
+                showAttachmentErrorModal('Файл вложения не найден. Возможно, он был удалён с диска вручную.');
+                return;
+            }
+            if (!response.ok) {
+                showAttachmentErrorModal('Не удалось открыть вложение (HTTP ' + response.status + ').');
+                return;
+            }
+            window.open(url, '_blank');
+        } catch (error) {
+            showAttachmentErrorModal('Не удалось открыть вложение.');
+        }
+    });
+});
+
+document.querySelectorAll('.attachment-delete-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+        const section = document.getElementById('task-attachments-section');
+        const taskId = section.dataset.taskId;
+        const attachmentId = btn.dataset.attachmentId;
+        try {
+            await window.LeaderUiApi.request('/api/tasks/' + taskId + '/attachments/' + attachmentId, {
+                method: 'DELETE'
+            });
+            window.location.reload();
+        } catch (error) {}
+    });
 });
 </script>
 </body>

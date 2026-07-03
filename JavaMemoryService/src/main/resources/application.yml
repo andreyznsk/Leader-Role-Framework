@@ -16,6 +16,10 @@ spring:
     hiddenmethod:
       filter:
         enabled: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 21MB
   ai:
     mcp:
       server:
@@ -33,6 +37,10 @@ management:
         include: health,info,mappings
 
 app:
+  attachments:
+    dir: workspace/attachments
+    max-file-size: 20MB
+    allowed-mime-prefixes: image/,application/pdf,text/
   capture:
     inbox-dir: capture-inbox
   plugins:

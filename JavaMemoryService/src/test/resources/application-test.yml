@@ -10,6 +10,10 @@ spring:
     default-schema: memory
 
 app:
+  attachments:
+    dir: ${java.io.tmpdir}/test-attachments
+    max-file-size: 20MB
+    allowed-mime-prefixes: image/,application/pdf,text/
   capture:
     inbox-dir: ${java.io.tmpdir}/test-capture-inbox
   plugins:

@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.domain.TaskEvent;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
+import ru.andreyz.memoryservice.service.TaskAttachmentService;
 import ru.andreyz.memoryservice.service.TaskDescriptionService;
 import ru.andreyz.memoryservice.service.TaskService;
 import ru.andreyz.memoryservice.service.TaskTimelineService;
@@ -21,13 +22,16 @@ public class TaskEditController {
     private final TaskService taskService;
     private final TaskDescriptionService taskDescriptionService;
     private final TaskTimelineService taskTimelineService;
+    private final TaskAttachmentService taskAttachmentService;
 
     public TaskEditController(TaskService taskService,
                               TaskDescriptionService taskDescriptionService,
-                              TaskTimelineService taskTimelineService) {
+                              TaskTimelineService taskTimelineService,
+                              TaskAttachmentService taskAttachmentService) {
         this.taskService = taskService;
         this.taskDescriptionService = taskDescriptionService;
         this.taskTimelineService = taskTimelineService;
+        this.taskAttachmentService = taskAttachmentService;
     }
 
     @GetMapping("/{id}/edit")
@@ -40,6 +44,7 @@ public class TaskEditController {
         model.addAttribute("timeline", timeline.stream().limit(5).toList());
         model.addAttribute("timelineTotalCount", timeline.size());
         model.addAttribute("exportUrl", "/api/tasks/%d/description/export-md".formatted(id));
+        model.addAttribute("attachments", taskAttachmentService.list(id));
         return "task-edit";
     }
 
