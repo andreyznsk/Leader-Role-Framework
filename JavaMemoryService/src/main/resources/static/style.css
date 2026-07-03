@@ -757,3 +757,19 @@ html.los-collapsed .los-nav-item:hover::after {
     max-height: none;
   }
 }
+
+/* ─── TASK DESCRIPTION EDITOR (CR-MEM-029, Toast UI) ─────── */
+.toastui-editor-defaultUI {
+  border-color: var(--border);
+  border-radius: 6px;
+}
+.toastui-editor-defaultUI code,
+.toastui-editor-defaultUI pre,
+.toastui-editor-contents code,
+.toastui-editor-contents pre {
+  font-family: var(--mono);
+}
+.toastui-editor-md-code-block-line-background,
+.toastui-editor-md-code-block editor {
+  font-family: var(--mono);
+}

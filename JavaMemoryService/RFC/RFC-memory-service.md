@@ -864,10 +864,15 @@ Toggle «No Done» убран — раньше `hideDone` был отдельн�
 | Поле | Тип | Источник данных |
 |------|-----|----------------|
 | `title` | text input | `tasks.title` (PostgreSQL) |
-| `description` | Markdown textarea | `memory.task_descriptions.content_md` |
+| `description` | Toast UI Editor (WYSIWYG, CR-MEM-029) | `memory.task_descriptions.content_md` |
 
-Markdown-редактор — две вкладки: `markdown` (raw, monospace) и `preview` (HTML-рендер через JS, без библиотек).
-Под textarea — кнопка `Export MD`, которая скачивает `TASK-{id}.md`, сгенерированный из БД.
+Описание редактируется через **Toast UI Editor** в единственном режиме WYSIWYG (`hideModeSwitch: true` — переключатель на сырой Markdown-режим скрыт, редактор визуальный только). Toast UI сериализует контент в Markdown при сохранении (`editor.getMarkdown()`), поэтому `content_md` остаётся source of truth, а API `PUT /api/tasks/{id}/description` не меняется (шлёт `text/plain` body). tsvector-индексация (CR-MEM-015) и `/description/export-md` работают без изменений — сырой Markdown по-прежнему доступен через export.
+
+Ассеты редактора — self-hosted, без CDN в рантайме: `static/vendor/toastui/toastui-editor-all.min.js` + `toastui-editor.min.css` + `toastui-editor-dark.min.css` (тёмная тема, т.к. вся UI всегда `data-bs-theme="dark"`, переключателя тем в проекте нет). Важно: сборка `toastui-editor.js` из npm-пакета `@toast-ui/editor` НЕ подходит для прямого browser-скрипта — там `prosemirror-*` вынесены как внешние UMD-зависимости, и `toastui.Editor` не инициализируется. Нужен именно all-in-one бандл (например с `uicdn.toast.com/editor/latest/toastui-editor-all.min.js`), где prosemirror включён внутрь.
+
+Вставка/drag-drop изображений в редактор идёт через хук `addImageBlobHook` → upload в API вложений (CR-MEM-030, `POST /api/tasks/{id}/attachments`) → в Markdown вставляется `![](/api/tasks/{id}/attachments/{aid}/content)`.
+
+Под редактором — кнопка `Export MD`, которая скачивает `TASK-{id}.md`, сгенерированный из БД.
 
 Правая колонка (`task-control-panel`) — элементы строго в порядке:
 
@@ -1502,7 +1507,7 @@ JavaMemoryService/
     │       ├── templates/
     │       │   ├── fragments/layout.html
     │       │   ├── today.html
-    │       │   ├── task-edit.html                  # форма редактирования с MD-редактором
+    │       │   ├── task-edit.html                  # форма редактирования с WYSIWYG-редактором (Toast UI, CR-MEM-029)
     │       │   ├── incidents.html
     │       │   ├── risks.html
     │       │   ├── people.html
@@ -1633,7 +1638,7 @@ JavaMemoryService/
 13. `TaskFileService` + `workspace/tasks/` используется только для legacy import и export backup-файлов
 14. `TaskDescriptionController` (GET/PUT `/api/tasks/{id}/description`, `GET /api/tasks/{id}/description/export-md`)
 15. Reorder endpoint в `TaskController` + `ReorderTaskRequest`
-16. `TaskEditController` + `task-edit.html` (форма с MD-редактором)
+16. `TaskEditController` + `task-edit.html` (форма с Toast UI WYSIWYG-редактором, CR-MEM-029)
 17. Обновить `today.html`: sort_order, drag handle, стрелки, иконки карандаш/корзина, inline add
 18. `getTaskDescription` MCP tool в `TaskTools`
 

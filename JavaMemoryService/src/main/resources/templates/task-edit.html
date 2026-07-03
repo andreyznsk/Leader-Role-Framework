@@ -2,6 +2,8 @@
 <html xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
 <head th:replace="~{fragments/layout :: head('Редактирование задачи')}"></head>
 <body>
+<link rel="stylesheet" th:href="@{/vendor/toastui/toastui-editor.min.css}"/>
+<link rel="stylesheet" th:href="@{/vendor/toastui/toastui-editor-dark.min.css}"/>
 <div th:replace="~{fragments/layout :: sidebar}"></div>
 
 <div class="container los-page-content">
@@ -28,12 +30,13 @@
                            th:value="${task.title}" required/>
                 </div>
 
-                <!-- Description with markdown editor -->
+                <!-- Description with WYSIWYG markdown editor (CR-MEM-029, Toast UI) -->
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Описание</label>
-                    <textarea id="md-input" name="description" class="form-control"
-                              rows="25" style="font-family:monospace"
+                    <textarea id="md-input" name="description" class="d-none"
                               th:text="${description}"></textarea>
+                    <div id="toastui-editor" class="toastui-editor-dark" data-testid="task-description-editor"
+                         th:attr="data-task-id=${task.id}"></div>
                     <!-- Links preview (CR-MEM-009) -->
                     <div id="task-editor-links" class="task-editor-links mt-2 d-none">
                         <div class="task-editor-links-label">Ссылки из описания:</div>
@@ -216,12 +219,41 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/vendor/toastui/toastui-editor-all.min.js}"></script>
 <script>
 let saveStatusTimer = null;
 
-// Links preview: extract URLs from textarea, render as clickable links
+const descriptionEditorEl = document.getElementById('toastui-editor');
+const descriptionEditor = new toastui.Editor({
+    el: descriptionEditorEl,
+    height: '600px',
+    initialEditType: 'wysiwyg',
+    hideModeSwitch: true,
+    initialValue: document.getElementById('md-input').value,
+    usageStatistics: false,
+    hooks: {
+        addImageBlobHook: async function (blob, callback) {
+            const taskId = descriptionEditorEl.dataset.taskId;
+            const formData = new FormData();
+            formData.append('file', blob, blob.name || 'image.png');
+            try {
+                const result = await window.LeaderUiApi.request('/api/tasks/' + taskId + '/attachments', {
+                    method: 'POST',
+                    body: formData
+                });
+                callback(result.data.contentUrl, blob.name || 'image');
+            } catch (error) {
+                window.alert('Не удалось загрузить изображение');
+            }
+            return false;
+        }
+    }
+});
+descriptionEditor.on('change', updateLinksPreview);
+
+// Links preview: extract URLs from editor content, render as clickable links
 function updateLinksPreview() {
-    const text = document.getElementById('md-input').value;
+    const text = descriptionEditor.getMarkdown();
     const urlRegex = /https?:\/\/[^\s<>"']+/g;
     const matches = text.match(urlRegex) || [];
     const unique = [...new Set(matches)];
@@ -265,10 +297,7 @@ function confirmDelete(btn) {
     }, 3000);
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    updateLinksPreview();
-    document.getElementById('md-input').addEventListener('input', updateLinksPreview);
-});
+updateLinksPreview();
 
 document.getElementById('task-edit-form').addEventListener('submit', async function (event) {
     event.preventDefault();
@@ -285,7 +314,7 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
         status: formData.get('status'),
         dueDate: formData.get('dueDate') || null
     };
-    const description = formData.get('description') || '';
+    const description = descriptionEditor.getMarkdown();
 
     const statusSelect = form.querySelector('[name="status"]');
     const originalStatus = statusSelect ? statusSelect.dataset.originalStatus : null;
