@@ -187,6 +187,7 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | Метод | Путь | Описание |
 |-------|------|----------|
 | `GET` | `/api/context` | Контекст сессии: today/tomorrow, open incidents/risks, recent people notes |
+| `GET` | `/api/ui/badges` | Live-обновление счётчиков сайдбара (`newIntake`, `pendingTasks`) для JS-поллера (10 сек, backoff после 3 ошибок); фундамент под будущий notifications bell (CR-MEM-028) |
 | `POST` | `/api/tasks` | Создать подтверждённую задачу; UI создаёт title, description, priority, status, dueDate, date |
 | `POST` | `/api/tasks/pending` | Создать задачу со статусом PENDING напрямую; mail/capture flow сюда больше не пишет напрямую |
 | `POST` | `/api/intake` | Создать intake item для mail/capture/manual producer |
