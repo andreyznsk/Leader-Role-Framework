@@ -216,6 +216,53 @@ regex `/Сохранить/` матчит ОБА кнопки: "💾 Сохра�
   - При медленном старте memory-service происходит 2 неудачных retry вместо 1
   - Тест должен проверять `attempts_count >= 1`, не точно `= 1`
 
+## Flyway checksum mismatch — STARTUP_FAILED (2026-07-03, branch feature/28-pillong)
+
+При старте JavaMemoryService (профиль local) после чистой пересборки — `BeanCreationException: flywayInitializer` /
+`FlywayValidateException: Migration checksum mismatch` для версий 16, 17, 18. Working tree чист
+(`git diff HEAD -- .../db/migration/` пусто, файлы совпадают с HEAD ветки) — то есть дело не в
+незакоммиченной правке миграции, а в том, что `flyway_schema_history` в общем dev Postgres
+(`leader-postgres`, база `leader_framework`, схема `memory`) хранит checksum-ы, применённые ДРУГИМ
+содержимым V16-18 (видимо с другой ветки/worktree, которая когда-то писала в ту же БД), плюс в
+истории видны V13-15 и V19, которых на диске в этой ветке вообще нет (`ls db/migration` доходит
+только до V18). Это тот же паттерн, что уже отмечался раньше ("БД опережает миграции в коде ветки"),
+но раньше был просто warning, а тут это HARD STARTUP_FAILED, блокирующий вообще все тесты модуля.
+
+**В репозитории есть штатный инструмент именно для этого:** `scripts/flyway-repair.sh` (обёртка над
+`ru.andreyz.memoryservice.tools.FlywayAdminTool`, запускается через `mvn exec:java`, требует
+`FLYWAY_URL`/`FLYWAY_USER`/`FLYWAY_PASSWORD` в env). Делает `info → confirm → pg_dump backup
+flyway_schema_history → repair (только пересчитывает checksum, НЕ гоняет SQL) → info`. Комментарий в
+скрипте явно предупреждает: repair безопасен, только если новое содержимое миграции семантически
+идентично старому — иначе можно замаскировать реальный дрейф схемы. Обычный `flyway-maven-plugin`/CLI
+без classpath модуля не годится — не видит Java-миграции (V13/14/15/19) и удалит их строки истории.
+
+**Why:** правило CLAUDE.md прямо запрещает менять файлы миграций, а `flyway_schema_history` — общее
+состояние Postgres, которое может использоваться и другими worktree/ветками одновременно (в сессии
+2026-07-03 параллельно существует `.claude/worktrees/agent-a4255f8c4c0507456`). Решение "чинить" checksum
+через repair — это суждение, которое требует явного согласия пользователя, не дело test-runner агента
+запускать это самостоятельно.
+**How to apply:** при STARTUP_FAILED с "Migration checksum mismatch" — не пытаться чинить миграции
+самому. Зафиксировать блокер, указать на `scripts/flyway-repair.sh` как готовый путь решения, и явно
+попросить пользователя подтвердить repair (после того как он/она удостоверится, что дрейф контента
+безобиден) прежде чем запускать. Все зависящие тесты (markdown-сценарии и Playwright spec) в этом
+состоянии — SKIP/BLOCKED, не FAIL.
+
+## CR-MEM-028 — Live badge polling (2026-07-03, branch feature/28-pillong)
+
+**Сценарий 22 (`22_ui_badges_live_polling.md`, 4 шага) + Playwright (`tests/badge-polling.spec.js`, 3 теста) — все PASS с первого прогона**, без правок кода/теста.
+
+- `GET /api/ui/badges` → `{"counts":{"newIntake":N,"pendingTasks":M},"serverTime":"..."}`, конверт стабилен
+- Step 2: POST `/api/intake` (MANUAL/TASK) увеличивает `newIntake` на 1 сразу же (без задержки индексации)
+- Step 4: `data-badge="newIntake"` / `data-badge="pendingTasks"` есть в `/ui/today` HTML всегда (span не удаляется через th:if, скрывается через display:none) — подтверждено grep
+- Playwright тесты используют реальные `waitForTimeout(10_000+1_000)` под реальный 10-сек poll-интервал — сьют занимает ~25с (3 теста параллельно, 3 workers), не флейки
+- Cleanup (`POST /api/intake/{id}/reject`) корректно возвращает newIntake обратно к 0
+
+**Важное наблюдение о "Flyway checksum mismatch" из блокера 2026-07-03 (см. ниже) — ЛОЖНАЯ ТРЕВОГА при первом /healthcheck.sh:**
+Первый `./test-runner/healthcheck.sh` в начале сессии показал `STARTUP_FAILED` c mismatch для V16-18, НО это было чтение **устаревшего** `logs/JavaMemoryService.log` (mtime 00:20, от предыдущей попытки запуска в этой же сессии/ветке) — сам процесс уже не существовал (PID stale), и `target/*.jar` вообще отсутствовал (нужна была пересборка). После `./test-runner/build.sh --service JavaMemoryService` + `./test-runner/start-services.sh --service JavaMemoryService` сервис поднялся ЧИСТО, без единой ERROR/Exception в свежем логе. Проверка через `docker exec leader-postgres psql -U superuser -d leader_framework` (креды берутся из `docker-compose.yaml`: POSTGRES_USER=superuser) показала, что `memory.flyway_schema_history` для V16-18 уже содержит checksum-ы, совпадающие с локальными файлами — то есть кто-то (вероятно параллельный worktree `.claude/worktrees/agent-a4255f8c4c0507456`) уже пофиксил рассинхрон между этим и предыдущим прогоном.
+
+**Why:** это меняет предыдущую запись "Flyway checksum mismatch — STARTUP_FAILED" ниже — тот блокер был реальным в момент фиксации (2026-07-03 раньше в тот же день), но **временным** и уже устранённым к моменту этого прогона. Не считать его постоянным состоянием окружения.
+**How to apply:** при STARTUP_FAILED из healthcheck.sh — ВСЕГДА сначала проверять mtime `logs/{Service}.log` и наличие/mtime `target/*.jar` (`date -r`, `ls -la`) прежде чем доверять содержимому лога как актуальному. Если jar отсутствует или лог старый — пересобрать и перезапустить, и только потом делать вывод о реальном блокере. Общий вывод "не чинить миграции самому" по-прежнему в силе, если mismatch подтверждается на СВЕЖЕМ логе после пересборки/рестарта.
+
 ### Retry flow — ключевые факты
 
 - Retry-очередь обрабатывается РАНЬШЕ новых писем в каждом poll
