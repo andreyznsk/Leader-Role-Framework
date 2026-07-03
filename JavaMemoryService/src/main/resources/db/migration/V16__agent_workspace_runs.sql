@@ -1,5 +1,5 @@
 CREATE TABLE memory.agent_workspace_runs (
-    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    id          UUID         DEFAULT gen_random_uuid() PRIMARY KEY,
     mode        VARCHAR(32)  NOT NULL,
     provider    VARCHAR(64)  NOT NULL,
     prompt      TEXT,

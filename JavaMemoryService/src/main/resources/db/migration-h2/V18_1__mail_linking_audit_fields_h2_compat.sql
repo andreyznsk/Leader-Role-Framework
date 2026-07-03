@@ -1,2 +1,1 @@
-ALTER TABLE tasks ADD COLUMN linked_to_task_id BIGINT;
-ALTER TABLE tasks ADD COLUMN linked_at TIMESTAMP;
+-- No-op: V18__mail_linking_audit_fields.sql is now H2-compatible.

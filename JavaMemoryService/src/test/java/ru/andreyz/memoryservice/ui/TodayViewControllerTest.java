@@ -37,7 +37,7 @@ class TodayViewControllerTest {
         when(incidentRepository.findByStatus("OPEN")).thenReturn(List.of());
         when(planRepository.findByPlanDate(LocalDate.now())).thenReturn(java.util.Optional.empty());
 
-        String view = controller.today("HIGH", null, null, null, null, null, null, true, model);
+        String view = controller.today("HIGH", null, null, null, null, null, null,  model);
 
         assertThat(view).isEqualTo("today");
         assertThat(model.getAttribute("currentTasks"))
@@ -67,7 +67,7 @@ class TodayViewControllerTest {
         when(incidentRepository.findByStatus("OPEN")).thenReturn(List.of());
         when(planRepository.findByPlanDate(today)).thenReturn(java.util.Optional.empty());
 
-        controller.today(null, null, null, null, null, null, null, true, model);
+        controller.today(null, null, null, null, null, null, null, model);
 
         assertThat(model.getAttribute("deadlineCounts"))
                 .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.map(String.class, Long.class))
