@@ -62,7 +62,7 @@
 | CR-ARCH-005 | [CR-ARCH-005-mail-notice-rag-document-flow.md](CR-ARCH-005-mail-notice-rag-document-flow.md) | Draft | — |
 | CR-ARCH-005 ⚠️ | [CR-ARCH-005-universal-knowledge-ui.md](CR-ARCH-005-universal-knowledge-ui.md) | Draft | — |
 | CR-ARCH-006 | [CR-ARCH-006-update-presentation-architecture-diagrams.md](CR-ARCH-006-update-presentation-architecture-diagrams.md) | Draft | — |
-| CR-ARCH-007 | [2026-07-02_CR-ARCH-007-rename-notice-to-rag.md](2026-07-02_CR-ARCH-007-rename-notice-to-rag.md) | Draft | 2026-07-02 |
+| CR-ARCH-007 | [2026-07-02_CR-ARCH-007-rename-notice-to-rag.md](2026-07-02_CR-ARCH-007-rename-notice-to-rag.md) | Implemented | 2026-07-03 |
 
 ---
 

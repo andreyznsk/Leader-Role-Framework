@@ -195,7 +195,7 @@ public class MailAgentJob {
     }
 
     private void countByType(String responseType, int[] counts) {
-        AgentResponseType type = AgentResponseType.valueOf(responseType);
+        AgentResponseType type = AgentResponseType.from(responseType);
         counts[type.ordinal()]++;
     }
 
@@ -206,14 +206,14 @@ public class MailAgentJob {
     }
 
     private void finishPoll(int total, int errors, int[] counts) {
-        String result = "%d processed (%d REQUEST, %d DRAFT, %d NOISE, %d CAPTURE, %d NOTICE, %d NOTE, %d errors)"
+        String result = "%d processed (%d REQUEST, %d DRAFT, %d NOISE, %d CAPTURE, %d RAG, %d NOTE, %d errors)"
             .formatted(
                 Math.max(0, total - errors),
                 countFor(AgentResponseType.REQUEST, counts),
                 countFor(AgentResponseType.DRAFT, counts),
                 countFor(AgentResponseType.NOISE, counts),
                 countFor(AgentResponseType.CAPTURE, counts),
-                countFor(AgentResponseType.NOTICE, counts),
+                countFor(AgentResponseType.RAG, counts),
                 countFor(AgentResponseType.NOTE, counts),
                 errors
             );

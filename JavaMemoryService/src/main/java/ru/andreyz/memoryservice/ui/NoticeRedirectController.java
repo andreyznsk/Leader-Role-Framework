@@ -11,6 +11,6 @@ public class NoticeRedirectController {
 
     @GetMapping
     public RedirectView notice() {
-        return new RedirectView("/ui/knowledge?type=NOTICE");
+        return new RedirectView("/ui/knowledge?type=RAG");
     }
 }

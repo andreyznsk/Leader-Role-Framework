@@ -72,7 +72,7 @@ class MailLinkingServiceTest {
         MemorySearchResponse searchResponse = new MemorySearchResponse(
                 "release sender@test.com",
                 "QUICK",
-                List.of("TASK", "NOTICE"),
+                List.of("TASK", "NOTE"),
                 null,
                 List.of(new MemorySearchResultItem(
                         "TASK",

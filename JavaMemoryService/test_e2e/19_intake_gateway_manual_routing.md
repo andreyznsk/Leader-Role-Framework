@@ -50,7 +50,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:8082/api/intake 
     },
     \"suggestedRoute\": \"RAG\",
     \"suggestedPayload\": {
-      \"docType\": \"NOTICE\",
+      \"docType\": \"RAG\",
       \"title\": \"$RUN_ID release rule\",
       \"body\": \"$RUN_ID release process should go through calendar\"
     },
@@ -105,7 +105,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "http://localhost:8082/api/intake
   -d "{
     \"finalRoute\": \"RAG\",
     \"finalPayload\": {
-      \"docType\": \"NOTICE\",
+      \"docType\": \"RAG\",
       \"title\": \"$RUN_ID release rule\",
       \"body\": \"$RUN_ID release process should go through calendar\",
       \"subject\": \"$RUN_ID release rule\",

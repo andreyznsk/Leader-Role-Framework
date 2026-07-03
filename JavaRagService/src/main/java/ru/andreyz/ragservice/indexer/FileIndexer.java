@@ -120,7 +120,7 @@ public class FileIndexer {
             return null;
         }
         try {
-            return DocType.valueOf(typeRaw.trim().toUpperCase().replace("-", "_"));
+            return DocType.fromRaw(typeRaw);
         } catch (IllegalArgumentException e) {
             log.error("", e);
             return null;

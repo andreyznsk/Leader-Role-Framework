@@ -1,7 +1,7 @@
 # 2026-07-02_CR-ARCH-007: Rename NOTICE terminology to RAG
 
 **Дата:** 2026-07-02  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** ARCH / MAIL / MEM / RAG  
 **Тип:** cross-service terminology refactoring  
 **Ветка:** `feature/ARCH-007-2026-07-02`
@@ -193,11 +193,11 @@ input NOTE    → route NOTE
 
 ## Definition of Done
 
-- [ ] Runtime-код использует `RAG` вместо `NOTICE` для knowledge route.
-- [ ] Legacy `NOTICE` поддержан как alias.
-- [ ] UI не показывает `NOTICE` как актуальную сущность.
-- [ ] Search providers приведены к `Note` / `RAG` терминологии.
-- [ ] E2E тесты добавлены / обновлены.
-- [ ] Документация обновлена после реализации.
-- [ ] CR переведён в `Implemented` после подтверждения пользователя.
-- [ ] `docs/cr/REGISTRY.md` обновлён.
+- [x] Runtime-код использует `RAG` вместо `NOTICE` для knowledge route.
+- [x] Legacy `NOTICE` поддержан как alias.
+- [x] UI не показывает `NOTICE` как актуальную сущность.
+- [x] Search providers приведены к `Note` / `RAG` терминологии.
+- [x] E2E тесты добавлены / обновлены.
+- [x] Документация обновлена после реализации.
+- [x] CR переведён в `Implemented` после подтверждения пользователя.
+- [x] `docs/cr/REGISTRY.md` обновлён.

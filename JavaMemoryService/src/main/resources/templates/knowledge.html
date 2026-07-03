@@ -19,7 +19,7 @@
            th:href="${docType == 'ALL'} ? @{/ui/knowledge} : @{/ui/knowledge(type=${docType})}"
            class="btn btn-sm"
            th:classappend="${selectedType == docType} ? ' btn-primary' : ' btn-outline-secondary'"
-           th:text="${typeLabelResolver.labelFor(docType)}">Notices</a>
+           th:text="${typeLabelResolver.labelFor(docType)}">RAG Documents</a>
         </div>
     </div>
 
@@ -27,7 +27,7 @@
         <div class="col-lg-5">
             <div class="card">
                 <div class="card-body p-0">
-                    <div class="px-3 py-2 border-bottom small text-muted" th:text="${selectedTypeLabel}">Notices</div>
+                    <div class="px-3 py-2 border-bottom small text-muted" th:text="${selectedTypeLabel}">RAG Documents</div>
                     <div th:if="${#lists.isEmpty(documents)}" class="text-muted p-3">RAG-документов по фильтру пока нет</div>
                     <div th:each="document : ${documents}"
                          class="los-notice-item d-flex align-items-start gap-2 p-3 border-bottom"
@@ -37,7 +37,7 @@
                             <div class="d-flex justify-content-between align-items-start gap-2">
                                 <div class="min-w-0">
                                     <div class="fw-semibold text-body" th:text="${document.title != null ? document.title : document.fileName}">Title</div>
-                                    <div class="small text-muted" th:text="${document.docType}">NOTICE</div>
+                                    <div class="small text-muted" th:text="${document.docType}">RAG</div>
                                 </div>
                                 <span class="badge text-uppercase flex-shrink-0"
                                       th:classappend="${document.status == 'indexed'} ? ' bg-success-subtle text-success' : (${document.status == 'outdated'} ? ' bg-warning-subtle text-warning' : ' bg-danger-subtle text-danger')"
