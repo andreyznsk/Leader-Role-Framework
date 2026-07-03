@@ -78,11 +78,50 @@
                                 th:attr="data-original-status=${task.status}">
                             <option value="PENDING"     th:selected="${task.status == 'PENDING'}">PENDING</option>
                             <option value="TODO"        th:selected="${task.status == 'TODO'}">TODO</option>
+                            <option value="RESEARCH"    th:selected="${task.status == 'RESEARCH'}">RESEARCH</option>
                             <option value="IN_PROGRESS" th:selected="${task.status == 'IN_PROGRESS'}">IN_PROGRESS</option>
+                            <option value="DELEGATED"   th:selected="${task.status == 'DELEGATED'}">DELEGATED</option>
                             <option value="BLOCKED"     th:selected="${task.status == 'BLOCKED'}">BLOCKED</option>
                             <option value="DONE"        th:selected="${task.status == 'DONE'}">DONE</option>
                             <option value="ARCHIVED"    th:selected="${task.status == 'ARCHIVED'}">ARCHIVED</option>
                         </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Assigned to</label>
+                        <select name="assignedPersonId" class="form-select">
+                            <option value="">Не назначено</option>
+                            <option th:each="person : ${people}"
+                                    th:value="${person.id}"
+                                    th:text="${person.fullName}"
+                                    th:selected="${task.assignedPersonId == person.id}"></option>
+                        </select>
+                        <div class="form-text">Для статуса DELEGATED исполнитель обязателен.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Labels</label>
+                        <div class="border rounded-2 p-3" style="max-height: 240px; overflow-y: auto;">
+                            <div th:if="${#lists.isEmpty(taskLabels)}" class="text-muted small">Label-ы пока не созданы.</div>
+                            <div th:each="label : ${taskLabels}" class="form-check mb-2">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       name="labelIds"
+                                       th:id="${'task-label-' + label.id}"
+                                       th:value="${label.id}"
+                                       th:checked="${task.labelIds != null and #lists.contains(task.labelIds, label.id)}"/>
+                                <label class="form-check-label d-flex align-items-center gap-2"
+                                       th:for="${'task-label-' + label.id}">
+                                    <span class="badge text-bg-secondary"
+                                          th:if="${label.color == null or #strings.isEmpty(label.color)}"
+                                          th:text="${label.name}">Backend</span>
+                                    <span class="badge"
+                                          th:if="${label.color != null and !#strings.isEmpty(label.color)}"
+                                          th:style="'background-color:' + ${label.color} + ';color:#111827;'"
+                                          th:text="${label.name}">Backend</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- 4. Action buttons -->
@@ -312,7 +351,9 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
         title: formData.get('title'),
         priority: formData.get('priority'),
         status: formData.get('status'),
-        dueDate: formData.get('dueDate') || null
+        dueDate: formData.get('dueDate') || null,
+        assignedPersonId: formData.get('assignedPersonId') ? Number(formData.get('assignedPersonId')) : null,
+        labelIds: formData.getAll('labelIds').map(function(value) { return Number(value); })
     };
     const description = descriptionEditor.getMarkdown();
 
@@ -320,6 +361,13 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
     const originalStatus = statusSelect ? statusSelect.dataset.originalStatus : null;
     if (metaPayload.status === 'DONE' && originalStatus !== 'DONE'
         && !window.confirm('Перевести задачу в статус DONE?')) {
+        return;
+    }
+    if (metaPayload.status === 'DELEGATED' && !metaPayload.assignedPersonId) {
+        saveStatus.textContent = 'Для статуса DELEGATED нужно выбрать исполнителя.';
+        saveStatus.classList.remove('d-none');
+        saveStatus.classList.remove('alert-success');
+        saveStatus.classList.add('alert-danger');
         return;
     }
 
@@ -354,7 +402,9 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
             saveStatus.textContent = '';
         }, 3000);
     } catch (error) {
-        saveStatus.textContent = 'Не удалось сохранить задачу';
+        saveStatus.textContent = error && error.data && error.data.message
+            ? error.data.message
+            : 'Не удалось сохранить задачу';
         saveStatus.classList.remove('d-none');
         saveStatus.classList.remove('alert-success');
         saveStatus.classList.add('alert-danger');

@@ -56,8 +56,33 @@ class UiBadgesControllerTest {
     }
 
     private Task pendingTask(Long id) {
-        return new Task(id, null, "title", null, "PENDING", null, null,
-                null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null);
+        return new Task(
+                id,
+                null,
+                "title",
+                null,
+                "PENDING",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
     }
 }

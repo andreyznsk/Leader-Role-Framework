@@ -1,6 +1,6 @@
 # LeaderOS — Architecture - Мастер-Спека
 
-**Последнее обновление:** 2026-07-02
+**Последнее обновление:** 2026-07-03
 **Статус:** Living document — обновлять при любом изменении контрактов между сервисами
 **git:** https://github.com/andreyznsk/Leader-Role-Framework.git
 ---
@@ -194,7 +194,7 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 |-------|------|----------|
 | `GET` | `/api/context` | Контекст сессии: today/tomorrow, open incidents/risks, recent people notes |
 | `GET` | `/api/ui/badges` | Live-обновление счётчиков сайдбара (`newIntake`, `pendingTasks`) для JS-поллера (10 сек, backoff после 3 ошибок); фундамент под будущий notifications bell (CR-MEM-028) |
-| `POST` | `/api/tasks` | Создать подтверждённую задачу; UI создаёт title, description, priority, status, dueDate, date |
+| `POST` | `/api/tasks` | Создать подтверждённую задачу; UI создаёт title, description, priority, status, dueDate, assignedPersonId, labelIds, date |
 | `POST` | `/api/tasks/pending` | Создать задачу со статусом PENDING напрямую; mail/capture flow сюда больше не пишет напрямую |
 | `POST` | `/api/intake` | Создать intake item для mail/capture/manual producer |
 | `GET` | `/api/intake?status=NEW` | Список intake items с фильтрами по status/sourceType/suggestedRoute |
@@ -202,8 +202,9 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `PUT` | `/api/intake/{id}` | Сохранить finalRoute/finalPayload, статус `REVIEWING` |
 | `POST` | `/api/intake/{id}/apply` | Применить item в target receiver (`TASK`, `NOTE`, `RAG`, `RISK`, `INCIDENT`, `PERSON`, `NOISE`) |
 | `POST` | `/api/intake/{id}/reject` | Отклонить item, статус `REJECTED` |
-| `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `ARCHIVED` и legacy `DELETED` по умолчанию |
-| `PATCH` | `/api/tasks/{id}/status` | Изменить статус задачи |
+| `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `ARCHIVED` и legacy `DELETED` по умолчанию; поддерживает фильтр `labelId=...` |
+| `PATCH` | `/api/tasks/{id}/status` | Изменить статус задачи; `DELEGATED` требует исполнителя |
+| `GET/POST/PUT/DELETE` | `/api/task-labels` | CRUD task labels; delete архивирует label |
 | `POST` | `/api/capture` | Сохранить raw capture в БД и `capture-inbox/` |
 | `POST` | `/api/capture/process-now` | Ручной запуск классификации capture-файлов |
 | `POST` | `/api/knowledge/search` | Memory-owned прокси к JavaRagService `/api/search` + usage events |
@@ -254,7 +255,9 @@ MemoryService выступает единой точкой управления 
 
 **Live Prompt Editing Policy:** prompt templates plugin-сервисов редактируются через тот же control plane UI `/ui/settings`, что и остальные runtime settings. Каждый plugin хранит свои prompts в собственной БД, в отдельной таблице своей схемы. Начальные prompt values seed-ятся Flyway migration-ами. После этого пользователь может менять prompt в реальном времени через descriptor-driven form (`type=text`), plugin сохраняет обновлённый prompt в свою БД и использует его на следующем вызове без рестарта процесса. Snapshot в MemoryService не является source of truth для prompts, он нужен только для proxy UI и audit/history.
 
-**Статусы задачи:** `PENDING → TODO → IN_PROGRESS → DONE` / `ARCHIVED` (`DELETED` остаётся только legacy-статусом)
+**Статусы задачи:** `PENDING → TODO → RESEARCH → IN_PROGRESS → DELEGATED → DONE` / `ARCHIVED` (`DELETED` остаётся только legacy-статусом)
+
+**Task delegation & labels:** задачи поддерживают `assigned_person_id`, отдельный статус `DELEGATED`, пользовательские `task_labels` и mapping `task_label_mapping`. Today UI показывает исполнителя и labels бейджами, а task timeline фиксирует назначение, переназначение и снятие исполнителя.
 
 **Capture Bot:** `POST /api/capture` сохраняет заметку без интерпретации.
 `CaptureScheduler` по `capture.scheduler.cron` пакетно читает `capture-inbox/YYYY-MM-DD/*.md`,

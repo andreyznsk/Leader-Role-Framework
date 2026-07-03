@@ -1,6 +1,7 @@
 package ru.andreyz.memoryservice.dto;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public record CreateTaskRequest(
         String title,
@@ -8,6 +9,8 @@ public record CreateTaskRequest(
         String priority,
         String status,
         LocalDate dueDate,
+        Long assignedPersonId,
+        List<Long> labelIds,
         LocalDate date,
         String source
 ) {}
