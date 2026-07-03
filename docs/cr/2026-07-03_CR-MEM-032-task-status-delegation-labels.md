@@ -4,7 +4,7 @@
 **Статус:** Draft  
 **Сервис:** MEM / JavaMemoryService  
 **Тип:** enhancement  
-**Связанный Issue:** создаётся после публикации CR  
+**Связанный Issue:** #74  
 
 ---
 
