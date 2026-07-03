@@ -48,6 +48,63 @@
     </div>
 
     <div class="card mb-4">
+        <div class="card-header">Task Labels</div>
+        <div class="card-body">
+            <form class="row g-3 mb-4"
+                  data-api-url="/api/task-labels"
+                  data-api-method="POST"
+                  data-api-success="reload">
+                <div class="col-md-5">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="name" class="form-control" required/>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Color</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="color" class="form-control form-control-color los-color-picker" value="#60a5fa"/>
+                        <input type="text" name="color" class="form-control los-color-code" placeholder="#60a5fa"/>
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Create Label</button>
+                </div>
+            </form>
+
+            <div th:if="${#lists.isEmpty(taskLabels)}" class="text-muted small">Task labels не созданы.</div>
+            <div th:each="label : ${taskLabels}" class="border rounded-2 p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                    <form class="row g-3 flex-grow-1"
+                          th:attr="data-api-url=@{/api/task-labels/{id}(id=${label.id})}"
+                          data-api-method="PUT"
+                          data-api-success="reload">
+                        <div class="col-md-5">
+                            <label class="form-label">Name</label>
+                            <input type="text" name="name" class="form-control" th:value="${label.name}" required/>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Color</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="color"
+                                       class="form-control form-control-color los-color-picker"
+                                       th:value="${label.color != null and !#strings.isEmpty(label.color) ? label.color : '#6b7280'}"/>
+                                <input type="text" name="color" class="form-control los-color-code" th:value="${label.color}"/>
+                            </div>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-outline-primary w-100">Save</button>
+                        </div>
+                    </form>
+                    <form th:attr="data-api-url=@{/api/task-labels/{id}(id=${label.id})}"
+                          data-api-method="DELETE"
+                          data-api-success="reload">
+                        <button type="submit" class="btn btn-outline-danger">Archive</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
         <div class="card-header">Registered Control Plugins</div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -286,6 +343,33 @@
         const modalDetails = document.querySelector('[data-mail-test-modal-details]');
         const testConnectionModal = modalElement ? new bootstrap.Modal(modalElement) : null;
 
+        function normalizeColorValue(value, fallback) {
+            if (!value) return fallback;
+            const normalized = value.trim();
+            return /^#[0-9a-fA-F]{6}$/.test(normalized) ? normalized : fallback;
+        }
+
+        function bindColorField(container) {
+            const picker = container.querySelector('.los-color-picker');
+            const input = container.querySelector('.los-color-code');
+            if (!picker || !input || container.dataset.colorBound === 'true') {
+                return;
+            }
+            container.dataset.colorBound = 'true';
+            const initial = normalizeColorValue(input.value, picker.value || '#6b7280');
+            picker.value = initial;
+            if (!input.value) {
+                input.value = initial;
+            }
+            picker.addEventListener('input', function () {
+                input.value = picker.value;
+            });
+            input.addEventListener('change', function () {
+                picker.value = normalizeColorValue(input.value, picker.value || '#6b7280');
+                input.value = picker.value;
+            });
+        }
+
         function formToPayload(form) {
             const formData = new FormData(form);
             const settings = {};
@@ -390,6 +474,12 @@
         }
 
         document.querySelectorAll('form[data-api-url]').forEach(function (form) {
+            form.querySelectorAll('.los-color-picker').forEach(function (picker) {
+                bindColorField(picker.parentElement);
+            });
+        });
+
+        document.querySelectorAll('form[data-plugin-code]').forEach(function (form) {
             const protocolSelect = form.querySelector('[data-plugin-field="protocol"]');
             const authTypeSelect = form.querySelector('[data-plugin-field="authType"]');
             const protocolScopedNodes = form.querySelectorAll('[data-protocol-scope]');

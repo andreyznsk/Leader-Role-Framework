@@ -21,40 +21,54 @@ public class TaskService {
     private final UsageEventService usageEventService;
     private final TaskDescriptionService taskDescriptionService;
     private final TaskTimelineService taskTimelineService;
+    private final TaskRelationService taskRelationService;
 
     public TaskService(TaskRepository taskRepository,
                        DailyPlanRepository planRepository,
                        UsageEventService usageEventService,
                        TaskDescriptionService taskDescriptionService,
-                       TaskTimelineService taskTimelineService) {
+                       TaskTimelineService taskTimelineService,
+                       TaskRelationService taskRelationService) {
         this.taskRepository = taskRepository;
         this.planRepository = planRepository;
         this.usageEventService = usageEventService;
         this.taskDescriptionService = taskDescriptionService;
         this.taskTimelineService = taskTimelineService;
+        this.taskRelationService = taskRelationService;
     }
 
     public Task createConfirmed(LocalDate date, String title, String priority,
                                 String description, String source, String emailId) {
-        return createConfirmed(date, title, priority, description, source, emailId, date, "TODO");
+        return createConfirmed(date, title, priority, description, source, emailId, date, "TODO", null, List.of());
     }
 
     public Task createConfirmed(LocalDate date, String title, String priority,
                                 String description, String source, String emailId,
                                 LocalDate dueDate, String status) {
+        return createConfirmed(date, title, priority, description, source, emailId, dueDate, status, null, List.of());
+    }
+
+    public Task createConfirmed(LocalDate date, String title, String priority,
+                                String description, String source, String emailId,
+                                LocalDate dueDate, String status,
+                                Long assignedPersonId, List<Long> labelIds) {
         Long planId = getOrCreatePlan(date).id();
         int sortOrder = taskRepository.findMaxSortOrderByPlanId(planId) + 1;
+        String normalizedStatus = normalizeStatus(status != null ? status : "TODO");
+        taskRelationService.validateStatusAssignment(normalizedStatus, assignedPersonId);
         Task task = new Task(null, planId, title, description,
-                status != null ? status : "TODO", priority != null ? priority : "NORMAL",
-                dueDate != null ? dueDate : date, source != null ? source : "MANUAL", emailId,
+                normalizedStatus, priority != null ? priority : "NORMAL",
+                dueDate != null ? dueDate : date, normalizeAssignedPersonId(assignedPersonId), null, null, null,
+                source != null ? source : "MANUAL", emailId,
                 "NEW_TASK", null, null, null, null, null, null, null,
                 null, null,
                 sortOrder, Instant.now(), Instant.now());
         Task saved = taskRepository.save(task);
+        taskRelationService.replaceTaskLabels(saved.id(), labelIds);
         taskDescriptionService.initializeFromTaskField(saved);
         taskTimelineService.recordTaskCreated(saved);
         recordTaskCreated(saved, usageSource(source), false);
-        return saved;
+        return findById(saved.id());
     }
 
     public Task createPending(String title, String description,
@@ -90,7 +104,7 @@ public class TaskService {
         String desc = description != null ? description : (sender != null ? "От: " + sender : null);
         Task task = new Task(null, null, title, desc,
                 "PENDING", priority != null ? priority : "NORMAL",
-                dueDate, "EMAIL", emailId,
+                dueDate, null, null, null, null, "EMAIL", emailId,
                 normalizePendingType(pendingType), suggestedTaskId, agentConfidence, agentReason,
                 sourceType != null ? sourceType : "EMAIL", sourceSubject, sourceSender != null ? sourceSender : sender,
                 blankToNull(proposedDescriptionAppend),
@@ -123,7 +137,7 @@ public class TaskService {
         Long planId = getOrCreatePlan(today).id();
         int sortOrder = taskRepository.findMaxSortOrderByPlanId(planId) + 1;
         Task confirmed = new Task(task.id(), planId, task.title(), task.description(),
-                "TODO", task.priority(), today, task.source(), task.emailId(),
+                "TODO", task.priority(), today, task.assignedPersonId(), null, null, null, task.source(), task.emailId(),
                 task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
                 task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
                 task.linkedToTaskId(), task.linkedAt(),
@@ -147,7 +161,7 @@ public class TaskService {
             return task;
         }
         Task archived = new Task(task.id(), task.planId(), task.title(), task.description(),
-                "ARCHIVED", task.priority(), task.dueDate(), task.source(), task.emailId(),
+                "ARCHIVED", task.priority(), task.dueDate(), task.assignedPersonId(), null, null, null, task.source(), task.emailId(),
                 task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
                 task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
                 task.linkedToTaskId(), task.linkedAt(),
@@ -160,27 +174,37 @@ public class TaskService {
     public Task edit(Long id, EditTaskRequest req) {
         Task task = findById(id);
         String newTitle = req.title() != null ? req.title() : task.title();
-        String newStatus = req.status() != null ? req.status() : task.status();
+        String newStatus = normalizeStatus(req.status() != null ? req.status() : task.status());
         String newPriority = req.priority() != null ? req.priority() : task.priority();
         LocalDate newDueDate = req.dueDate() != null ? req.dueDate() : task.dueDate();
+        Long newAssignedPersonId = normalizeAssignedPersonId(req.assignedPersonId());
+        taskRelationService.validateStatusAssignment(newStatus, newAssignedPersonId);
         Task updated = new Task(task.id(), task.planId(),
                 newTitle,
                 task.description(),
                 newStatus,
                 newPriority,
                 newDueDate,
+                newAssignedPersonId,
+                null,
+                null,
+                null,
                 task.source(), task.emailId(),
                 task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
                 task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
                 task.linkedToTaskId(), task.linkedAt(),
                 task.sortOrder(), task.createdAt(), Instant.now());
         Task saved = taskRepository.save(updated);
+        if (req.labelIds() != null) {
+            taskRelationService.replaceTaskLabels(id, req.labelIds());
+        }
         recordEditTimeline(task, newTitle, newStatus, newPriority, newDueDate);
+        recordAssigneeTimeline(task, newAssignedPersonId);
         if (req.description() != null) {
             taskDescriptionService.update(id, req.description());
             return findById(id);
         }
-        return saved;
+        return findById(saved.id());
     }
 
     public Task markDone(Long id) {
@@ -199,7 +223,7 @@ public class TaskService {
         String newStatus = task.status().equals("DONE") ? "TODO" : task.status();
         Task moved = new Task(task.id(), planId, task.title(), task.description(),
                 newStatus,
-                task.priority(), toDate, task.source(), task.emailId(),
+                task.priority(), toDate, task.assignedPersonId(), null, null, null, task.source(), task.emailId(),
                 task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
                 task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
                 task.linkedToTaskId(), task.linkedAt(),
@@ -220,7 +244,7 @@ public class TaskService {
         int sortOrder = taskRepository.findMaxSortOrderByPlanId(planId) + 1;
         Task updated = new Task(task.id(), planId, task.title(), task.description(),
                 task.status(),
-                task.priority(), date, task.source(), task.emailId(),
+                task.priority(), date, task.assignedPersonId(), null, null, null, task.source(), task.emailId(),
                 task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
                 task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
                 task.linkedToTaskId(), task.linkedAt(),
@@ -246,18 +270,20 @@ public class TaskService {
 
     public Task updateStatus(Long id, String status) {
         Task task = findById(id);
-        if (equalsNullable(task.status(), status)) {
+        String normalizedStatus = normalizeStatus(status);
+        if (equalsNullable(task.status(), normalizedStatus)) {
             return task;
         }
+        taskRelationService.validateStatusAssignment(normalizedStatus, task.assignedPersonId());
         Task updated = new Task(task.id(), task.planId(), task.title(), task.description(),
-                status, task.priority(), task.dueDate(), task.source(), task.emailId(),
+                normalizedStatus, task.priority(), task.dueDate(), task.assignedPersonId(), null, null, null, task.source(), task.emailId(),
                 task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
                 task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
                 task.linkedToTaskId(), task.linkedAt(),
                 task.sortOrder(), task.createdAt(), Instant.now());
         Task saved = taskRepository.save(updated);
-        taskTimelineService.recordStatusChanged(task, status);
-        if ("DONE".equals(status) && !"DONE".equals(task.status())) {
+        taskTimelineService.recordStatusChanged(task, normalizedStatus);
+        if ("DONE".equals(normalizedStatus) && !"DONE".equals(task.status())) {
             usageEventService.record(new UsageEventCommand(
                     UsageEventType.TASK_COMPLETED,
                     "memory-service",
@@ -270,7 +296,7 @@ public class TaskService {
                     java.util.Map.of("title", saved.title())
             ));
         }
-        return saved;
+        return findById(saved.id());
     }
 
     public Task reorder(Long id, String direction, Integer position) {
@@ -302,13 +328,13 @@ public class TaskService {
     private void swapSortOrders(Task a, Task b) {
         Integer orderA = a.sortOrder();
         Task updatedA = new Task(a.id(), a.planId(), a.title(), a.description(),
-                a.status(), a.priority(), a.dueDate(), a.source(), a.emailId(),
+                a.status(), a.priority(), a.dueDate(), a.assignedPersonId(), null, null, null, a.source(), a.emailId(),
                 a.pendingType(), a.suggestedTaskId(), a.agentConfidence(), a.agentReason(),
                 a.sourceType(), a.sourceSubject(), a.sourceSender(), a.proposedDescriptionAppend(),
                 a.linkedToTaskId(), a.linkedAt(),
                 b.sortOrder(), a.createdAt(), Instant.now());
         Task updatedB = new Task(b.id(), b.planId(), b.title(), b.description(),
-                b.status(), b.priority(), b.dueDate(), b.source(), b.emailId(),
+                b.status(), b.priority(), b.dueDate(), b.assignedPersonId(), null, null, null, b.source(), b.emailId(),
                 b.pendingType(), b.suggestedTaskId(), b.agentConfidence(), b.agentReason(),
                 b.sourceType(), b.sourceSubject(), b.sourceSender(), b.proposedDescriptionAppend(),
                 b.linkedToTaskId(), b.linkedAt(),
@@ -323,10 +349,10 @@ public class TaskService {
         Task moved = reordered.remove(fromIdx);
         reordered.add(toIdx, moved);
         for (int i = 0; i < reordered.size(); i++) {
-            Task t = reordered.get(i);
-            if (!t.sortOrder().equals(i)) {
-                taskRepository.save(new Task(t.id(), t.planId(), t.title(), t.description(),
-                        t.status(), t.priority(), t.dueDate(), t.source(), t.emailId(),
+                Task t = reordered.get(i);
+                if (!t.sortOrder().equals(i)) {
+                    taskRepository.save(new Task(t.id(), t.planId(), t.title(), t.description(),
+                        t.status(), t.priority(), t.dueDate(), t.assignedPersonId(), null, null, null, t.source(), t.emailId(),
                         t.pendingType(), t.suggestedTaskId(), t.agentConfidence(), t.agentReason(),
                         t.sourceType(), t.sourceSubject(), t.sourceSender(), t.proposedDescriptionAppend(),
                         t.linkedToTaskId(), t.linkedAt(),
@@ -360,11 +386,11 @@ public class TaskService {
     }
 
     public List<Task> findByDate(LocalDate date) {
-        return planRepository.findByPlanDate(date)
+        return taskRelationService.enrich(planRepository.findByPlanDate(date)
                 .map(plan -> taskRepository.findByPlanIdOrderBySortOrder(plan.id()).stream()
                         .filter(task -> !"DELETED".equals(task.status()) && !"ARCHIVED".equals(task.status()))
                         .toList())
-                .orElse(List.of());
+                .orElse(List.of()));
     }
 
     public List<Task> findByDateAndStatus(LocalDate date, String status) {
@@ -376,21 +402,21 @@ public class TaskService {
     }
 
     public List<Task> findPending() {
-        return taskRepository.findByStatus("PENDING");
+        return taskRelationService.enrich(taskRepository.findByStatus("PENDING"));
     }
 
     public List<Task> findCurrentTasks() {
-        return taskRepository.findCurrentTasks();
+        return taskRelationService.enrich(taskRepository.findCurrentTasks());
     }
 
     public Task findById(Long id) {
-        return taskRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Task not found: " + id));
+        return taskRelationService.enrich(taskRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Task not found: " + id)));
     }
 
     private Task archive(Task task) {
         Task archived = new Task(task.id(), task.planId(), task.title(), task.description(),
-                "ARCHIVED", task.priority(), task.dueDate(), task.source(), task.emailId(),
+                "ARCHIVED", task.priority(), task.dueDate(), task.assignedPersonId(), null, null, null, task.source(), task.emailId(),
                 task.pendingType(), task.suggestedTaskId(), task.agentConfidence(), task.agentReason(),
                 task.sourceType(), task.sourceSubject(), task.sourceSender(), task.proposedDescriptionAppend(),
                 task.linkedToTaskId(), task.linkedAt(),
@@ -448,6 +474,17 @@ public class TaskService {
         }
     }
 
+    private void recordAssigneeTimeline(Task original, Long newAssignedPersonId) {
+        if (!equalsNullable(original.assignedPersonId(), newAssignedPersonId)) {
+            taskTimelineService.recordAssigneeChanged(
+                    original,
+                    newAssignedPersonId,
+                    taskRelationService.findPersonName(original.assignedPersonId()),
+                    taskRelationService.findPersonName(newAssignedPersonId)
+            );
+        }
+    }
+
     private void appendDescription(Long taskId, String appendBlock) {
         String current = taskDescriptionService.getContent(taskId);
         String addition = appendBlock.trim();
@@ -459,7 +496,7 @@ public class TaskService {
 
     private Task linkedPendingTask(Task pending, Long resolvedTargetId) {
         return new Task(pending.id(), pending.planId(), pending.title(), pending.description(),
-                pending.status(), pending.priority(), pending.dueDate(), pending.source(), pending.emailId(),
+                pending.status(), pending.priority(), pending.dueDate(), pending.assignedPersonId(), null, null, null, pending.source(), pending.emailId(),
                 pending.pendingType(), pending.suggestedTaskId(), pending.agentConfidence(), pending.agentReason(),
                 pending.sourceType(), pending.sourceSubject(), pending.sourceSender(), pending.proposedDescriptionAppend(),
                 resolvedTargetId, Instant.now(),
@@ -475,6 +512,17 @@ public class TaskService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private Long normalizeAssignedPersonId(Long assignedPersonId) {
+        return assignedPersonId == null || assignedPersonId <= 0 ? null : assignedPersonId;
+    }
+
+    private String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return "TODO";
+        }
+        return status.trim().toUpperCase(java.util.Locale.ROOT);
     }
 
     private static boolean equalsNullable(Object left, Object right) {

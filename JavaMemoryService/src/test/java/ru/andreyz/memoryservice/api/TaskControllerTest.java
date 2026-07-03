@@ -181,4 +181,78 @@ class TaskControllerTest {
                 .andExpect(jsonPath("$[?(@.id == %s && @.dueDate == '%s')]".formatted(overdueTodoId, today)).exists())
                 .andExpect(jsonPath("$[?(@.id == %s)]".formatted(overdueDoneId)).doesNotExist());
     }
+
+    @Test
+    void delegatedTaskRequiresAssignedPerson() throws Exception {
+        String today = LocalDate.now().toString();
+
+        mockMvc.perform(post("/api/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Delegated without owner","date":"%s","status":"DELEGATED","source":"MANUAL"}
+                                """.formatted(today)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void taskSupportsAssignedPersonLabelsAndLabelFiltering() throws Exception {
+        String personJson = mockMvc.perform(post("/api/people")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fullName":"Иван Иванов","login":"ivanov"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String personId = personJson.replaceAll(".*\"id\":(\\d+).*", "$1");
+
+        String backendLabelJson = mockMvc.perform(post("/api/task-labels")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Backend","color":"#60a5fa"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String releaseLabelJson = mockMvc.perform(post("/api/task-labels")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Release"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String backendLabelId = backendLabelJson.replaceAll(".*\"id\":(\\d+).*", "$1");
+        String releaseLabelId = releaseLabelJson.replaceAll(".*\"id\":(\\d+).*", "$1");
+
+        String today = LocalDate.now().toString();
+        mockMvc.perform(post("/api/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title":"Delegated release",
+                                  "date":"%s",
+                                  "status":"DELEGATED",
+                                  "assignedPersonId":%s,
+                                  "labelIds":[%s,%s],
+                                  "source":"MANUAL"
+                                }
+                                """.formatted(today, personId, backendLabelId, releaseLabelId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("DELEGATED"))
+                .andExpect(jsonPath("$.assignedPersonId").value(Long.parseLong(personId)))
+                .andExpect(jsonPath("$.assignedPerson.fullName").value("Иван Иванов"))
+                .andExpect(jsonPath("$.labelIds[0]").isNumber())
+                .andExpect(jsonPath("$.labels[?(@.name == 'Backend')]").exists())
+                .andExpect(jsonPath("$.labels[?(@.name == 'Release')]").exists());
+
+        mockMvc.perform(get("/api/tasks")
+                        .param("date", today)
+                        .param("labelId", backendLabelId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.title == 'Delegated release')]").exists());
+    }
 }

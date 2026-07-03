@@ -116,6 +116,20 @@ public class TaskTimelineService {
                 "Дедлайн изменен");
     }
 
+    public void recordAssigneeChanged(Task before, Long newAssignedPersonId, String oldAssigneeName, String newAssigneeName) {
+        save(before.id(), "ASSIGNEE_CHANGED", "USER", "User",
+                fields(
+                        "assignedPersonId", before.assignedPersonId(),
+                        "assignedPersonName", oldAssigneeName
+                ),
+                fields(
+                        "assignedPersonId", newAssignedPersonId,
+                        "assignedPersonName", newAssigneeName
+                ),
+                "UI", before.emailId(),
+                assigneeSummary(oldAssigneeName, newAssigneeName));
+    }
+
     public void recordTaskArchived(Task before) {
         save(before.id(), "TASK_ARCHIVED", "USER", "User",
                 fields("status", before.status()),
@@ -253,6 +267,19 @@ public class TaskTimelineService {
             builder.append(" от ").append(sender.trim());
         }
         return builder.toString();
+    }
+
+    private String assigneeSummary(String oldAssigneeName, String newAssigneeName) {
+        if ((oldAssigneeName == null || oldAssigneeName.isBlank()) && newAssigneeName != null && !newAssigneeName.isBlank()) {
+            return "Исполнитель назначен: " + newAssigneeName;
+        }
+        if (oldAssigneeName != null && !oldAssigneeName.isBlank() && (newAssigneeName == null || newAssigneeName.isBlank())) {
+            return "Исполнитель снят: " + oldAssigneeName;
+        }
+        return "Исполнитель изменен: %s -> %s".formatted(
+                oldAssigneeName != null ? oldAssigneeName : "—",
+                newAssigneeName != null ? newAssigneeName : "—"
+        );
     }
 
     private record EventMeta(String actorType, String actorName, String sourceType) {}

@@ -30,7 +30,7 @@ public class TaskTools {
     @Tool(description = "Get tasks for a specific date. Optionally filter by status.")
     public List<Task> getTasks(
             @ToolParam(description = "Date in YYYY-MM-DD format") String date,
-            @ToolParam(description = "Status filter: TODO|IN_PROGRESS|DONE|BLOCKED", required = false) String status) {
+            @ToolParam(description = "Status filter: TODO|RESEARCH|IN_PROGRESS|DELEGATED|DONE|BLOCKED", required = false) String status) {
         LocalDate localDate = LocalDate.parse(date);
         return status != null
                 ? taskService.findByDateAndStatus(localDate, status)
@@ -59,7 +59,7 @@ public class TaskTools {
 
     public Task updateTaskStatus(
             @ToolParam(description = "Task ID") Long id,
-            @ToolParam(description = "Status: TODO|IN_PROGRESS|DONE|BLOCKED") String status) {
+            @ToolParam(description = "Status: TODO|RESEARCH|IN_PROGRESS|DELEGATED|DONE|BLOCKED") String status) {
         return taskService.updateStatus(id, status);
     }
 
