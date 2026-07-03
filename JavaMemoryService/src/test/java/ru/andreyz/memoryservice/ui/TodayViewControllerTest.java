@@ -6,6 +6,8 @@ import org.springframework.ui.Model;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.repository.DailyPlanRepository;
 import ru.andreyz.memoryservice.repository.IncidentRepository;
+import ru.andreyz.memoryservice.service.PeopleService;
+import ru.andreyz.memoryservice.service.TaskRelationService;
 import ru.andreyz.memoryservice.service.TaskService;
 
 import java.time.Instant;
@@ -22,9 +24,11 @@ class TodayViewControllerTest {
     @Test
     void filteringWithoutExplicitSortKeepsDefaultPriorityThenStatusOrdering() {
         TaskService taskService = mock(TaskService.class);
+        TaskRelationService taskRelationService = mock(TaskRelationService.class);
+        PeopleService peopleService = mock(PeopleService.class);
         DailyPlanRepository planRepository = mock(DailyPlanRepository.class);
         IncidentRepository incidentRepository = mock(IncidentRepository.class);
-        TodayViewController controller = new TodayViewController(taskService, planRepository, incidentRepository);
+        TodayViewController controller = new TodayViewController(taskService, taskRelationService, peopleService, planRepository, incidentRepository);
         Model model = new ExtendedModelMap();
 
         Task criticalTodo = task(1L, "Critical TODO", "TODO", "CRITICAL", LocalDate.now(), 2);
@@ -34,10 +38,12 @@ class TodayViewControllerTest {
 
         when(taskService.findPending()).thenReturn(List.of());
         when(taskService.findCurrentTasks()).thenReturn(List.of(normalTodo, highBlocked, criticalTodo, highInProgress));
+        when(taskRelationService.listActiveLabels()).thenReturn(List.of());
+        when(peopleService.findAll()).thenReturn(List.of());
         when(incidentRepository.findByStatus("OPEN")).thenReturn(List.of());
         when(planRepository.findByPlanDate(LocalDate.now())).thenReturn(java.util.Optional.empty());
 
-        String view = controller.today("HIGH", null, null, null, null, null, null,  model);
+        String view = controller.today("HIGH", null, null, null, null, null, null, null,  model);
 
         assertThat(view).isEqualTo("today");
         assertThat(model.getAttribute("currentTasks"))
@@ -52,9 +58,11 @@ class TodayViewControllerTest {
     @Test
     void calendarDeadlineCountsExcludeDoneTasks() {
         TaskService taskService = mock(TaskService.class);
+        TaskRelationService taskRelationService = mock(TaskRelationService.class);
+        PeopleService peopleService = mock(PeopleService.class);
         DailyPlanRepository planRepository = mock(DailyPlanRepository.class);
         IncidentRepository incidentRepository = mock(IncidentRepository.class);
-        TodayViewController controller = new TodayViewController(taskService, planRepository, incidentRepository);
+        TodayViewController controller = new TodayViewController(taskService, taskRelationService, peopleService, planRepository, incidentRepository);
         Model model = new ExtendedModelMap();
 
         LocalDate today = LocalDate.now();
@@ -64,10 +72,12 @@ class TodayViewControllerTest {
 
         when(taskService.findPending()).thenReturn(List.of());
         when(taskService.findCurrentTasks()).thenReturn(List.of(todoTask, doneTask, blockedTask));
+        when(taskRelationService.listActiveLabels()).thenReturn(List.of());
+        when(peopleService.findAll()).thenReturn(List.of());
         when(incidentRepository.findByStatus("OPEN")).thenReturn(List.of());
         when(planRepository.findByPlanDate(today)).thenReturn(java.util.Optional.empty());
 
-        controller.today(null, null, null, null, null, null, null, model);
+        controller.today(null, null, null, null, null, null, null, null, model);
 
         assertThat(model.getAttribute("deadlineCounts"))
                 .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.map(String.class, Long.class))
@@ -87,6 +97,10 @@ class TodayViewControllerTest {
                 status,
                 priority,
                 dueDate,
+                null,
+                null,
+                List.of(),
+                List.of(),
                 "MANUAL",
                 null,
                 "NEW_TASK",

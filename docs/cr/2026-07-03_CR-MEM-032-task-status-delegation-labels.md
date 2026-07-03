@@ -1,7 +1,7 @@
 # 2026-07-03_CR-MEM-032: Task statuses, delegation and configurable labels
 
 **Дата:** 2026-07-03  
-**Статус:** Draft  
+**Статус:** DONE  
 **Сервис:** MEM / JavaMemoryService  
 **Тип:** enhancement  
 **Связанный Issue:** #74  

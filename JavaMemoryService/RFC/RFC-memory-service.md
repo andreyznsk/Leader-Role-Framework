@@ -632,10 +632,10 @@ POST /api/plans
 
 # Задачи
 GET  /api/tasks?date=2026-06-08&status=TODO
-POST /api/tasks                          # создать подтверждённую задачу; поддерживает title, description, priority, status, dueDate, date, source
+POST /api/tasks                          # создать подтверждённую задачу; поддерживает title, description, priority, status, dueDate, assignedPersonId, labelIds, date, source
 PUT  /api/tasks/{id}
 PATCH /api/tasks/{id}/date               body: { "date": "2026-06-09" }   # быстрый inline update даты/дедлайна
-PATCH /api/tasks/{id}/status             body: { "status": "TODO|IN_PROGRESS|BLOCKED|DONE" }
+PATCH /api/tasks/{id}/status             body: { "status": "TODO|RESEARCH|IN_PROGRESS|DELEGATED|BLOCKED|DONE" }
 POST /api/tasks/{id}/done
 POST /api/tasks/{id}/move                body: { "toDate": "2026-06-09" }
 POST /api/tasks/move-overdue-to-today    # batch-перенос активных просроченных задач на today
@@ -643,6 +643,10 @@ POST /api/tasks/{id}/reorder             body: { "direction": "up"|"down" } | { 
 POST /api/tasks/{id}/archive             # архивирование (статус → ARCHIVED)
 POST /api/tasks/{id}/delete              # legacy alias: архивирование (статус → ARCHIVED)
 DELETE /api/tasks/{id}                   # legacy alias: архивирование (статус → ARCHIVED)
+GET  /api/task-labels
+POST /api/task-labels
+PUT  /api/task-labels/{id}
+DELETE /api/task-labels/{id}
 POST /api/search                         # Global Search по operational layers + RAG layer
 
 # Knowledge Gateway proxy (без прямого JDBC в schema rag)

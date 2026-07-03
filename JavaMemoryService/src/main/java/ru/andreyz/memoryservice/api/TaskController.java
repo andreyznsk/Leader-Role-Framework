@@ -18,6 +18,7 @@ import ru.andreyz.memoryservice.dto.UpdateTaskStatusRequest;
 import ru.andreyz.memoryservice.service.TaskService;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -33,10 +34,18 @@ public class TaskController {
     @GetMapping
     public ResponseEntity<List<Task>> getTasks(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String labelIds,
+            @RequestParam(name = "labelId", required = false) List<Long> labelIdParams) {
         List<Task> tasks = status != null
                 ? taskService.findByDateAndStatus(date, status)
                 : taskService.findByDate(date);
+        List<Long> selectedLabelIds = mergeLabelIds(labelIds, labelIdParams);
+        if (!selectedLabelIds.isEmpty()) {
+            tasks = tasks.stream()
+                    .filter(task -> task.labelIds() != null && task.labelIds().stream().anyMatch(selectedLabelIds::contains))
+                    .toList();
+        }
         return ResponseEntity.ok(tasks);
     }
 
@@ -45,7 +54,7 @@ public class TaskController {
         Task task = taskService.createConfirmed(
                 req.date() != null ? req.date() : LocalDate.now(),
                 req.title(), req.priority(), req.description(),
-                req.source(), null, req.dueDate(), req.status());
+                req.source(), null, req.dueDate(), req.status(), req.assignedPersonId(), req.labelIds());
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
@@ -150,5 +159,21 @@ public class TaskController {
     public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
         taskService.archive(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private List<Long> mergeLabelIds(String csvLabelIds, List<Long> repeatedLabelIds) {
+        List<Long> result = new ArrayList<>();
+        if (repeatedLabelIds != null) {
+            result.addAll(repeatedLabelIds.stream().filter(value -> value != null && value > 0).toList());
+        }
+        if (csvLabelIds != null && !csvLabelIds.isBlank()) {
+            for (String part : csvLabelIds.split(",")) {
+                String normalized = part.trim();
+                if (!normalized.isEmpty()) {
+                    result.add(Long.parseLong(normalized));
+                }
+            }
+        }
+        return result.stream().distinct().toList();
     }
 }

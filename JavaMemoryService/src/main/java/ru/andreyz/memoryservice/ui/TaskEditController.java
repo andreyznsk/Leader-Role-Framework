@@ -7,7 +7,9 @@ import org.springframework.web.bind.annotation.*;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.domain.TaskEvent;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
+import ru.andreyz.memoryservice.service.PeopleService;
 import ru.andreyz.memoryservice.service.TaskDescriptionService;
+import ru.andreyz.memoryservice.service.TaskRelationService;
 import ru.andreyz.memoryservice.service.TaskService;
 import ru.andreyz.memoryservice.service.TaskTimelineService;
 
@@ -21,13 +23,19 @@ public class TaskEditController {
     private final TaskService taskService;
     private final TaskDescriptionService taskDescriptionService;
     private final TaskTimelineService taskTimelineService;
+    private final PeopleService peopleService;
+    private final TaskRelationService taskRelationService;
 
     public TaskEditController(TaskService taskService,
                               TaskDescriptionService taskDescriptionService,
-                              TaskTimelineService taskTimelineService) {
+                              TaskTimelineService taskTimelineService,
+                              PeopleService peopleService,
+                              TaskRelationService taskRelationService) {
         this.taskService = taskService;
         this.taskDescriptionService = taskDescriptionService;
         this.taskTimelineService = taskTimelineService;
+        this.peopleService = peopleService;
+        this.taskRelationService = taskRelationService;
     }
 
     @GetMapping("/{id}/edit")
@@ -40,6 +48,10 @@ public class TaskEditController {
         model.addAttribute("timeline", timeline.stream().limit(5).toList());
         model.addAttribute("timelineTotalCount", timeline.size());
         model.addAttribute("exportUrl", "/api/tasks/%d/description/export-md".formatted(id));
+        model.addAttribute("people", peopleService.findAll().stream()
+                .sorted(java.util.Comparator.comparing(person -> person.fullName().toLowerCase()))
+                .toList());
+        model.addAttribute("taskLabels", taskRelationService.listActiveLabels());
         return "task-edit";
     }
 
@@ -49,9 +61,11 @@ public class TaskEditController {
                            @RequestParam(required = false) String priority,
                            @RequestParam(required = false) String status,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
+                           @RequestParam(required = false) Long assignedPersonId,
+                           @RequestParam(name = "labelIds", required = false) List<Long> labelIds,
                            @RequestParam(required = false, defaultValue = "") String description,
                            @RequestParam(required = false, defaultValue = "save_close") String action) {
-        taskService.edit(id, new EditTaskRequest(title, null, priority, status, dueDate));
+        taskService.edit(id, new EditTaskRequest(title, null, priority, status, dueDate, assignedPersonId, labelIds));
         taskDescriptionService.update(id, description);
         if ("save".equalsIgnoreCase(action)) {
             return "redirect:/ui/tasks/%d/edit".formatted(id);
