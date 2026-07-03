@@ -76,7 +76,7 @@ public class SearchViewController {
     private List<String> resolveSelectedLayers(String[] layers, String preset, List<LayerInfo> available) {
         if (preset != null) {
             return switch (preset) {
-                case "notice" -> List.of("NOTICE");
+                case "notice", "rag" -> List.of("KNOWLEDGE");
                 case "everything" -> available.stream().filter(LayerInfo::enabled).map(LayerInfo::name).toList();
                 case "documentation" -> List.of("KNOWLEDGE");
                 case "people_tasks" -> List.of("PEOPLE", "TASK");

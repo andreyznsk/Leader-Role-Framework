@@ -1,1 +1,0 @@
--- H2 test override: base PostgreSQL migration is replaced by V18_1__mail_linking_audit_fields_h2_compat.sql.

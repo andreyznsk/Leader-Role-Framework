@@ -7,6 +7,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 @Service
 public class KnowledgeService {
@@ -21,29 +22,38 @@ public class KnowledgeService {
     }
 
     public List<KnowledgeDocumentSummary> list(String type) {
-        String uri = type == null || type.isBlank()
+        String normalizedType = normalizeType(type);
+        boolean ragAliasFilter = "RAG".equals(normalizedType);
+        String uri = type == null || type.isBlank() || ragAliasFilter
                 ? ragBaseUrl + "/api/rag/documents"
-                : ragBaseUrl + "/api/rag/documents?type=" + type.trim().toUpperCase();
+                : ragBaseUrl + "/api/rag/documents?type=" + normalizedType;
         List<KnowledgeDocumentSummary> documents = restClient.get()
                 .uri(uri)
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {});
-        return documents != null ? documents : List.of();
+        List<KnowledgeDocumentSummary> baseDocuments = documents != null ? documents : List.of();
+        return baseDocuments.stream()
+                .map(this::normalizeSummary)
+                .filter(document -> document != null)
+                .filter(document -> normalizedType == null || normalizedType.equals(document.docType()))
+                .toList();
     }
 
     public KnowledgeDocumentDetails get(Long id) {
-        return restClient.get()
+        KnowledgeDocumentDetails details = restClient.get()
                 .uri(ragBaseUrl + "/api/rag/documents/{id}", id)
                 .retrieve()
                 .body(KnowledgeDocumentDetails.class);
+        return normalizeDetails(details);
     }
 
     public KnowledgeDocumentDetails update(Long id, String content) {
-        return restClient.put()
+        KnowledgeDocumentDetails details = restClient.put()
                 .uri(ragBaseUrl + "/api/rag/documents/{id}", id)
                 .body(Map.of("content", content))
                 .retrieve()
                 .body(KnowledgeDocumentDetails.class);
+        return normalizeDetails(details);
     }
 
     public ReindexResult reindex(Long id) {
@@ -58,6 +68,43 @@ public class KnowledgeService {
                 .uri(ragBaseUrl + "/api/rag/documents/{id}", id)
                 .retrieve()
                 .body(DeleteResult.class);
+    }
+
+    private KnowledgeDocumentSummary normalizeSummary(KnowledgeDocumentSummary summary) {
+        if (summary == null) {
+            return null;
+        }
+        return new KnowledgeDocumentSummary(
+                summary.id(),
+                summary.filePath(),
+                summary.fileName(),
+                normalizeType(summary.docType()),
+                summary.status(),
+                summary.errorMessage(),
+                summary.indexedAt(),
+                summary.updated(),
+                summary.title(),
+                summary.sender(),
+                summary.subject(),
+                summary.receivedAt()
+        );
+    }
+
+    private KnowledgeDocumentDetails normalizeDetails(KnowledgeDocumentDetails details) {
+        if (details == null) {
+            return null;
+        }
+        return new KnowledgeDocumentDetails(normalizeSummary(details.summary()), details.content());
+    }
+
+    private String normalizeType(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return switch (raw.trim().toUpperCase(Locale.ROOT)) {
+            case "NOTICE", "KNOWLEDGE", "RAG" -> "RAG";
+            default -> raw.trim().toUpperCase(Locale.ROOT);
+        };
     }
 
     public record KnowledgeDocumentSummary(

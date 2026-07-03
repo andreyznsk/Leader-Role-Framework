@@ -32,6 +32,7 @@
 | CR-MEM-025        | [2026-07-02_CR-MEM-024-task-done-confirmation.md](2026-07-02_CR-MEM-024-task-done-confirmation.md) | Implemented | 2026-07-02 |
 | CR-MEM-026        | [2026-07-02_CR-MEM-025-today-todo-done-tabs.md](2026-07-02_CR-MEM-025-today-todo-done-tabs.md) | Implemented | 2026-07-02 |
 | CR-MEM-027        | [2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md](2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md) | Implemented | 2026-07-02 |
+| CR-MEM-028        | [2026-07-02_CR-MEM-028-live-badge-polling.md](2026-07-02_CR-MEM-028-live-badge-polling.md) | DONE | 2026-07-02 |
 | CR-MEM-032        | [2026-07-03_CR-MEM-032-task-status-delegation-labels.md](2026-07-03_CR-MEM-032-task-status-delegation-labels.md) | Draft | 2026-07-03 |
 | CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md) | Draft | —          |
 
@@ -63,6 +64,7 @@
 | CR-ARCH-005 | [CR-ARCH-005-mail-notice-rag-document-flow.md](CR-ARCH-005-mail-notice-rag-document-flow.md) | Draft | — |
 | CR-ARCH-005 ⚠️ | [CR-ARCH-005-universal-knowledge-ui.md](CR-ARCH-005-universal-knowledge-ui.md) | Draft | — |
 | CR-ARCH-006 | [CR-ARCH-006-update-presentation-architecture-diagrams.md](CR-ARCH-006-update-presentation-architecture-diagrams.md) | Draft | — |
+| CR-ARCH-007 | [2026-07-02_CR-ARCH-007-rename-notice-to-rag.md](2026-07-02_CR-ARCH-007-rename-notice-to-rag.md) | Implemented | 2026-07-03 |
 
 ---
 
@@ -78,4 +80,5 @@
 ---
 
 _Следующий свободный номер в MEM серии: **CR-MEM-033**_  
+_Следующий свободный номер в ARCH серии: **CR-ARCH-008**_  
 _Последнее обновление реестра: 2026-07-03_

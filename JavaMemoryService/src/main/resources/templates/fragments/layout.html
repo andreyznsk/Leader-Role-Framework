@@ -54,8 +54,9 @@
             <a href="/ui/today" class="los-nav-item" data-nav-title="ToDo">
                 <span class="los-nav-icon">&#128203;</span>
                 <span class="los-nav-label">ToDo</span>
-                <span th:if="${pendingCount != null and pendingCount > 0}" class="los-nav-alert-dot"
-                      th:title="|Есть pending задачи: ${pendingCount}|"></span>
+                <span class="los-nav-alert-dot" data-badge="pendingTasks"
+                      th:style="${(pendingCount != null and pendingCount > 0) ? '' : 'display:none'}"
+                      th:title="|Есть pending задачи: ${pendingCount ?: 0}|"></span>
             </a>
             <a href="/ui/today?status=DONE" class="los-nav-item" data-nav-title="Done">
                 <span class="los-nav-icon">&#9989;</span>
@@ -64,8 +65,9 @@
             <a href="/ui/intake" class="los-nav-item" data-nav-title="Intake Gateway">
                 <span class="los-nav-icon">&#128229;</span>
                 <span class="los-nav-label">Intake Gateway</span>
-                <span th:if="${newIntakeCount != null and newIntakeCount > 0}" class="los-nav-alert-dot"
-                      th:title="|Есть новые intake items: ${newIntakeCount}|"></span>
+                <span class="los-nav-alert-dot" data-badge="newIntake"
+                      th:style="${(newIntakeCount != null and newIntakeCount > 0) ? '' : 'display:none'}"
+                      th:title="|Есть новые intake items: ${newIntakeCount ?: 0}|"></span>
             </a>
             <a href="/ui/notes" class="los-nav-item" data-nav-title="Notes">
                 <span class="los-nav-icon">&#128220;</span>
@@ -407,6 +409,51 @@
         document.addEventListener('DOMContentLoaded', function () {
             window.LeaderUiApi.bindApiForms('form[data-api-url]');
         });
+    })();
+
+    (function () {
+        const POLL_INTERVAL_MS = 10_000;
+        const MAX_FAILURES = 3;
+        let failures = 0;
+        let timerId = null;
+
+        function applyCounts(counts) {
+            document.querySelectorAll('[data-badge]').forEach(el => {
+                const value = counts[el.dataset.badge] ?? 0;
+                el.textContent = value > 0 ? value : '';
+                el.style.display = value > 0 ? '' : 'none';
+            });
+        }
+
+        async function poll() {
+            try {
+                const resp = await fetch('/api/ui/badges', { cache: 'no-store' });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                applyCounts(data.counts || {});
+                failures = 0;
+                schedule(POLL_INTERVAL_MS);
+            } catch (e) {
+                failures++;
+                // backoff: после MAX_FAILURES интервал ×3, не спамим консоль
+                schedule(failures >= MAX_FAILURES ? POLL_INTERVAL_MS * 3 : POLL_INTERVAL_MS);
+            }
+        }
+
+        function schedule(delay) {
+            clearTimeout(timerId);
+            timerId = setTimeout(poll, delay);
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                clearTimeout(timerId);        // вкладка в фоне — не поллим
+            } else {
+                poll();                        // вернулись — обновить сразу
+            }
+        });
+
+        if (!document.hidden) schedule(POLL_INTERVAL_MS);
     })();
 </script>
 </th:block>

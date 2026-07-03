@@ -211,7 +211,7 @@ class DocumentValidatorTest {
     }
 
     @Test
-    void validNotice_returnsOk() {
+    void validLegacyNotice_returnsOkAndNormalizesToRag() {
         String content = """
                 ---
                 type: NOTICE
@@ -233,14 +233,14 @@ class DocumentValidatorTest {
         ValidationResult result = validator.validate(content);
 
         assertThat(result.valid()).isTrue();
-        assertThat(result.docType()).isEqualTo(DocType.NOTICE);
+        assertThat(result.docType()).isEqualTo(DocType.RAG);
     }
 
     @Test
-    void noticeMissingSection_returnsErrorWithDocType() {
+    void ragMissingSection_returnsErrorWithDocType() {
         String content = """
                 ---
-                type: NOTICE
+                type: RAG
                 source: mail
                 updated: 2026-06-20
                 review_by: 2026-09-20
@@ -255,7 +255,7 @@ class DocumentValidatorTest {
         ValidationResult result = validator.validate(content);
 
         assertThat(result.valid()).isFalse();
-        assertThat(result.docType()).isEqualTo(DocType.NOTICE);
+        assertThat(result.docType()).isEqualTo(DocType.RAG);
         assertThat(result.errorsAsString()).contains("## Возможное применение");
     }
 }

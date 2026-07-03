@@ -5,6 +5,7 @@ import ru.andreyz.ragservice.client.OpenSearchClient;
 import ru.andreyz.ragservice.db.IndexedDocument;
 import ru.andreyz.ragservice.db.IndexedDocumentRepository;
 import ru.andreyz.ragservice.indexer.FileIndexer;
+import ru.andreyz.ragservice.validation.DocType;
 
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
@@ -35,11 +36,13 @@ public class RagDocumentService {
     }
 
     public List<RagDocumentSummary> listDocuments(String type) {
-        List<IndexedDocument> documents = type == null || type.isBlank()
+        String normalizedType = normalizeDocType(type);
+        List<IndexedDocument> documents = normalizedType == null
                 ? repository.findAll()
-                : repository.findByDocType(type.trim().toUpperCase());
+                : repository.findAll();
         return documents.stream()
                 .map(this::toSummary)
+                .filter(document -> normalizedType == null || normalizedType.equals(document.docType()))
                 .toList();
     }
 
@@ -118,7 +121,7 @@ public class RagDocumentService {
                 document.id(),
                 document.filePath(),
                 Path.of(document.filePath()).getFileName().toString(),
-                document.docType(),
+                normalizeDocType(document.docType()),
                 status,
                 errorMessage(document, e),
                 document.indexedAt(),
@@ -151,7 +154,7 @@ public class RagDocumentService {
                 document.id(),
                 document.filePath(),
                 Path.of(document.filePath()).getFileName().toString(),
-                document.docType(),
+                normalizeDocType(document.docType()),
                 document.status(),
                 document.errorMessage(),
                 document.indexedAt(),
@@ -197,6 +200,13 @@ public class RagDocumentService {
     }
 
     private record ParsedDocument(Map<String, String> frontmatter, String title) {}
+
+    private String normalizeDocType(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return DocType.fromRaw(raw).name();
+    }
 
     public record RagDocumentSummary(
             Long id,

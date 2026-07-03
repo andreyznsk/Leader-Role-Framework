@@ -49,6 +49,7 @@ class RagDocumentServiceTest {
         RagDocumentService.RagDocumentDetails details = service.getDocument(41L);
 
         assertThat(details.summary().id()).isEqualTo(41L);
+        assertThat(details.summary().docType()).isEqualTo("RAG");
         assertThat(details.summary().status()).isEqualTo("missing");
         assertThat(details.summary().errorMessage()).contains("missing");
         assertThat(details.content()).contains("Document content is unavailable");
