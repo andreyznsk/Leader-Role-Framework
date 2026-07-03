@@ -32,6 +32,7 @@
 | CR-MEM-025        | [2026-07-02_CR-MEM-024-task-done-confirmation.md](2026-07-02_CR-MEM-024-task-done-confirmation.md) | Implemented | 2026-07-02 |
 | CR-MEM-026        | [2026-07-02_CR-MEM-025-today-todo-done-tabs.md](2026-07-02_CR-MEM-025-today-todo-done-tabs.md) | Implemented | 2026-07-02 |
 | CR-MEM-027        | [2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md](2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md) | Implemented | 2026-07-02 |
+| CR-MEM-028        | [2026-07-02_CR-MEM-028-live-badge-polling.md](2026-07-02_CR-MEM-028-live-badge-polling.md) | DONE | 2026-07-02 |
 | CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md) | Draft | —          |
 
 ---
