@@ -263,6 +263,26 @@ flyway_schema_history → repair (только пересчитывает checks
 **Why:** это меняет предыдущую запись "Flyway checksum mismatch — STARTUP_FAILED" ниже — тот блокер был реальным в момент фиксации (2026-07-03 раньше в тот же день), но **временным** и уже устранённым к моменту этого прогона. Не считать его постоянным состоянием окружения.
 **How to apply:** при STARTUP_FAILED из healthcheck.sh — ВСЕГДА сначала проверять mtime `logs/{Service}.log` и наличие/mtime `target/*.jar` (`date -r`, `ls -la`) прежде чем доверять содержимому лога как актуальному. Если jar отсутствует или лог старый — пересобрать и перезапустить, и только потом делать вывод о реальном блокере. Общий вывод "не чинить миграции самому" по-прежнему в силе, если mismatch подтверждается на СВЕЖЕМ логе после пересборки/рестарта.
 
+## CR-MEM-030 — Task Attachments (2026-07-03, branch feature/mem-newUI)
+
+**Сценарий 23 (`23_task_attachments.md`, 9 шагов) + Playwright (`tests/task-attachments.spec.js`, 1 тест) — все PASS с первого прогона**, без правок кода/теста. Потребовалась пересборка+рестарт (JAR был собран 11:42, но source-файлы attachment-фичи (`TaskAttachmentController`, `AttachmentStorageService`, `V20__task_attachments.java`, `task-edit.html` и т.д.) новее — тот же паттерн "проверять `find src -newer target/*.jar` перед прогоном новых спеков").
+
+- `POST /api/tasks/{id}/attachments` (multipart `file=@...;type=...`) → 201, `{"kind":"FILE","filename":...,"mimeType":...}`
+- `GET /api/tasks/{id}/attachments/{attId}/content` → 200, побайтово идентично исходному файлу
+- `POST /api/tasks/{id}/attachments/link` (JSON `{url,title}`) → `{"kind":"LINK",...}` без HTTP-кода в теле (сценарий не проверяет код явно, только jq-поля)
+- `GET /api/tasks/{id}/attachments` → массив, длина растёт/падает корректно (2 после file+link, 1 после удаления file)
+- Path traversal (`filename=../../evil.sh`) → 400 (отклонено)
+- Неподдерживаемый MIME (`application/x-msdownload`, `.exe`) → 400
+- Превышение размера (>20MB, `dd if=/dev/zero ... count=21`) → 413 (`MaxUploadSizeExceededException` в логе — это ОЖИДАЕМЫЙ WARN, не баг)
+- `DELETE /api/tasks/{id}/attachments/{attId}` → 204, список уменьшается корректно
+
+**Playwright:** `data-testid="task-attachments"` секция на `/ui/tasks/{id}/edit`, `#attachment-file-input` + `#attachment-upload-btn`, `#attachment-link-title`/`#attachment-link-url`/`#attachment-link-btn`, `.attachment-delete-btn[data-attachment-id=...]` — все селекторы существуют и работают с первого прогона, без strict-mode violations и без скрытых багов (в отличие от task-timeline-ui.spec.js/sidebar-navigation.spec.js в прошлых сессиях).
+
+**Known limitation задокументирован в самом сценарии:** архивация задачи (`POST /api/tasks/{id}/archive`) не делает cleanup файлов вложений — в приложении нет жёсткого DELETE для tasks, только soft-archive. Это сознательное решение CR-MEM-030, не баг.
+
+**Why:** первый CR-MEM-03x (030) прогон без единого дефекта — ни в тесте, ни в приложении. Полезно как baseline "чистой" фичи для сравнения с будущими доработками attachments (например CR-MEM-031 task-links, если он расширяет ту же таблицу/контроллер).
+**How to apply:** при будущих изменениях в TaskAttachmentController/AttachmentStorageService — этот сценарий и spec можно использовать как regression baseline. Если появится жёсткое удаление задач — перепроверить cleanup файлов attachments (текущее ограничение).
+
 ### Retry flow — ключевые факты
 
 - Retry-очередь обрабатывается РАНЬШЕ новых писем в каждом poll

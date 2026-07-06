@@ -37,7 +37,7 @@ public class IntakeViewController {
         model.addAttribute("activeStatus", status == null || status.isBlank() ? "" : status.toUpperCase());
         model.addAttribute("activeSourceType", sourceType == null ? "" : sourceType.toUpperCase());
         model.addAttribute("activeSuggestedRoute", suggestedRoute == null ? "" : suggestedRoute.toUpperCase());
-        model.addAttribute("routeOptions", List.of("RAG", "TASK", "NOTE", "INCIDENT", "RISK", "PERSON", "NOISE"));
+        model.addAttribute("routeOptions", List.of("RAG", "TASK", "TASK_LINK", "NOTE", "INCIDENT", "RISK", "PERSON", "NOISE"));
         model.addAttribute("sourceOptions", List.of("MAIL", "CAPTURE", "AGENT_MCP", "MANUAL"));
         model.addAttribute("statusOptions", List.of("NEW", "REVIEWING", "APPLIED", "REJECTED"));
         return "intake";

@@ -664,6 +664,13 @@ GET  /api/tasks/{id}/description/export-md
 GET  /api/tasks/{id}/timeline            # audit timeline событий задачи
 POST /api/tasks/{id}/timeline/comment    # добавить ручной комментарий в timeline
 
+# Вложения задач (файлы на ФС workspace/attachments/{taskId}/ + метаданные в PostgreSQL memory.task_attachments, CR-MEM-030)
+GET  /api/tasks/{id}/attachments               # список метаданных вложений (FILE и LINK)
+POST /api/tasks/{id}/attachments               # multipart upload, поле "file" (kind=FILE) → 201
+POST /api/tasks/{id}/attachments/link          # JSON {url, title} (kind=LINK) → 201
+GET  /api/tasks/{id}/attachments/{aid}/content # стриминг файла (только kind=FILE); 404 если файл отсутствует на диске
+DELETE /api/tasks/{id}/attachments/{aid}       # удаление записи + файла с диска
+
 # Intake Gateway
 POST /api/intake                         # создать intake item (mail/capture/manual producer)
 GET  /api/intake?status=NEW             # очередь intake items
@@ -861,10 +868,15 @@ Toggle «No Done» убран — раньше `hideDone` был отдельн�
 | Поле | Тип | Источник данных |
 |------|-----|----------------|
 | `title` | text input | `tasks.title` (PostgreSQL) |
-| `description` | Markdown textarea | `memory.task_descriptions.content_md` |
+| `description` | Toast UI Editor (WYSIWYG, CR-MEM-029) | `memory.task_descriptions.content_md` |
 
-Markdown-редактор — две вкладки: `markdown` (raw, monospace) и `preview` (HTML-рендер через JS, без библиотек).
-Под textarea — кнопка `Export MD`, которая скачивает `TASK-{id}.md`, сгенерированный из БД.
+Описание редактируется через **Toast UI Editor** в единственном режиме WYSIWYG (`hideModeSwitch: true` — переключатель на сырой Markdown-режим скрыт, редактор визуальный только). Toast UI сериализует контент в Markdown при сохранении (`editor.getMarkdown()`), поэтому `content_md` остаётся source of truth, а API `PUT /api/tasks/{id}/description` не меняется (шлёт `text/plain` body). tsvector-индексация (CR-MEM-015) и `/description/export-md` работают без изменений — сырой Markdown по-прежнему доступен через export.
+
+Ассеты редактора — self-hosted, без CDN в рантайме: `static/vendor/toastui/toastui-editor-all.min.js` + `toastui-editor.min.css` + `toastui-editor-dark.min.css` (тёмная тема, т.к. вся UI всегда `data-bs-theme="dark"`, переключателя тем в проекте нет). Важно: сборка `toastui-editor.js` из npm-пакета `@toast-ui/editor` НЕ подходит для прямого browser-скрипта — там `prosemirror-*` вынесены как внешние UMD-зависимости, и `toastui.Editor` не инициализируется. Нужен именно all-in-one бандл (например с `uicdn.toast.com/editor/latest/toastui-editor-all.min.js`), где prosemirror включён внутрь.
+
+Вставка/drag-drop изображений в редактор идёт через хук `addImageBlobHook` → upload в API вложений (CR-MEM-030, `POST /api/tasks/{id}/attachments`) → в Markdown вставляется `![](/api/tasks/{id}/attachments/{aid}/content)`.
+
+Под редактором — кнопка `Export MD`, которая скачивает `TASK-{id}.md`, сгенерированный из БД.
 
 Правая колонка (`task-control-panel`) — элементы строго в порядке:
 
@@ -877,12 +889,15 @@ Markdown-редактор — две вкладки: `markdown` (raw, monospace)
 
 Если при сохранении (`#3`) выбран статус `DONE`, а исходный статус задачи был другим — перед отправкой формы запрашивается `confirm()` (CR-MEM-024). Отмена не отправляет форму.
 | 5 | Timeline (`data-testid="task-timeline"`) | последние 5 событий + счётчик, ниже — форма добавления комментария | `GET /api/tasks/{id}/timeline` |
+| 6 | Attachments (`data-testid="task-attachments"`, CR-MEM-030) | список вложений (📎 FILE / 🔗 LINK), форма загрузки файла, форма добавления ссылки, кнопка удаления на каждой записи | `GET/POST/DELETE /api/tasks/{id}/attachments*` |
 
 `source` (readonly badge) и `email_id` отображаются в заголовке страницы, а не в control panel.
 
 Удаление (archive) — двойное подтверждение: первый клик меняет текст кнопки на "Точно архивировать?" (3 сек), второй — `DELETE /api/tasks/{id}`.
 
 Блок добавления комментария в timeline — это `<div>` (не `<form>`), т.к. он физически расположен внутри основной `<form id="task-edit-form">`; вложенные HTML-формы невалидны и браузер молча ломает DOM/JS-обработчики. Кнопка `Добавить` — `type="button"` с явным `click`-обработчиком, не `submit`.
+
+**Attachments (CR-MEM-030):** клик по имени FILE-вложения не переходит по прямой ссылке — JS сначала делает `HEAD`-запрос на `contentUrl`; если файл удалён с диска вручную (404), показывается Bootstrap-модалка «Вложение недоступно» вместо перехода на `Whitelabel Error Page`. Загрузка/добавление ссылки/удаление перезагружают страницу при успехе (тот же паттерн, что и timeline-комментарий). Ограничения: `app.attachments.max-file-size` (по умолчанию 20MB), `app.attachments.allowed-mime-prefixes` (по умолчанию `image/,application/pdf,text/`), path traversal в имени файла (`/`, `\`, `..`) отклоняется с 400.
 
 **`/ui/incidents`** — Активные инциденты
 - Список с severity badge (P1/P2/P3)
@@ -999,6 +1014,8 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 | `proposeRiskUpdate` | Создать proposal обновления риска | Когда агент предлагает mitigation/status update |
 | `proposePersonNote` | Создать proposal заметки о человеке | Наблюдение по итогам встречи и т.д. |
 | `searchPeople` | Найти человека по имени | "Что я знаю про Иванова?" |
+| `getTaskLinks` | Связи задачи: исходящие + зеркальные входящие (CR-MEM-031) | "С чем связана задача X?" |
+| `proposeTaskLink` | Создать proposal связи между задачами в Intake Gateway (CR-MEM-031) | Когда агент предлагает связать задачи |
 
 `getTaskDescription` реализован поверх `GET /api/tasks/{id}/description`; source of truth — `memory.task_descriptions`, а markdown-файл создаётся только через export endpoint.
 Task timeline доступен через `GET /api/tasks/{id}/timeline`; любые значимые изменения задачи создают immutable event в `task_events`.
@@ -1393,7 +1410,8 @@ JavaMemoryService/
     │   │   │   ├── Capture.java
     │   │   │   ├── Note.java
     │   │   │   ├── Question.java
-    │   │   │   └── PersonNameNote.java
+    │   │   │   ├── PersonNameNote.java
+    │   │   │   └── TaskAttachment.java             # kind=FILE|LINK, CR-MEM-030
     │   │   ├── repository/
     │   │   │   ├── DailyPlanRepository.java
     │   │   │   ├── TaskRepository.java
@@ -1404,7 +1422,8 @@ JavaMemoryService/
     │   │   │   ├── CaptureRepository.java
     │   │   │   ├── NoteRepository.java
     │   │   │   ├── QuestionRepository.java
-    │   │   │   └── PersonNameNoteRepository.java
+    │   │   │   ├── PersonNameNoteRepository.java
+    │   │   │   └── TaskAttachmentRepository.java
     │   │   ├── service/
     │   │   │   ├── ContextService.java
     │   │   │   ├── TaskService.java
@@ -1418,11 +1437,14 @@ JavaMemoryService/
     │   │   │   ├── CaptureRouter.java
     │   │   │   ├── CaptureScheduler.java
     │   │   │   ├── NoteService.java
-    │   │   │   └── QuestionService.java
+    │   │   │   ├── QuestionService.java
+    │   │   │   ├── AttachmentStorageService.java   # ФС: workspace/attachments/{taskId}/{uuid}_{filename}, CR-MEM-030
+    │   │   │   └── TaskAttachmentService.java      # валидация filename/MIME/size, CR-MEM-030
     │   │   ├── api/
     │   │   │   ├── ContextController.java
     │   │   │   ├── TaskController.java          # включает /pending, /reorder, /delete endpoints
     │   │   │   ├── TaskDescriptionController.java  # GET/PUT /api/tasks/{id}/description
+    │   │   │   ├── TaskAttachmentController.java   # GET/POST/DELETE /api/tasks/{id}/attachments*, CR-MEM-030
     │   │   │   ├── PlanController.java
     │   │   │   ├── IncidentController.java
     │   │   │   ├── RiskController.java
@@ -1471,7 +1493,9 @@ JavaMemoryService/
     │   │       ├── CaptureResponse.java
     │   │       ├── ClassifiedCapture.java
     │   │       ├── CreateNoteRequest.java           # { title, text?, tags, source }
-    │   │       └── UpdateTaskStatusRequest.java
+    │   │       ├── UpdateTaskStatusRequest.java
+    │   │       ├── TaskAttachmentResponse.java       # CR-MEM-030
+    │   │       └── CreateLinkAttachmentRequest.java  # CR-MEM-030
     │   └── resources/
     │       ├── application.yml
     │       ├── application-local.yml
@@ -1489,7 +1513,7 @@ JavaMemoryService/
     │       ├── templates/
     │       │   ├── fragments/layout.html
     │       │   ├── today.html
-    │       │   ├── task-edit.html                  # форма редактирования с MD-редактором
+    │       │   ├── task-edit.html                  # форма редактирования с WYSIWYG-редактором (Toast UI, CR-MEM-029)
     │       │   ├── incidents.html
     │       │   ├── risks.html
     │       │   ├── people.html
@@ -1620,7 +1644,7 @@ JavaMemoryService/
 13. `TaskFileService` + `workspace/tasks/` используется только для legacy import и export backup-файлов
 14. `TaskDescriptionController` (GET/PUT `/api/tasks/{id}/description`, `GET /api/tasks/{id}/description/export-md`)
 15. Reorder endpoint в `TaskController` + `ReorderTaskRequest`
-16. `TaskEditController` + `task-edit.html` (форма с MD-редактором)
+16. `TaskEditController` + `task-edit.html` (форма с Toast UI WYSIWYG-редактором, CR-MEM-029)
 17. Обновить `today.html`: sort_order, drag handle, стрелки, иконки карандаш/корзина, inline add
 18. `getTaskDescription` MCP tool в `TaskTools`
 

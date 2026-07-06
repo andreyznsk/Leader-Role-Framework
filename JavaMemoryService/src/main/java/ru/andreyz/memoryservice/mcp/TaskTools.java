@@ -5,8 +5,10 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.dto.AgentProposalResponse;
+import ru.andreyz.memoryservice.dto.TaskLinkResponse;
 import ru.andreyz.memoryservice.service.AgentIntakeProposalService;
 import ru.andreyz.memoryservice.service.TaskDescriptionService;
+import ru.andreyz.memoryservice.service.TaskLinkService;
 import ru.andreyz.memoryservice.service.TaskService;
 
 import java.time.LocalDate;
@@ -18,13 +20,16 @@ public class TaskTools {
     private final TaskService taskService;
     private final TaskDescriptionService taskDescriptionService;
     private final AgentIntakeProposalService agentIntakeProposalService;
+    private final TaskLinkService taskLinkService;
 
     public TaskTools(TaskService taskService,
                      TaskDescriptionService taskDescriptionService,
-                     AgentIntakeProposalService agentIntakeProposalService) {
+                     AgentIntakeProposalService agentIntakeProposalService,
+                     TaskLinkService taskLinkService) {
         this.taskService = taskService;
         this.taskDescriptionService = taskDescriptionService;
         this.agentIntakeProposalService = agentIntakeProposalService;
+        this.taskLinkService = taskLinkService;
     }
 
     @Tool(description = "Get tasks for a specific date. Optionally filter by status.")
@@ -66,6 +71,21 @@ public class TaskTools {
     @Tool(description = "Get the markdown description of a task from the database. Returns empty string if no description exists.")
     public String getTaskDescription(@ToolParam(description = "Task ID") Long id) {
         return taskDescriptionService.getContent(id);
+    }
+
+    @Tool(description = "Get links for a task (read-only): outgoing links and mirrored incoming links (e.g. BLOCKS -> BLOCKED_BY).")
+    public List<TaskLinkResponse> getTaskLinks(@ToolParam(description = "Task ID") Long id) {
+        return taskLinkService.list(id);
+    }
+
+    @Tool(description = "Create a task-link proposal in Intake Gateway. Does not write directly to task_links. User must review and apply it in /ui/intake.")
+    public AgentProposalResponse proposeTaskLink(
+            @ToolParam(description = "Source task ID") Long fromTaskId,
+            @ToolParam(description = "Target task ID") Long toTaskId,
+            @ToolParam(description = "Link type: RELATES_TO|BLOCKS|DUPLICATES|PARENT_OF") String linkType,
+            @ToolParam(description = "Why this link is proposed", required = false) String reason,
+            @ToolParam(description = "Optional run/session/source identifier", required = false) String sourceId) {
+        return agentIntakeProposalService.createTaskLinkProposal(fromTaskId, toTaskId, linkType, reason, sourceId);
     }
 
     public void setTaskDescription(

@@ -7,9 +7,11 @@ import org.springframework.web.bind.annotation.*;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.domain.TaskEvent;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
+import ru.andreyz.memoryservice.service.TaskAttachmentService;
 import ru.andreyz.memoryservice.service.PeopleService;
 import ru.andreyz.memoryservice.service.TaskDescriptionService;
 import ru.andreyz.memoryservice.service.TaskRelationService;
+import ru.andreyz.memoryservice.service.TaskLinkService;
 import ru.andreyz.memoryservice.service.TaskService;
 import ru.andreyz.memoryservice.service.TaskTimelineService;
 
@@ -23,19 +25,25 @@ public class TaskEditController {
     private final TaskService taskService;
     private final TaskDescriptionService taskDescriptionService;
     private final TaskTimelineService taskTimelineService;
+    private final TaskAttachmentService taskAttachmentService;
     private final PeopleService peopleService;
     private final TaskRelationService taskRelationService;
+    private final TaskLinkService taskLinkService;
 
     public TaskEditController(TaskService taskService,
                               TaskDescriptionService taskDescriptionService,
                               TaskTimelineService taskTimelineService,
+                              TaskAttachmentService taskAttachmentService,
                               PeopleService peopleService,
-                              TaskRelationService taskRelationService) {
+                              TaskRelationService taskRelationService,
+                              TaskLinkService taskLinkService) {
         this.taskService = taskService;
         this.taskDescriptionService = taskDescriptionService;
         this.taskTimelineService = taskTimelineService;
         this.peopleService = peopleService;
         this.taskRelationService = taskRelationService;
+        this.taskAttachmentService = taskAttachmentService;
+        this.taskLinkService = taskLinkService;
     }
 
     @GetMapping("/{id}/edit")
@@ -48,6 +56,8 @@ public class TaskEditController {
         model.addAttribute("timeline", timeline.stream().limit(5).toList());
         model.addAttribute("timelineTotalCount", timeline.size());
         model.addAttribute("exportUrl", "/api/tasks/%d/description/export-md".formatted(id));
+        model.addAttribute("attachments", taskAttachmentService.list(id));
+        model.addAttribute("taskLinks", taskLinkService.list(id));
         model.addAttribute("people", peopleService.findAll().stream()
                 .sorted(java.util.Comparator.comparing(person -> person.fullName().toLowerCase()))
                 .toList());
