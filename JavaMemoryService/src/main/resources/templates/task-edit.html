@@ -144,44 +144,7 @@
                         </button>
                     </div>
 
-                    <!-- 5. Timeline -->
-                    <section data-testid="task-timeline" class="mt-4">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <h6 class="mb-0 fw-semibold">Timeline</h6>
-                            <span class="text-muted small"
-                                  th:text="${timelineTotalCount > 5 ? 'Последние 5 из ' + timelineTotalCount : timelineTotalCount + ' events'}">0 events</span>
-                        </div>
-
-                        <div th:if="${#lists.isEmpty(timeline)}" class="text-muted small">Событий пока нет.</div>
-                        <div th:unless="${#lists.isEmpty(timeline)}"
-                             id="task-timeline-list"
-                             style="max-height: 280px; overflow-y: auto;">
-                            <div th:each="event : ${timeline}" class="border-bottom pb-2 mb-2">
-                                <div class="fw-semibold small" th:text="${event.summary}">Событие</div>
-                                <div class="small text-muted">
-                                    <span th:text="${event.eventType}">EVENT_TYPE</span>
-                                    <span th:if="${event.actorType}" th:text="${' · ' + event.actorType}"></span>
-                                    <span th:if="${event.sourceType}" th:text="${' · ' + event.sourceType}"></span>
-                                </div>
-                                <div class="small text-muted"
-                                     th:text="${#temporals.format(event.createdAt.atZone(T(java.time.ZoneId).systemDefault()), 'yyyy-MM-dd HH:mm')}">
-                                    2026-06-29 15:30
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="timeline-comment-form" class="mt-3" th:attr="data-task-id=${task.id}">
-                            <label for="timeline-comment" class="form-label fw-semibold small">Комментарий</label>
-                            <textarea id="timeline-comment" class="form-control form-control-sm" rows="2"
-                                      placeholder="Добавить комментарий"></textarea>
-                            <div class="d-flex justify-content-between align-items-center mt-2">
-                                <div id="timeline-comment-status" class="small text-success d-none">Комментарий добавлен</div>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="timeline-comment-submit">Добавить</button>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- 6. Attachments -->
+                    <!-- 5. Attachments -->
                     <section data-testid="task-attachments" class="mt-4" id="task-attachments-section"
                               th:attr="data-task-id=${task.id}">
                         <div class="d-flex align-items-center justify-content-between mb-2">
@@ -227,6 +190,86 @@
                         </div>
 
                         <div id="attachment-status" class="small text-danger d-none mt-2"></div>
+                    </section>
+
+                    <!-- 6. Linked tasks -->
+                    <section data-testid="task-links" class="mt-4" id="task-links-section"
+                              th:attr="data-task-id=${task.id}">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="mb-0 fw-semibold">Linked tasks</h6>
+                            <span class="text-muted small" th:text="${#lists.size(taskLinks)} + ' items'">0 items</span>
+                        </div>
+
+                        <div th:if="${#lists.isEmpty(taskLinks)}" class="text-muted small">Связей пока нет.</div>
+                        <div th:unless="${#lists.isEmpty(taskLinks)}"
+                             id="task-links-list"
+                             style="max-height: 280px; overflow-y: auto;">
+                            <div th:each="link : ${taskLinks}"
+                                 class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-2">
+                                <div>
+                                    <span class="badge bg-secondary" th:text="${link.linkType}">RELATES_TO</span>
+                                    <a th:href="@{/ui/tasks/{id}/edit(id=${link.relatedTaskId})}"
+                                       th:text="${link.relatedTaskTitle != null ? link.relatedTaskTitle : ('TASK-' + link.relatedTaskId)}">Related task</a>
+                                    <div class="small text-muted" th:text="${link.relatedTaskStatus}">TODO</div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger task-link-delete-btn"
+                                        th:attr="data-link-id=${link.id}">✕</button>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <label class="form-label fw-semibold small">Добавить связь</label>
+                            <select id="task-link-type" class="form-select form-select-sm mb-2">
+                                <option value="RELATES_TO">RELATES_TO</option>
+                                <option value="BLOCKS">BLOCKS</option>
+                                <option value="DUPLICATES">DUPLICATES</option>
+                                <option value="PARENT_OF">PARENT_OF</option>
+                            </select>
+                            <input type="text" id="task-link-search" class="form-control form-control-sm mb-2"
+                                   placeholder="Поиск задачи по названию..." autocomplete="off"/>
+                            <div id="task-link-search-results" class="list-group mb-2"></div>
+                            <div id="task-link-selected" class="small text-muted mb-2 d-none"></div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="task-link-add-btn" disabled>+ Link</button>
+                        </div>
+
+                        <div id="task-link-status" class="small text-danger d-none mt-2"></div>
+                    </section>
+
+                    <!-- 7. Timeline -->
+                    <section data-testid="task-timeline" class="mt-4">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="mb-0 fw-semibold">Timeline</h6>
+                            <span class="text-muted small"
+                                  th:text="${timelineTotalCount > 5 ? 'Последние 5 из ' + timelineTotalCount : timelineTotalCount + ' events'}">0 events</span>
+                        </div>
+
+                        <div th:if="${#lists.isEmpty(timeline)}" class="text-muted small">Событий пока нет.</div>
+                        <div th:unless="${#lists.isEmpty(timeline)}"
+                             id="task-timeline-list"
+                             style="max-height: 280px; overflow-y: auto;">
+                            <div th:each="event : ${timeline}" class="border-bottom pb-2 mb-2">
+                                <div class="fw-semibold small" th:text="${event.summary}">Событие</div>
+                                <div class="small text-muted">
+                                    <span th:text="${event.eventType}">EVENT_TYPE</span>
+                                    <span th:if="${event.actorType}" th:text="${' · ' + event.actorType}"></span>
+                                    <span th:if="${event.sourceType}" th:text="${' · ' + event.sourceType}"></span>
+                                </div>
+                                <div class="small text-muted"
+                                     th:text="${#temporals.format(event.createdAt.atZone(T(java.time.ZoneId).systemDefault()), 'yyyy-MM-dd HH:mm')}">
+                                    2026-06-29 15:30
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="timeline-comment-form" class="mt-3" th:attr="data-task-id=${task.id}">
+                            <label for="timeline-comment" class="form-label fw-semibold small">Комментарий</label>
+                            <textarea id="timeline-comment" class="form-control form-control-sm" rows="2"
+                                      placeholder="Добавить комментарий"></textarea>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <div id="timeline-comment-status" class="small text-success d-none">Комментарий добавлен</div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="timeline-comment-submit">Добавить</button>
+                            </div>
+                        </div>
                     </section>
 
                 </aside>
@@ -506,6 +549,93 @@ document.querySelectorAll('.attachment-delete-btn').forEach(function (btn) {
         const attachmentId = btn.dataset.attachmentId;
         try {
             await window.LeaderUiApi.request('/api/tasks/' + taskId + '/attachments/' + attachmentId, {
+                method: 'DELETE'
+            });
+            window.location.reload();
+        } catch (error) {}
+    });
+});
+
+// Linked tasks (CR-MEM-031)
+let taskLinkSearchTimer = null;
+let taskLinkSearchSeq = 0;
+let taskLinkSelectedTaskId = null;
+
+document.getElementById('task-link-search')?.addEventListener('input', function () {
+    const query = this.value.trim();
+    const resultsEl = document.getElementById('task-link-search-results');
+    if (taskLinkSearchTimer) window.clearTimeout(taskLinkSearchTimer);
+    taskLinkSelectedTaskId = null;
+    document.getElementById('task-link-add-btn').disabled = true;
+    document.getElementById('task-link-selected').classList.add('d-none');
+    if (!query) {
+        resultsEl.innerHTML = '';
+        return;
+    }
+    taskLinkSearchTimer = window.setTimeout(async function () {
+        const seq = ++taskLinkSearchSeq;
+        try {
+            const result = await window.LeaderUiApi.request('/api/search', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({query: query, layers: ['TASK'], mode: 'QUICK', limit: 8})
+            });
+            if (seq !== taskLinkSearchSeq) return;
+            const section = document.getElementById('task-links-section');
+            const currentTaskId = section.dataset.taskId;
+            const items = (result?.data?.results || []).filter(function (item) {
+                return String(item.entityId) !== String(currentTaskId);
+            });
+            resultsEl.innerHTML = items.map(function (item) {
+                return '<button type="button" class="list-group-item list-group-item-action task-link-search-result"'
+                    + ' data-task-id="' + item.entityId + '" data-task-title="' + (item.title || '').replace(/"/g, '&quot;') + '">'
+                    + (item.title || ('TASK-' + item.entityId)) + '</button>';
+            }).join('');
+        } catch (error) {
+            resultsEl.innerHTML = '';
+        }
+    }, 300);
+});
+
+document.getElementById('task-link-search-results')?.addEventListener('click', function (event) {
+    const btn = event.target.closest('.task-link-search-result');
+    if (!btn) return;
+    taskLinkSelectedTaskId = btn.dataset.taskId;
+    const selected = document.getElementById('task-link-selected');
+    selected.textContent = 'Выбрано: ' + btn.dataset.taskTitle;
+    selected.classList.remove('d-none');
+    document.getElementById('task-link-search-results').innerHTML = '';
+    document.getElementById('task-link-search').value = '';
+    document.getElementById('task-link-add-btn').disabled = false;
+});
+
+document.getElementById('task-link-add-btn')?.addEventListener('click', async function () {
+    if (!taskLinkSelectedTaskId) return;
+    const section = document.getElementById('task-links-section');
+    const taskId = section.dataset.taskId;
+    const linkType = document.getElementById('task-link-type').value;
+    const status = document.getElementById('task-link-status');
+    status.classList.add('d-none');
+    try {
+        await window.LeaderUiApi.request('/api/tasks/' + taskId + '/links', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({toTaskId: Number(taskLinkSelectedTaskId), linkType: linkType})
+        });
+        window.location.reload();
+    } catch (error) {
+        status.textContent = 'Не удалось добавить связь';
+        status.classList.remove('d-none');
+    }
+});
+
+document.querySelectorAll('.task-link-delete-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+        const section = document.getElementById('task-links-section');
+        const taskId = section.dataset.taskId;
+        const linkId = btn.dataset.linkId;
+        try {
+            await window.LeaderUiApi.request('/api/tasks/' + taskId + '/links/' + linkId, {
                 method: 'DELETE'
             });
             window.location.reload();

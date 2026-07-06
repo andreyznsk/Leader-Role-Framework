@@ -188,6 +188,12 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 |---------|----------|
 | `memory.task_attachments` | Вложения задач: kind=FILE (файл на ФС `workspace/attachments/{taskId}/{uuid}_{filename}`, метаданные в БД) или kind=LINK (внешний URL, байты не хранятся). `ON DELETE CASCADE` по `task_id` |
 
+**Новые таблицы (CR-MEM-031):**
+
+| Таблица | Описание |
+|---------|----------|
+| `memory.task_links` | Направленные связи между задачами: `from_task_id`/`to_task_id`/`link_type` (`RELATES_TO`, `BLOCKS`, `DUPLICATES`, `PARENT_OF`). Обратное направление (`BLOCKED_BY`, `DUPLICATED_BY`, `CHILD_OF`) выводится зеркально при чтении, в БД хранится одна запись. `UNIQUE(from_task_id, to_task_id, link_type)`, `CHECK (from_task_id <> to_task_id)`, `ON DELETE CASCADE` по обеим сторонам. Миграция `V22__task_links.java` |
+
 **Ключевые endpoint-ы:**
 
 | Метод | Путь | Описание |
@@ -215,6 +221,7 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `PUT` | `/api/notes/{id}` | Обновить заметку (title/text/tags/source) |
 | `DELETE` | `/api/notes/{id}` | Удалить заметку: `204 No Content` / `404 Not Found` (hard delete, CR-MEM-011) |
 | `GET/POST/DELETE` | `/api/tasks/{id}/attachments*` | Вложения задачи: список, multipart upload (kind=FILE), внешняя ссылка (kind=LINK), скачивание содержимого, удаление (CR-MEM-030) |
+| `GET/POST/DELETE` | `/api/tasks/{id}/links*` | Связи задачи: список (исходящие + зеркальные входящие, `direction: OUT\|IN`), создать связь → `201`, удалить связь (CR-MEM-031) |
 | `GET/POST/PUT/DELETE` | `/api/incidents`, `/api/risks`, `/api/people` | CRUD/soft delete рабочих сущностей |
 | `GET` | `/ui/today` | Web UI: план дня. Сайдбар разделён на вкладки **ToDo** (`/ui/today`, DONE всегда скрыт) и **Done** (`/ui/today?status=DONE`, только DONE); toggle «No Done» убран (CR-MEM-025) |
 | `GET` | `/ui/notes` | Web UI: Operational Notes |
@@ -278,7 +285,7 @@ mail `Message-ID`.
 
 **MCP tools:** `getContext`, `getTasks`, `getTaskDescription`, `proposeTask`,
 `proposeIncident`, `proposeIncidentUpdate`, `proposeRisk`, `proposeRiskUpdate`,
-`proposePersonNote`, `searchPeople`.
+`proposePersonNote`, `searchPeople`, `getTaskLinks`, `proposeTaskLink` (CR-MEM-031).
 
 **Входящие вызовы от:** JavaMailAgent, Claude-агент, CLI/user scripts
 
@@ -710,6 +717,7 @@ docker compose up -d
 | `05_pending_task_flow.md` | HIGH | PENDING → confirm → TODO / reject → ARCHIVED |
 | `17_task_timeline_archive_flow.md` | HIGH | timeline событий задачи + archive flow |
 | `23_task_attachments.md` | HIGH | upload/download/link/delete вложений, отклонение path traversal, недопустимого MIME и превышения размера (CR-MEM-030) |
+| `25_task_links.md` | HIGH | POST/GET/DELETE связей, зеркальные типы, дубль → 409, self-link → 400, MCP proposeTaskLink → intake apply (CR-MEM-031) |
 | `18_agent_workspace.md` | HIGH | Agent Workspace: UI smoke, Chat mode (mock), аудит в БД, WebSocket upgrade, security whitelist (CR-MEM-012) |
 | `06_incidents.md` | HIGH | OPEN → INVESTIGATING → RESOLVED |
 | `07_risks.md` | MEDIUM | OPEN → MITIGATED + getContext |

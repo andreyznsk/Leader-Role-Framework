@@ -7,6 +7,7 @@ import ru.andreyz.memoryservice.domain.Incident;
 import ru.andreyz.memoryservice.domain.PersonNameNote;
 import ru.andreyz.memoryservice.domain.Risk;
 import ru.andreyz.memoryservice.domain.Task;
+import ru.andreyz.memoryservice.dto.TaskLinkResponse;
 import ru.andreyz.memoryservice.repository.PersonNameNoteRepository;
 
 import java.io.IOException;
@@ -28,6 +29,7 @@ public class IntakeTargetApplier {
     private final IncidentService incidentService;
     private final NoteService noteService;
     private final PersonNameNoteRepository personNameNoteRepository;
+    private final TaskLinkService taskLinkService;
     private final Path ragInboxDir;
 
     public IntakeTargetApplier(TaskService taskService,
@@ -35,12 +37,14 @@ public class IntakeTargetApplier {
                                IncidentService incidentService,
                                NoteService noteService,
                                PersonNameNoteRepository personNameNoteRepository,
+                               TaskLinkService taskLinkService,
                                @Value("${app.rag.inbox-dir:../JavaRagService/rag-inbox}") String ragInboxDir) {
         this.taskService = taskService;
         this.riskService = riskService;
         this.incidentService = incidentService;
         this.noteService = noteService;
         this.personNameNoteRepository = personNameNoteRepository;
+        this.taskLinkService = taskLinkService;
         this.ragInboxDir = Path.of(ragInboxDir);
     }
 
@@ -49,6 +53,7 @@ public class IntakeTargetApplier {
         JsonNode safePayload = payload != null ? payload : com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
         return switch (normalizedRoute) {
             case "TASK" -> applyTask(safePayload);
+            case "TASK_LINK" -> applyTaskLink(safePayload);
             case "NOTE" -> applyNote(safePayload);
             case "RISK" -> applyRisk(safePayload);
             case "INCIDENT" -> applyIncident(safePayload);
@@ -57,6 +62,14 @@ public class IntakeTargetApplier {
             case "NOISE" -> "noise";
             default -> throw new IllegalArgumentException("Unsupported intake route: " + route);
         };
+    }
+
+    private String applyTaskLink(JsonNode payload) {
+        Long fromTaskId = requiredLong(payload, "fromTaskId");
+        Long toTaskId = requiredLong(payload, "toTaskId");
+        String linkType = requiredText(payload, "linkType");
+        TaskLinkResponse created = taskLinkService.create(fromTaskId, toTaskId, linkType);
+        return "task_links/" + created.id();
     }
 
     private String applyTask(JsonNode payload) {
@@ -228,6 +241,14 @@ public class IntakeTargetApplier {
             case "NOTICE", "KNOWLEDGE", "RAG" -> "RAG";
             default -> raw.trim().toUpperCase();
         };
+    }
+
+    private Long requiredLong(JsonNode payload, String fieldName) {
+        JsonNode field = payload.get(fieldName);
+        if (field == null || field.isNull() || !field.canConvertToLong()) {
+            throw new IllegalArgumentException("Missing required payload field: " + fieldName);
+        }
+        return field.longValue();
     }
 
     private String requiredText(JsonNode payload, String... fieldNames) {

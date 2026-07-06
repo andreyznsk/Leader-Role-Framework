@@ -1014,6 +1014,8 @@ spring.ai.mcp.server.sse-message-endpoint=/mcp/message
 | `proposeRiskUpdate` | Создать proposal обновления риска | Когда агент предлагает mitigation/status update |
 | `proposePersonNote` | Создать proposal заметки о человеке | Наблюдение по итогам встречи и т.д. |
 | `searchPeople` | Найти человека по имени | "Что я знаю про Иванова?" |
+| `getTaskLinks` | Связи задачи: исходящие + зеркальные входящие (CR-MEM-031) | "С чем связана задача X?" |
+| `proposeTaskLink` | Создать proposal связи между задачами в Intake Gateway (CR-MEM-031) | Когда агент предлагает связать задачи |
 
 `getTaskDescription` реализован поверх `GET /api/tasks/{id}/description`; source of truth — `memory.task_descriptions`, а markdown-файл создаётся только через export endpoint.
 Task timeline доступен через `GET /api/tasks/{id}/timeline`; любые значимые изменения задачи создают immutable event в `task_events`.
