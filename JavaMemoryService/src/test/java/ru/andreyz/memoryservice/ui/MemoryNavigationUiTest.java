@@ -49,7 +49,7 @@ class MemoryNavigationUiTest {
         mockMvc.perform(get("/ui/notes"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Operational Notes")))
-                .andExpect(content().string(containsString("Operational Memory")));
+                .andExpect(content().string(containsString("Рабочие заметки Memory Service")));
     }
 
     @Test
@@ -62,7 +62,7 @@ class MemoryNavigationUiTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("RAG Knowledge")))
                 .andExpect(content().string(containsString("Knowledge Gateway")))
-                .andExpect(content().string(containsString("Notices")))
+                .andExpect(content().string(containsString("RAG Documents")))
                 .andExpect(content().string(containsString("Service Cards")));
     }
 
@@ -70,7 +70,7 @@ class MemoryNavigationUiTest {
     void noticeRedirectsToKnowledgeNoticeFilter() throws Exception {
         mockMvc.perform(get("/ui/notice"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/ui/knowledge?type=NOTICE"));
+                .andExpect(redirectedUrl("/ui/knowledge?type=RAG"));
     }
 
     @Test

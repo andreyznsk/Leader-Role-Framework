@@ -10,7 +10,7 @@
 Проверить, что UI Memory Service явно разделён на:
 - `Operational Notes` для локального Memory storage;
 - `RAG Knowledge` для gateway к JavaRagService;
-- `/ui/notice` больше не самостоятельный экран, а redirect на NOTICE filter.
+- `/ui/notice` больше не самостоятельный экран, а redirect на canonical RAG filter.
 
 ## Preconditions
 - JavaMemoryService запущен на :8082
@@ -36,18 +36,18 @@ echo "knowledge title OK"
 ```
 **Expected:** вывод `knowledge title OK`
 
-### Step 3 — /ui/notice делает redirect на NOTICE filter
+### Step 3 — /ui/notice делает redirect на RAG filter
 ```bash
 curl -s -I http://localhost:8082/ui/notice | tr -d '\r'
 ```
-**Expected:** статус `302`, заголовок `Location: /ui/knowledge?type=NOTICE`
+**Expected:** статус `302`, заголовок `Location: /ui/knowledge?type=RAG`
 
 ### Step 4 — Навигация не путает Notes и RAG Knowledge
 ```bash
 HTML=$(curl -s http://localhost:8082/ui/knowledge)
 echo "$HTML" | grep -q "Notes" && \
 echo "$HTML" | grep -q "RAG Knowledge" && \
-echo "$HTML" | grep -q "Notices" && \
+echo "$HTML" | grep -q "RAG Documents" && \
 echo "navigation split OK"
 ```
 **Expected:** вывод `navigation split OK`

@@ -1,6 +1,6 @@
 # LeaderOS — Architecture - Мастер-Спека
 
-**Последнее обновление:** 2026-07-02
+**Последнее обновление:** 2026-07-03
 **Статус:** Living document — обновлять при любом изменении контрактов между сервисами
 **git:** https://github.com/andreyznsk/Leader-Role-Framework.git
 ---
@@ -98,12 +98,12 @@ agent:
 | `DRAFT` | POST `/api/intake` (suggestedRoute=`NOISE`) -> move в `processed/` |
 | `NOISE` | POST `/api/intake` (suggestedRoute=`NOISE`) -> move в `processed/` -> `MARK_AS_READ` |
 | `CAPTURE` | POST `/api/intake` (suggestedRoute=`NOTE`) -> move в `processed/` |
-| `NOTICE` | POST `/api/intake` (suggestedRoute=`RAG`) -> move в `processed/` -> `MARK_AS_READ` |
+| `RAG` | POST `/api/intake` (suggestedRoute=`RAG`) -> move в `processed/` -> `MARK_AS_READ` |
 | `NOTE` | POST `/api/intake` (suggestedRoute=`NOTE`) -> move в `processed/` |
 
 **Трекинг обработанных писем:** таблица `mailagent.processed_emails` теперь хранит не только dedup, но и checkpoint state-machine:
 - `status`: `NEW | PROCESSING | ERROR | PROCESSED`
-- `failed_route`: checkpoint следующего side-effect (`PLAN_APPEND`, `MEMORY_PENDING_TASK`, `MEMORY_CAPTURE`, `MEMORY_NOTE`, `NOTICE_WRITE`, `MOVE_TO_PROCESSED`, `MARK_AS_READ`)
+- `failed_route`: checkpoint следующего side-effect (`PLAN_APPEND`, `MEMORY_PENDING_TASK`, `MEMORY_CAPTURE`, `MEMORY_NOTE`, `RAG_INTAKE`, `MOVE_TO_PROCESSED`, `MARK_AS_READ`)
 - `route_payload_json`: сериализованный payload для retry без повторного чтения письма с сервера и без повторного вызова LLM
 
 **Retry flow:** каждый poll сначала обрабатывает очередь `status=ERROR` по `last_attempt_at, created_at`. Пока очередь ошибок не пуста, новые письма не имеют приоритета. При падении любого route batch останавливается, запись письма остаётся в `ERROR`, а следующий запуск продолжает цепочку с сохранённого checkpoint.
@@ -182,12 +182,25 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 |---------|----------|
 | `memory.agent_workspace_runs` | Аудит запусков агента из Agent Workspace (mode, provider, prompt, status, duration_ms) |
 
+**Новые таблицы (CR-MEM-030):**
+
+| Таблица | Описание |
+|---------|----------|
+| `memory.task_attachments` | Вложения задач: kind=FILE (файл на ФС `workspace/attachments/{taskId}/{uuid}_{filename}`, метаданные в БД) или kind=LINK (внешний URL, байты не хранятся). `ON DELETE CASCADE` по `task_id` |
+
+**Новые таблицы (CR-MEM-031):**
+
+| Таблица | Описание |
+|---------|----------|
+| `memory.task_links` | Направленные связи между задачами: `from_task_id`/`to_task_id`/`link_type` (`RELATES_TO`, `BLOCKS`, `DUPLICATES`, `PARENT_OF`). Обратное направление (`BLOCKED_BY`, `DUPLICATED_BY`, `CHILD_OF`) выводится зеркально при чтении, в БД хранится одна запись. `UNIQUE(from_task_id, to_task_id, link_type)`, `CHECK (from_task_id <> to_task_id)`, `ON DELETE CASCADE` по обеим сторонам. Миграция `V22__task_links.java` |
+
 **Ключевые endpoint-ы:**
 
 | Метод | Путь | Описание |
 |-------|------|----------|
 | `GET` | `/api/context` | Контекст сессии: today/tomorrow, open incidents/risks, recent people notes |
-| `POST` | `/api/tasks` | Создать подтверждённую задачу; UI создаёт title, description, priority, status, dueDate, date |
+| `GET` | `/api/ui/badges` | Live-обновление счётчиков сайдбара (`newIntake`, `pendingTasks`) для JS-поллера (10 сек, backoff после 3 ошибок); фундамент под будущий notifications bell (CR-MEM-028) |
+| `POST` | `/api/tasks` | Создать подтверждённую задачу; UI создаёт title, description, priority, status, dueDate, assignedPersonId, labelIds, date |
 | `POST` | `/api/tasks/pending` | Создать задачу со статусом PENDING напрямую; mail/capture flow сюда больше не пишет напрямую |
 | `POST` | `/api/intake` | Создать intake item для mail/capture/manual producer |
 | `GET` | `/api/intake?status=NEW` | Список intake items с фильтрами по status/sourceType/suggestedRoute |
@@ -195,8 +208,9 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `PUT` | `/api/intake/{id}` | Сохранить finalRoute/finalPayload, статус `REVIEWING` |
 | `POST` | `/api/intake/{id}/apply` | Применить item в target receiver (`TASK`, `NOTE`, `RAG`, `RISK`, `INCIDENT`, `PERSON`, `NOISE`) |
 | `POST` | `/api/intake/{id}/reject` | Отклонить item, статус `REJECTED` |
-| `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `ARCHIVED` и legacy `DELETED` по умолчанию |
-| `PATCH` | `/api/tasks/{id}/status` | Изменить статус задачи |
+| `GET` | `/api/tasks?date=YYYY-MM-DD` | Задачи на дату, без `ARCHIVED` и legacy `DELETED` по умолчанию; поддерживает фильтр `labelId=...` |
+| `PATCH` | `/api/tasks/{id}/status` | Изменить статус задачи; `DELEGATED` требует исполнителя |
+| `GET/POST/PUT/DELETE` | `/api/task-labels` | CRUD task labels; delete архивирует label |
 | `POST` | `/api/capture` | Сохранить raw capture в БД и `capture-inbox/` |
 | `POST` | `/api/capture/process-now` | Ручной запуск классификации capture-файлов |
 | `POST` | `/api/knowledge/search` | Memory-owned прокси к JavaRagService `/api/search` + usage events |
@@ -206,6 +220,8 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `GET/POST` | `/api/notes` | Лента заметок (`POST` → `201 Created`; поля: `title` обязательный, `text` опциональный, `tags`, `source`) |
 | `PUT` | `/api/notes/{id}` | Обновить заметку (title/text/tags/source) |
 | `DELETE` | `/api/notes/{id}` | Удалить заметку: `204 No Content` / `404 Not Found` (hard delete, CR-MEM-011) |
+| `GET/POST/DELETE` | `/api/tasks/{id}/attachments*` | Вложения задачи: список, multipart upload (kind=FILE), внешняя ссылка (kind=LINK), скачивание содержимого, удаление (CR-MEM-030) |
+| `GET/POST/DELETE` | `/api/tasks/{id}/links*` | Связи задачи: список (исходящие + зеркальные входящие, `direction: OUT\|IN`), создать связь → `201`, удалить связь (CR-MEM-031) |
 | `GET/POST/PUT/DELETE` | `/api/incidents`, `/api/risks`, `/api/people` | CRUD/soft delete рабочих сущностей |
 | `GET` | `/ui/today` | Web UI: план дня. Сайдбар разделён на вкладки **ToDo** (`/ui/today`, DONE всегда скрыт) и **Done** (`/ui/today?status=DONE`, только DONE); toggle «No Done» убран (CR-MEM-025) |
 | `GET` | `/ui/notes` | Web UI: Operational Notes |
@@ -246,7 +262,9 @@ MemoryService выступает единой точкой управления 
 
 **Live Prompt Editing Policy:** prompt templates plugin-сервисов редактируются через тот же control plane UI `/ui/settings`, что и остальные runtime settings. Каждый plugin хранит свои prompts в собственной БД, в отдельной таблице своей схемы. Начальные prompt values seed-ятся Flyway migration-ами. После этого пользователь может менять prompt в реальном времени через descriptor-driven form (`type=text`), plugin сохраняет обновлённый prompt в свою БД и использует его на следующем вызове без рестарта процесса. Snapshot в MemoryService не является source of truth для prompts, он нужен только для proxy UI и audit/history.
 
-**Статусы задачи:** `PENDING → TODO → IN_PROGRESS → DONE` / `ARCHIVED` (`DELETED` остаётся только legacy-статусом)
+**Статусы задачи:** `PENDING → TODO → RESEARCH → IN_PROGRESS → DELEGATED → DONE` / `ARCHIVED` (`DELETED` остаётся только legacy-статусом)
+
+**Task delegation & labels:** задачи поддерживают `assigned_person_id`, отдельный статус `DELEGATED`, пользовательские `task_labels` и mapping `task_label_mapping`. Today UI показывает исполнителя и labels бейджами, а task timeline фиксирует назначение, переназначение и снятие исполнителя.
 
 **Capture Bot:** `POST /api/capture` сохраняет заметку без интерпретации.
 `CaptureScheduler` по `capture.scheduler.cron` пакетно читает `capture-inbox/YYYY-MM-DD/*.md`,
@@ -267,7 +285,7 @@ mail `Message-ID`.
 
 **MCP tools:** `getContext`, `getTasks`, `getTaskDescription`, `proposeTask`,
 `proposeIncident`, `proposeIncidentUpdate`, `proposeRisk`, `proposeRiskUpdate`,
-`proposePersonNote`, `searchPeople`.
+`proposePersonNote`, `searchPeople`, `getTaskLinks`, `proposeTaskLink` (CR-MEM-031).
 
 **Входящие вызовы от:** JavaMailAgent, Claude-агент, CLI/user scripts
 
@@ -383,6 +401,9 @@ Leader-Role-Framework/
 │   ├── tasks/          ← export/backup markdown-файлы задач по id (on demand, not source of truth)
 │   │   ├── TASK-001.md
 │   │   └── TASK-002.md
+│   ├── attachments/    ← файловые вложения задач (CR-MEM-030), source of truth для байтов
+│   │   └── {taskId}/
+│   │       └── {uuid}_{filename}
 │   └── 08_daily_journal/
 │       └── YYYY-MM-DD.md
 ├── JavaRagService/
@@ -695,6 +716,8 @@ docker compose up -d
 | `04_edit_task.md` | HIGH | PUT + PATCH /status + file description |
 | `05_pending_task_flow.md` | HIGH | PENDING → confirm → TODO / reject → ARCHIVED |
 | `17_task_timeline_archive_flow.md` | HIGH | timeline событий задачи + archive flow |
+| `23_task_attachments.md` | HIGH | upload/download/link/delete вложений, отклонение path traversal, недопустимого MIME и превышения размера (CR-MEM-030) |
+| `25_task_links.md` | HIGH | POST/GET/DELETE связей, зеркальные типы, дубль → 409, self-link → 400, MCP proposeTaskLink → intake apply (CR-MEM-031) |
 | `18_agent_workspace.md` | HIGH | Agent Workspace: UI smoke, Chat mode (mock), аудит в БД, WebSocket upgrade, security whitelist (CR-MEM-012) |
 | `06_incidents.md` | HIGH | OPEN → INVESTIGATING → RESOLVED |
 | `07_risks.md` | MEDIUM | OPEN → MITIGATED + getContext |
@@ -713,7 +736,7 @@ docker compose up -d
 | `04_poll_cycle_request.md` | HIGH | дедлайн → REQUEST → today.md + unread |
 | `05_deduplication.md` | HIGH | письмо обрабатывается ровно один раз |
 | `06_multiple_emails.md` | MEDIUM | 3 типа за один poll + корректные read-статусы |
-| `07_integration_memory_service.md` | HIGH | REQUEST/NOTICE/CAPTURE/... → POST /api/intake → NEW intake item |
+| `07_integration_memory_service.md` | HIGH | REQUEST/RAG/CAPTURE/... → POST /api/intake → NEW intake item |
 
 #### JavaRagService (`test_e2e/`)
 

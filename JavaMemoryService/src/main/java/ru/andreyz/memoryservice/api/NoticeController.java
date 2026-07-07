@@ -18,7 +18,7 @@ public class NoticeController {
 
     @GetMapping
     public ResponseEntity<List<KnowledgeService.KnowledgeDocumentSummary>> list() {
-        return ResponseEntity.ok(knowledgeService.list("NOTICE"));
+        return ResponseEntity.ok(knowledgeService.list("RAG"));
     }
 
     @GetMapping("/{id}")

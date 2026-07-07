@@ -19,8 +19,8 @@
 `JavaMemoryService/test_e2e/19_intake_gateway_manual_routing.md`.
 
 > Ограничение mock-классификатора: в режиме `mock.agent=true` mail keyword-flow стабильно
-> воспроизводит `REQUEST`, `CAPTURE`, `DRAFT`, `NOISE`. Для отдельного `NOTICE -> RAG`
-> используется сценарий `e2e-integration/09_mail_notice_to_rag_document.md`.
+> воспроизводит `REQUEST`, `CAPTURE`, `DRAFT`, `NOISE`. Для отдельного `RAG -> RAG`
+> используется сценарий `e2e-integration/09_mail_notice_to_rag_document.md` (legacy filename, canonical RAG flow).
 
 ## Preconditions
 

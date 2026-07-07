@@ -179,6 +179,27 @@
                                         th:selected="${statusFilter == option}"></option>
                             </select>
                         </div>
+                        <div style="min-width: 320px; max-width: 420px;">
+                            <label class="form-label mb-1">Labels</label>
+                            <div class="border rounded-2 p-2 d-flex flex-wrap gap-2">
+                                <span th:if="${#lists.isEmpty(taskLabels)}" class="text-muted small">Нет label-ов</span>
+                                <label th:each="label : ${taskLabels}"
+                                       class="form-check form-check-inline m-0 d-inline-flex align-items-center gap-2">
+                                    <input class="form-check-input mt-0"
+                                           type="checkbox"
+                                           name="labelId"
+                                           th:value="${label.id}"
+                                           th:checked="${selectedLabelIds != null and #lists.contains(selectedLabelIds, label.id)}"/>
+                                    <span class="badge text-bg-secondary"
+                                          th:if="${label.color == null or #strings.isEmpty(label.color)}"
+                                          th:text="${label.name}">Backend</span>
+                                    <span class="badge"
+                                          th:if="${label.color != null and !#strings.isEmpty(label.color)}"
+                                          th:style="'background-color:' + ${label.color} + ';color:#111827;'"
+                                          th:text="${label.name}">Backend</span>
+                                </label>
+                            </div>
+                        </div>
                         <div class="d-flex gap-2 align-items-end pb-1">
                             <button type="submit" class="btn btn-sm btn-primary">Применить</button>
                             <a th:href="${doneView} ? @{/ui/today(status='DONE')} : @{/ui/today}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
@@ -213,11 +234,26 @@
                     </button>
 
                     <!-- Title -->
-                    <span class="flex-grow-1">
+                    <span class="flex-grow-1 d-flex flex-column gap-1">
                         <a class="task-title-clickable"
                            th:href="@{/ui/tasks/{id}/edit(id=${task.id})}"
                            th:text="${task.title}"
                            th:classappend="${task.status == 'DONE'} ? 'text-decoration-line-through text-muted' : ''"></a>
+                        <span class="d-flex flex-wrap gap-2 align-items-center">
+                            <span th:if="${task.assignedPerson != null}" class="badge text-bg-dark border">
+                                <span>👤 </span>
+                                <span th:text="${task.assignedPerson.fullName}">Иван Иванов</span>
+                            </span>
+                            <th:block th:each="label : ${task.labels}">
+                                <span class="badge text-bg-secondary"
+                                      th:if="${label.color == null or #strings.isEmpty(label.color)}"
+                                      th:text="${label.name}">Backend</span>
+                                <span class="badge"
+                                      th:if="${label.color != null and !#strings.isEmpty(label.color)}"
+                                      th:style="'background-color:' + ${label.color} + ';color:#111827;'"
+                                      th:text="${label.name}">Backend</span>
+                            </th:block>
+                        </span>
                     </span>
 
                     <!-- Deadline -->
@@ -245,7 +281,7 @@
                             th:attr="data-id=${task.id},data-status=${task.status},title='Сменить статус'"
                             onclick="toggleStatus(this)">
                         <span class="badge"
-                              th:classappend="${task.status == 'DONE'} ? 'bg-success' : (${task.status == 'IN_PROGRESS'} ? 'bg-primary' : (${task.status == 'BLOCKED'} ? 'bg-danger' : 'bg-secondary'))"
+                              th:classappend="${task.status == 'DONE'} ? 'bg-success' : (${task.status == 'IN_PROGRESS'} ? 'bg-primary' : (${task.status == 'RESEARCH'} ? 'bg-info text-dark' : (${task.status == 'DELEGATED'} ? 'bg-warning text-dark' : (${task.status == 'BLOCKED'} ? 'bg-danger' : 'bg-secondary'))))"
                               th:text="${task.status}"></span>
                     </button>
 
@@ -348,7 +384,9 @@
                             <label for="newTaskStatus" class="form-label fw-semibold">Статус</label>
                             <select id="newTaskStatus" name="status" class="form-select">
                                 <option value="TODO" selected>TODO</option>
+                                <option value="RESEARCH">RESEARCH</option>
                                 <option value="IN_PROGRESS">IN_PROGRESS</option>
+                                <option value="DELEGATED">DELEGATED</option>
                                 <option value="BLOCKED">BLOCKED</option>
                                 <option value="DONE">DONE</option>
                             </select>
@@ -357,6 +395,38 @@
                             <label for="newTaskDueDate" class="form-label fw-semibold">Дедлайн</label>
                             <input id="newTaskDueDate" type="date" name="dueDate" class="form-control"
                                    th:value="${#temporals.format(today, 'yyyy-MM-dd')}"/>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-6">
+                            <label for="newTaskAssignedPersonId" class="form-label fw-semibold">Assigned to</label>
+                            <select id="newTaskAssignedPersonId" name="assignedPersonId" class="form-select">
+                                <option value="">Не назначено</option>
+                                <option th:each="person : ${people}"
+                                        th:value="${person.id}"
+                                        th:text="${person.fullName}"></option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Labels</label>
+                            <div class="border rounded-2 p-2 d-flex flex-wrap gap-2" style="min-height: 42px;">
+                                <span th:if="${#lists.isEmpty(taskLabels)}" class="text-muted small">Нет label-ов</span>
+                                <label th:each="label : ${taskLabels}"
+                                       class="form-check form-check-inline m-0 d-inline-flex align-items-center gap-2">
+                                    <input class="form-check-input mt-0"
+                                           type="checkbox"
+                                           name="labelIds"
+                                           th:value="${label.id}"/>
+                                    <span class="badge text-bg-secondary"
+                                          th:if="${label.color == null or #strings.isEmpty(label.color)}"
+                                          th:text="${label.name}">Backend</span>
+                                    <span class="badge"
+                                          th:if="${label.color != null and !#strings.isEmpty(label.color)}"
+                                          th:style="'background-color:' + ${label.color} + ';color:#111827;'"
+                                          th:text="${label.name}">Backend</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -859,8 +929,12 @@ async function moveOverdueTasksToToday() {
 function nextTaskStatus(status) {
     switch (status) {
         case 'TODO':
+            return 'RESEARCH';
+        case 'RESEARCH':
             return 'IN_PROGRESS';
         case 'IN_PROGRESS':
+            return 'DELEGATED';
+        case 'DELEGATED':
             return 'BLOCKED';
         case 'BLOCKED':
             return 'TODO';
@@ -912,9 +986,16 @@ document.getElementById('add-task-modal-form')?.addEventListener('submit', async
         priority: formData.get('priority'),
         status: formData.get('status'),
         dueDate: formData.get('dueDate') || null,
+        assignedPersonId: formData.get('assignedPersonId') ? Number(formData.get('assignedPersonId')) : null,
+        labelIds: formData.getAll('labelIds').map(function(value) { return Number(value); }),
         date: formData.get('date'),
         source: formData.get('source')
     };
+
+    if (payload.status === 'DELEGATED' && !payload.assignedPersonId) {
+        showTodayMessage('error', 'Для статуса DELEGATED нужно выбрать исполнителя');
+        return;
+    }
 
     try {
         const createResult = await window.LeaderUiApi.request('/api/tasks', {
@@ -932,7 +1013,12 @@ document.getElementById('add-task-modal-form')?.addEventListener('submit', async
         }
 
         window.LeaderUiApi.handleSuccess('reload', createResult);
-    } catch (error) {}
+    } catch (error) {
+        showTodayMessage('error',
+            error && error.data && error.data.message
+                ? error.data.message
+                : 'Не удалось создать задачу');
+    }
 });
 
 document.getElementById('confirmDeleteTaskButton')?.addEventListener('click', async function () {
