@@ -137,6 +137,27 @@ public class AgentIntakeProposalService {
         return createProposal("PERSON", sourceId, sourcePayload, suggestedPayload);
     }
 
+    public AgentProposalResponse createTaskLinkProposal(Long fromTaskId,
+                                                        Long toTaskId,
+                                                        String linkType,
+                                                        String reason,
+                                                        String sourceId) {
+        ObjectNode sourcePayload = objectMapper.createObjectNode()
+                .put("tool", "proposeTaskLink")
+                .put("fromTaskId", fromTaskId)
+                .put("toTaskId", toTaskId)
+                .put("linkType", linkType);
+        putIfPresent(sourcePayload, "reason", reason);
+
+        ObjectNode suggestedPayload = objectMapper.createObjectNode()
+                .put("fromTaskId", fromTaskId)
+                .put("toTaskId", toTaskId)
+                .put("linkType", linkType);
+        putIfPresent(suggestedPayload, "reason", reason);
+
+        return createProposal("TASK_LINK", sourceId, sourcePayload, suggestedPayload);
+    }
+
     private AgentProposalResponse createProposal(String route,
                                                  String sourceId,
                                                  ObjectNode sourcePayload,

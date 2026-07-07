@@ -27,7 +27,7 @@ curl -s -X POST "$MS_URL/api/search" \
 ```bash
 curl -s -X POST "$MS_URL/api/search" \
   -H "Content-Type: application/json" \
-  -d '{"query":"отпуск","layers":["NOTICE","TASK","PEOPLE","RISK","INCIDENT","KNOWLEDGE"],"mode":"QUICK","limit":20}'
+  -d '{"query":"отпуск","layers":["NOTE","TASK","PEOPLE","RISK","INCIDENT","KNOWLEDGE"],"mode":"QUICK","limit":20}'
 ```
 **Expected:** HTTP 200, `results` is array (may be empty for some layers), no 5xx errors
 
@@ -43,7 +43,7 @@ curl -s -o /dev/null -w "%{http_code}" -X POST "$MS_URL/api/search" \
 ```bash
 curl -s "$MS_URL/api/search/layers"
 ```
-**Expected:** HTTP 200, JSON array with objects containing `name`, `title`, `enabled`, `available`. NOTICE/TASK/PEOPLE/RISK/INCIDENT/KNOWLEDGE have `available: true`. MAIL/CALENDAR have `available: false`.
+**Expected:** HTTP 200, JSON array with objects containing `name`, `title`, `enabled`, `available`. NOTE/TASK/PEOPLE/RISK/INCIDENT/KNOWLEDGE have `available: true`. MAIL/CALENDAR have `available: false`.
 
 ### Step 6 — UI smoke test
 ```bash

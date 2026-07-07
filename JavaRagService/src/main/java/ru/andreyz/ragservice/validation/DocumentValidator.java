@@ -41,7 +41,7 @@ public class DocumentValidator {
 
         DocType docType;
         try {
-            docType = DocType.valueOf(typeRaw.toUpperCase().replace("-", "_"));
+            docType = DocType.fromRaw(typeRaw);
         } catch (IllegalArgumentException e) {
             log.error("", e);
             return ValidationResult.error("Неизвестный тип документа: '" + typeRaw + "'. " +

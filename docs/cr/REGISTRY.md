@@ -9,31 +9,36 @@
 
 ## MEM — JavaMemoryService
 
-| CR                | Файл | Статус | Дата       |
-|-------------------|---|-------|------------|
-| CR-MEM-009        | [2026-06-27_CR-MEM-009-global-search-layers.md](2026-06-27_CR-MEM-009-global-search-layers.md) | Draft | 2026-06-27 |
-| CR-MEM-009        | [CR-MEM-009-plugin-settings-control-plane.md](CR-MEM-009-plugin-settings-control-plane.md) | Implemented | —          |
-| CR-MEM-009        | [CR-MEM-009-ui-today-task-title-links-and-editor-links.md](CR-MEM-009-ui-today-task-title-links-and-editor-links.md) | Draft | —          |
-| CR-MEM-010        | [CR-MEM-010-universal-plugin-control-ui.md](CR-MEM-010-universal-plugin-control-ui.md) | Implemented | —          |
-| CR-MEM-012        | [2026-06-28_CR-MEM-012-capturebot-ui.md](2026-06-28_CR-MEM-012-capturebot-ui.md) | Implemented | 2026-06-28 |
-| CR-MEM-013        | [2026-06-29_CR-MEM-013-task-description-db-storage.md](2026-06-29_CR-MEM-013-task-description-db-storage.md) | Implemented | 2026-06-29 |
-| CR-MEM-014        | [2026-06-29_CR-MEM-014-today-hide-done-filter.md](2026-06-29_CR-MEM-014-today-hide-done-filter.md) | Superseded by CR-MEM-025 | 2026-06-29 |
-| CR-MEM-014 ⚠️     | [2026-06-29_CR-MEM-014-Today-Calendar-Navigation.md](2026-06-29_CR-MEM-014-Today-Calendar-Navigation.md) | Draft | 2026-06-29 |
+| CR                | Файл                                                                                                                   | Статус | Дата       |
+|-------------------|------------------------------------------------------------------------------------------------------------------------|-------|------------|
+| CR-MEM-009        | [2026-06-27_CR-MEM-009-global-search-layers.md](2026-06-27_CR-MEM-009-global-search-layers.md)                         | Draft | 2026-06-27 |
+| CR-MEM-009        | [CR-MEM-009-plugin-settings-control-plane.md](CR-MEM-009-plugin-settings-control-plane.md)                             | Implemented | —          |
+| CR-MEM-009        | [CR-MEM-009-ui-today-task-title-links-and-editor-links.md](CR-MEM-009-ui-today-task-title-links-and-editor-links.md)   | Draft | —          |
+| CR-MEM-010        | [CR-MEM-010-universal-plugin-control-ui.md](CR-MEM-010-universal-plugin-control-ui.md)                                 | Implemented | —          |
+| CR-MEM-012        | [2026-06-28_CR-MEM-012-capturebot-ui.md](2026-06-28_CR-MEM-012-capturebot-ui.md)                                       | Implemented | 2026-06-28 |
+| CR-MEM-013        | [2026-06-29_CR-MEM-013-task-description-db-storage.md](2026-06-29_CR-MEM-013-task-description-db-storage.md)           | Implemented | 2026-06-29 |
+| CR-MEM-014        | [2026-06-29_CR-MEM-014-today-hide-done-filter.md](2026-06-29_CR-MEM-014-today-hide-done-filter.md)                     | Superseded by CR-MEM-025 | 2026-06-29 |
+| CR-MEM-014 ⚠️     | [2026-06-29_CR-MEM-014-Today-Calendar-Navigation.md](2026-06-29_CR-MEM-014-Today-Calendar-Navigation.md)               | Draft | 2026-06-29 |
 | CR-MEM-015        | [2026-06-29_CR-MEM-015-global-search-tsvector-providers.md](2026-06-29_CR-MEM-015-global-search-tsvector-providers.md) | Implemented | 2026-06-29 |
-| CR-MEM-016        | [2026-06-29_CR-MEM-016-agent-workspace-ui.md](2026-06-29_CR-MEM-016-agent-workspace-ui.md) | Implemented | 2026-06-29 |
-| CR-MEM-017        | [2026-06-29_CR-MEM-017-task-timeline-audit.md](2026-06-29_CR-MEM-017-task-timeline-audit.md) | Implemented | 2026-06-29 |
-| CR-MEM-018        | [2026-06-30_CR-MEM-018-move-overdue-tasks-to-today.md](2026-06-30_CR-MEM-018-move-overdue-tasks-to-today.md) | DONE | 2026-06-30 |
-| CR-MEM-019        | [2026-06-30_CR-MEM-019-intake-gateway-manual-routing.md](2026-06-30_CR-MEM-019-intake-gateway-manual-routing.md) | DONE | 2026-06-30 |
-| CR-MEM-020        | [2026-06-30_CR-MEM-020-intake-route-automation.md](2026-06-30_CR-MEM-020-intake-route-automation.md) | Draft | 2026-06-30 |
-| CR-MEM-021        | [2026-06-30_CR-MEM-021-intake-rollback-reapply.md](2026-06-30_CR-MEM-021-intake-rollback-reapply.md) | Draft | 2026-06-30 |
-| CR-MEM-022        | [2026-06-30_CR-MEM-022-left-sidebar-navigation.md](2026-06-30_CR-MEM-022-left-sidebar-navigation.md) | Implemented | 2026-06-30 |
-| CR-MEM-023        | [2026-06-30_CR-MEM-023-task-edit-right-control-panel.md](2026-06-30_CR-MEM-023-task-edit-right-control-panel.md) | Implemented | 2026-06-30 |
-| CR-MEM-024        | [2026-07-01_CR-MEM-024-agent-mcp-write-via-intake.md](2026-07-01_CR-MEM-024-agent-mcp-write-via-intake.md) | Implemented | 2026-07-01 |
-| CR-MEM-025        | [2026-07-02_CR-MEM-024-task-done-confirmation.md](2026-07-02_CR-MEM-024-task-done-confirmation.md) | Implemented | 2026-07-02 |
-| CR-MEM-026        | [2026-07-02_CR-MEM-025-today-todo-done-tabs.md](2026-07-02_CR-MEM-025-today-todo-done-tabs.md) | Implemented | 2026-07-02 |
-| CR-MEM-027        | [2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md](2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md) | Implemented | 2026-07-02 |
-| CR-MEM-028        | [2026-07-07_CR-MEM-028-intake-payload-readable-summary.md](2026-07-07_CR-MEM-028-intake-payload-readable-summary.md) | Draft | 2026-07-07 |
-| CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md) | Draft | —          |
+| CR-MEM-016        | [2026-06-29_CR-MEM-016-agent-workspace-ui.md](2026-06-29_CR-MEM-016-agent-workspace-ui.md)                             | Implemented | 2026-06-29 |
+| CR-MEM-017        | [2026-06-29_CR-MEM-017-task-timeline-audit.md](2026-06-29_CR-MEM-017-task-timeline-audit.md)                           | Implemented | 2026-06-29 |
+| CR-MEM-018        | [2026-06-30_CR-MEM-018-move-overdue-tasks-to-today.md](2026-06-30_CR-MEM-018-move-overdue-tasks-to-today.md)           | DONE | 2026-06-30 |
+| CR-MEM-019        | [2026-06-30_CR-MEM-019-intake-gateway-manual-routing.md](2026-06-30_CR-MEM-019-intake-gateway-manual-routing.md)       | DONE | 2026-06-30 |
+| CR-MEM-020        | [2026-06-30_CR-MEM-020-intake-route-automation.md](2026-06-30_CR-MEM-020-intake-route-automation.md)                   | Draft | 2026-06-30 |
+| CR-MEM-021        | [2026-06-30_CR-MEM-021-intake-rollback-reapply.md](2026-06-30_CR-MEM-021-intake-rollback-reapply.md)                   | Draft | 2026-06-30 |
+| CR-MEM-022        | [2026-06-30_CR-MEM-022-left-sidebar-navigation.md](2026-06-30_CR-MEM-022-left-sidebar-navigation.md)                   | Implemented | 2026-06-30 |
+| CR-MEM-023        | [2026-06-30_CR-MEM-023-task-edit-right-control-panel.md](2026-06-30_CR-MEM-023-task-edit-right-control-panel.md)       | Implemented | 2026-06-30 |
+| CR-MEM-024        | [2026-07-01_CR-MEM-024-agent-mcp-write-via-intake.md](2026-07-01_CR-MEM-024-agent-mcp-write-via-intake.md)             | Implemented | 2026-07-01 |
+| CR-MEM-025        | [2026-07-02_CR-MEM-024-task-done-confirmation.md](2026-07-02_CR-MEM-024-task-done-confirmation.md)                     | Implemented | 2026-07-02 |
+| CR-MEM-026        | [2026-07-02_CR-MEM-025-today-todo-done-tabs.md](2026-07-02_CR-MEM-025-today-todo-done-tabs.md)                         | Implemented | 2026-07-02 |
+| CR-MEM-027        | [2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md](2026-07-02_CR-MEM-026-intake-gateway-bulk-actions.md)           | Implemented | 2026-07-02 |
+| CR-MEM-028        | [2026-07-02_CR-MEM-028-live-badge-polling.md](2026-07-02_CR-MEM-028-live-badge-polling.md)                             | DONE | 2026-07-02 |
+| CR-MEM-029        | [2026-07-02_CR-MEM-029-toastui-task-editor.md](2026-07-02_CR-MEM-029-toastui-task-editor.md)                           | Implemented | 2026-07-03 |
+| CR-MEM-030        | [2026-07-02_CR-MEM-030-task-attachments.md](2026-07-02_CR-MEM-030-task-attachments.md)                                 | Implemented | 2026-07-03 |
+| CR-MEM-031        | [2026-07-02_CR-MEM-031-task-links.md](2026-07-02_CR-MEM-031-task-links.md)                                             | Implemented | 2026-07-06 |
+| CR-MEM-032        | [2026-07-03_CR-MEM-032-task-status-delegation-labels.md](2026-07-03_CR-MEM-032-task-status-delegation-labels.md)       | DONE | 2026-07-03 |
+| CR-MEM-028        | [2026-07-07_CR-MEM-033-intake-payload-readable-summary.md](2026-07-07_CR-MEM-028-intake-payload-readable-summary.md)   | Draft | 2026-07-07 |
+| CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md)                                 | Draft | —          |
 
 ---
 
@@ -63,6 +68,7 @@
 | CR-ARCH-005 | [CR-ARCH-005-mail-notice-rag-document-flow.md](CR-ARCH-005-mail-notice-rag-document-flow.md) | Draft | — |
 | CR-ARCH-005 ⚠️ | [CR-ARCH-005-universal-knowledge-ui.md](CR-ARCH-005-universal-knowledge-ui.md) | Draft | — |
 | CR-ARCH-006 | [CR-ARCH-006-update-presentation-architecture-diagrams.md](CR-ARCH-006-update-presentation-architecture-diagrams.md) | Draft | — |
+| CR-ARCH-007 | [2026-07-02_CR-ARCH-007-rename-notice-to-rag.md](2026-07-02_CR-ARCH-007-rename-notice-to-rag.md) | Implemented | 2026-07-03 |
 
 ---
 
@@ -77,5 +83,6 @@
 
 ---
 
-_Следующий свободный номер в MEM серии: **CR-MEM-029**_  
+_Следующий свободный номер в MEM серии: **CR-MEM-034**_  
+_Следующий свободный номер в ARCH серии: **CR-ARCH-008**_  
 _Последнее обновление реестра: 2026-07-07_

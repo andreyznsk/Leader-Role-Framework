@@ -16,7 +16,7 @@ Spring Boot 3 приложение. Подключается к корпорат
 читает новые письма, для каждого вызывает LLM через `AgentClient` из `common`, выполняет
 детерминированное действие по результату. Интегрируется с `java-memory-service`
 для хранения задач, operational notes и capture flow, а с `JavaRagService` — через
-файловый inbox для `NOTICE`-документов. Имеет минимальный Web UI для просмотра статуса.
+файловый inbox для `RAG`-документов. Имеет минимальный Web UI для просмотра статуса.
 
 Классификационный prompt относится к runtime configuration: стартовое значение seed-ится
 миграцией БД, дальше prompt редактируется через control plane и хранится в БД MailAgent.
@@ -294,7 +294,7 @@ JavaMailAgent/
     │   │   ├── model/
     │   │   │   ├── Email.java                  ← record (id, subject, from, body, receivedAt, folder)
     │   │   │   ├── AgentResponse.java          ← record (@JsonInclude NON_NULL)
-    │   │   │   ├── AgentResponseType.java      ← enum: REQUEST/DRAFT/NOISE/CAPTURE/NOTICE/NOTE
+    │   │   │   ├── AgentResponseType.java      ← enum: REQUEST/DRAFT/NOISE/CAPTURE/RAG/NOTE
     │   │   │   ├── PendingTaskRequest.java     ← record, payload для memory-service
     │   │   │   └── ProcessedEmail.java         ← Spring Data JDBC record (@Table mailagent.processed_emails)
     │   │   ├── repository/
@@ -349,7 +349,7 @@ logs/
 10:32:17 INFO  MailAgentJob        - Classified as NOISE
 10:32:17 INFO  ActionExecutor      - NOISE: CI уведомление, пропускаем
 10:32:17 INFO  MailAgentJob        - Email AAMk-456 marked as read (NOISE)
-10:32:18 INFO  MailAgentJob        - Poll finished: 3 processed (1 REQUEST, 0 DRAFT, 1 NOISE, 0 CAPTURE, 1 NOTICE, 0 NOTE, 0 errors)
+10:32:18 INFO  MailAgentJob        - Poll finished: 3 processed (1 REQUEST, 0 DRAFT, 1 NOISE, 0 CAPTURE, 1 RAG, 0 NOTE, 0 errors)
 10:32:18 WARN  MailAgentJob        - Email AAMk-789 failed: Claude timed out after 5 minutes, will retry next poll
 ```
 
@@ -395,7 +395,7 @@ logs/
 2. Для каждой папки — получить непрочитанные письма (`listUnread(folder, limit)`)
 3. Пропустить письма, уже записанные в `processed_emails` (dedup по `emailId`)
 4. Обработать: Claude → ActionExecutor → записать в `processed_emails`
-5. `markAsRead` — для `NOISE` и для `NOTICE` после успешной записи markdown-файла (`REQUEST`/`DRAFT`/`CAPTURE`/`NOTE` остаются непрочитанными)
+5. `markAsRead` — для `NOISE` и для `RAG` после успешной записи markdown-файла (`REQUEST`/`DRAFT`/`CAPTURE`/`NOTE` остаются непрочитанными)
 
 ```java
 // fixedDelay — следующий тик только после завершения предыдущего
@@ -475,10 +475,10 @@ CaptureScheduler классифицирует письмо вместе с за�
 CAPTURE используется для писем с полезной информацией без немедленного действия:
 FYI, архитектурные решения, аналитика, плановые работы, новости команды.
 
-### Поток NOTICE → RAG документ
+### Поток RAG → RAG документ
 
 ```
-MailAgentJob (классифицировал как NOTICE)
+MailAgentJob (классифицировал как RAG)
         ↓
 ActionExecutor + NoticeDocumentWriter
         ↓
@@ -486,10 +486,10 @@ write JavaRagService/rag-inbox/mail/YYYY-MM-DD/{safe-message-id}.md
         ↓
 JavaRagService scheduler / manual reindex
         ↓
-Memory Service /ui/knowledge?type=NOTICE
+Memory Service /ui/knowledge?type=RAG
 ```
 
-`NOTICE` используется для писем, которые уже должны стать knowledge-документом:
+`RAG` используется для писем, которые уже должны стать knowledge-документом:
 release/process changes, operating rules, архитектурные договорённости, письма для RAG lifecycle.
 
 ### Поток NOTE → Operational Notes
@@ -691,10 +691,10 @@ public class ActionExecutor {
                 Files.move(inbox, processed, StandardCopyOption.REPLACE_EXISTING);
                 log.info("CAPTURE → memory-service: {}", text);
             }
-            case NOTICE -> {
+            case RAG -> {
                 Path noticePath = noticeDocumentWriter.write(email, response.note());
                 Files.move(inbox, processed, StandardCopyOption.REPLACE_EXISTING);
-                log.info("NOTICE → rag-inbox: {}", noticePath);
+                log.info("RAG → rag-inbox: {}", noticePath);
             }
             case NOTE -> {
                 String text = response.noteText() != null && !response.noteText().isBlank()
@@ -746,7 +746,7 @@ public interface MailClient {
 }
 ```
 
-`markAsRead` вызывается для `NOISE`, а также для `NOTICE` после успешной записи markdown.
+`markAsRead` вызывается для `NOISE`, а также для `RAG` после успешной записи markdown.
 `REQUEST`, `DRAFT`, `CAPTURE` и `NOTE` остаются непрочитанными в почте, повторная обработка
 предотвращается через `processed_emails`.
 
@@ -840,8 +840,8 @@ CREATE TABLE mailagent.processed_emails (
     folder        VARCHAR(255),
     sender        VARCHAR(255),
     subject       VARCHAR(512),
-    agent_type    VARCHAR(16) NOT NULL,   -- REQUEST | DRAFT | NOISE | CAPTURE | NOTICE | NOTE
-    output_path   TEXT,                   -- путь до созданного RAG markdown для NOTICE
+    agent_type    VARCHAR(16) NOT NULL,   -- REQUEST | DRAFT | NOISE | CAPTURE | RAG | NOTE
+    output_path   TEXT,                   -- путь до созданного RAG markdown для RAG route
     processed_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
 ```
@@ -873,7 +873,7 @@ Flyway управляет схемой `mailagent`. Файлы — в `classpath
 | Версия | Файл | Содержимое |
 |--------|------|------------|
 | V1 | `V1__create_processed_emails.sql` | Таблица + индексы |
-| V2 | `V2__add_output_path_to_processed_emails.sql` | `output_path` для NOTICE markdown |
+| V2 | `V2__add_output_path_to_processed_emails.sql` | `output_path` для RAG markdown |
 | V7 | `V7__note_title_in_prompt_template.sql` | Обновляет `classificationPrompt`: добавляет поля `noteTitle` и `noteText` в JSON-схему ответа для типа NOTE |
 
 ### Инфраструктура

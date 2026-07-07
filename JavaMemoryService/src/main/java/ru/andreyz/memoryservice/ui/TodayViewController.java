@@ -7,12 +7,15 @@ import org.springframework.web.bind.annotation.*;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.repository.DailyPlanRepository;
 import ru.andreyz.memoryservice.repository.IncidentRepository;
+import ru.andreyz.memoryservice.service.PeopleService;
+import ru.andreyz.memoryservice.service.TaskRelationService;
 import ru.andreyz.memoryservice.service.TaskService;
 
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -28,18 +31,26 @@ public class TodayViewController {
     private static final Map<String, Integer> STATUS_ORDER = Map.of(
             "IN_PROGRESS", 0,
             "TODO", 1,
-            "BLOCKED", 2,
-            "DONE", 3
+            "RESEARCH", 2,
+            "DELEGATED", 3,
+            "BLOCKED", 4,
+            "DONE", 5
     );
 
     private final TaskService taskService;
+    private final TaskRelationService taskRelationService;
+    private final PeopleService peopleService;
     private final DailyPlanRepository planRepository;
     private final IncidentRepository incidentRepository;
 
     public TodayViewController(TaskService taskService,
+                               TaskRelationService taskRelationService,
+                               PeopleService peopleService,
                                DailyPlanRepository planRepository,
                                IncidentRepository incidentRepository) {
         this.taskService = taskService;
+        this.taskRelationService = taskRelationService;
+        this.peopleService = peopleService;
         this.planRepository = planRepository;
         this.incidentRepository = incidentRepository;
     }
@@ -50,18 +61,21 @@ public class TodayViewController {
                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDateFrom,
                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDateTo,
+                        @RequestParam(name = "labelId", required = false) List<Long> labelIds,
                         @RequestParam(required = false) String sortBy,
                         @RequestParam(required = false) String sortDir,
                         Model model) {
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
         boolean doneView = "DONE".equalsIgnoreCase(normalizeFilter(status));
+        List<Long> selectedLabelIds = normalizeLabelIds(labelIds);
 
         List<Task> pending = taskService.findPending();
         List<Task> allCurrentTasks = taskService.findCurrentTasks();
         List<Task> currentTasks = allCurrentTasks.stream()
                 .filter(task -> isFilterMatch(task.priority(), priority))
                 .filter(task -> isFilterMatch(task.status(), status))
+                .filter(task -> matchesLabelFilter(task, selectedLabelIds))
                 .filter(task -> matchesDateFilter(task.dueDate(), dueDate, dueDateFrom, dueDateTo))
                 .filter(task -> doneView || !"DONE".equalsIgnoreCase(task.status()))
                 .sorted(taskComparator(sortBy, sortDir))
@@ -89,6 +103,11 @@ public class TodayViewController {
         model.addAttribute("dueDateFilter", dueDate);
         model.addAttribute("dueDateFromFilter", dueDateFrom);
         model.addAttribute("dueDateToFilter", dueDateTo);
+        model.addAttribute("selectedLabelIds", selectedLabelIds);
+        model.addAttribute("taskLabels", taskRelationService.listActiveLabels());
+        model.addAttribute("people", peopleService.findAll().stream()
+                .sorted(java.util.Comparator.comparing(person -> person.fullName().toLowerCase()))
+                .toList());
         String normalizedSortBy = normalizeFilter(sortBy);
         String normalizedSortDir = normalizeSortDir(sortDir);
         model.addAttribute("defaultSortActive", normalizedSortBy == null);
@@ -97,7 +116,7 @@ public class TodayViewController {
         model.addAttribute("requestedSortBy", normalizedSortBy != null ? normalizedSortBy : "");
         model.addAttribute("requestedSortDir", normalizedSortBy != null ? normalizedSortDir : "");
         model.addAttribute("priorityOptions", List.of("LOW", "NORMAL", "HIGH", "CRITICAL"));
-        model.addAttribute("statusOptions", List.of("TODO", "IN_PROGRESS", "BLOCKED", "DONE"));
+        model.addAttribute("statusOptions", List.of("TODO", "RESEARCH", "IN_PROGRESS", "DELEGATED", "BLOCKED", "DONE"));
         model.addAttribute("deadlineCounts", deadlineCounts);
         planRepository.findByPlanDate(today).ifPresent(p -> model.addAttribute("todaySummary", p.summary()));
         return "today";
@@ -150,6 +169,13 @@ public class TodayViewController {
         return normalized == null || normalized.equalsIgnoreCase(value);
     }
 
+    private boolean matchesLabelFilter(Task task, List<Long> labelIds) {
+        if (labelIds.isEmpty()) {
+            return true;
+        }
+        return task.labelIds() != null && task.labelIds().stream().anyMatch(labelIds::contains);
+    }
+
     private String normalizeFilter(String value) {
         return Stream.ofNullable(value)
                 .map(String::trim)
@@ -160,6 +186,16 @@ public class TodayViewController {
 
     private String normalizeSortDir(String value) {
         return "desc".equalsIgnoreCase(value) ? "desc" : "asc";
+    }
+
+    private List<Long> normalizeLabelIds(List<Long> labelIds) {
+        if (labelIds == null) {
+            return List.of();
+        }
+        return labelIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
     }
 
     @PostMapping("/tasks/add")

@@ -15,6 +15,7 @@ import ru.andreyz.memoryservice.dto.ControlPluginSettingsResponse;
 import ru.andreyz.memoryservice.dto.ControlPluginSettingsUpdateRequest;
 import ru.andreyz.memoryservice.service.ControlPluginService;
 import ru.andreyz.memoryservice.service.PluginSettingsService;
+import ru.andreyz.memoryservice.service.TaskRelationService;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,11 +30,14 @@ public class SettingsViewController {
 
     private final PluginSettingsService pluginSettingsService;
     private final ControlPluginService controlPluginService;
+    private final TaskRelationService taskRelationService;
 
     public SettingsViewController(PluginSettingsService pluginSettingsService,
-                                  ControlPluginService controlPluginService) {
+                                  ControlPluginService controlPluginService,
+                                  TaskRelationService taskRelationService) {
         this.pluginSettingsService = pluginSettingsService;
         this.controlPluginService = controlPluginService;
+        this.taskRelationService = taskRelationService;
     }
 
     @GetMapping("/settings")
@@ -50,6 +54,7 @@ public class SettingsViewController {
         model.addAttribute("saved", saved);
         model.addAttribute("failed", failed);
         model.addAttribute("message", message);
+        model.addAttribute("taskLabels", taskRelationService.listActiveLabels());
         return "settings";
     }
 

@@ -33,7 +33,7 @@ public class NoticeDocumentWriter {
     }
 
     private String buildMarkdown(Email email, String note, LocalDate today) {
-        String subject = safe(email.subject(), "Notice");
+        String subject = safe(email.subject(), "RAG document");
         String sender = safe(email.from(), "unknown");
         String summary = safe(note, "Письмо содержит полезную информацию для базы знаний техлида.");
         String normalizedContent = normalize(email.body());
@@ -41,7 +41,7 @@ public class NoticeDocumentWriter {
 
         return """
                 ---
-                type: NOTICE
+                type: RAG
                 source: mail
                 updated: %s
                 message_id: %s

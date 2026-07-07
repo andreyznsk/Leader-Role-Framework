@@ -23,6 +23,7 @@ public class MailLinkingService {
 
 
     private static final List<String> SEARCH_LAYERS = List.of("TASK", "NOTICE", "PEOPLE", "RISK", "INCIDENT", "KNOWLEDGE");
+    private static final int RAW_LOG_LIMIT = 2000;
 
     private final MemoryServiceClient memoryServiceClient;
     private final MailLinkingPromptBuilder promptBuilder;
@@ -44,14 +45,30 @@ public class MailLinkingService {
             return classification;
         }
 
+        String raw = null;
         try {
             MemorySearchResponse searchResponse = memoryServiceClient.search(buildSearchRequest(email));
-            MailLinkingDecision decision = parse(agentClient.complete(promptBuilder.build(email, classification, searchResponse)));
+            raw = agentClient.complete(promptBuilder.build(email, classification, searchResponse));
+            MailLinkingDecision decision = parse(raw);
             return merge(classification, email, decision);
         } catch (Exception exception) {
-            log.error("", exception);
+            log.error("Mail linking failed for email {}, falling back to classification without linking. rawResponse={}",
+                    email.id(), truncateForLog(raw), exception);
             return classification;
         }
+    }
+
+    private String truncateForLog(String raw) {
+        if (raw == null) {
+            return "<no response received>";
+        }
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
+            return "<empty response>";
+        }
+        return trimmed.length() > RAW_LOG_LIMIT
+                ? trimmed.substring(0, RAW_LOG_LIMIT) + "...[truncated " + (trimmed.length() - RAW_LOG_LIMIT) + " chars]"
+                : trimmed;
     }
 
     private MemorySearchRequest buildSearchRequest(Email email) {

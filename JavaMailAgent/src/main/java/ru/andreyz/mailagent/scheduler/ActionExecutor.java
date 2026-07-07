@@ -19,6 +19,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 @Component
 public class ActionExecutor {
 
+    private static final int MAX_STORED_EMAIL_ID_LENGTH = 120;
 
     private final MemoryServiceClient memoryServiceClient;
     private final MailClient mailClient;
@@ -52,7 +57,7 @@ public class ActionExecutor {
     }
 
     public void retry(ProcessedEmail state) throws Exception {
-        AgentResponseType responseType = AgentResponseType.valueOf(state.responseType());
+        AgentResponseType responseType = AgentResponseType.from(state.responseType());
         Object payload = payloadFor(responseType, state.routePayloadJson());
         Email email = loadStoredEmail(state.emailId(), processedFolderFor(payload));
         MailProcessingRoute route = state.failedRoute() != null ? state.failedRoute() : initialRoute(responseType);
@@ -99,14 +104,14 @@ public class ActionExecutor {
     }
 
     private Path resolveInbox(String emailId) {
-        return Path.of(pathProperties.getInbox(), sanitize(emailId) + ".json");
+        return Path.of(pathProperties.getInbox(), storageFileName(emailId));
     }
 
     private Path resolveProcessed(String emailId, String processedFolder) {
         String target = processedFolder != null && !processedFolder.isBlank()
                 ? processedFolder
                 : pathProperties.getProcessed();
-        return Path.of(target, sanitize(emailId) + ".json");
+        return Path.of(target, storageFileName(emailId));
     }
 
     private StepResult executeMailIntakeRoute(MailProcessingRoute route,
@@ -184,7 +189,7 @@ public class ActionExecutor {
         return switch (type) {
             case REQUEST -> "TASK";
             case CAPTURE, NOTE -> "NOTE";
-            case NOTICE -> "RAG";
+            case RAG -> "RAG";
             case NOISE, DRAFT -> "NOISE";
         };
     }
@@ -193,7 +198,7 @@ public class ActionExecutor {
         return switch (response.type()) {
             case REQUEST -> buildTaskSuggestedPayload(email, response);
             case CAPTURE -> buildCaptureSuggestedPayload(email, response);
-            case NOTICE -> buildNoticeSuggestedPayload(email, response);
+            case RAG -> buildRagSuggestedPayload(email, response);
             case NOTE -> buildNoteSuggestedPayload(email, response);
             case NOISE, DRAFT -> buildNoiseSuggestedPayload(email, response);
         };
@@ -218,10 +223,10 @@ public class ActionExecutor {
         return suggested;
     }
 
-    private Map<String, Object> buildNoticeSuggestedPayload(Email email, AgentResponse response) {
+    private Map<String, Object> buildRagSuggestedPayload(Email email, AgentResponse response) {
         Map<String, Object> suggested = new LinkedHashMap<>();
-        suggested.put("docType", "NOTICE");
-        suggested.put("title", hasText(email.subject()) ? email.subject().trim() : "Notice");
+        suggested.put("docType", "RAG");
+        suggested.put("title", hasText(email.subject()) ? email.subject().trim() : "RAG document");
         suggested.put("body", fallbackMailSummary(email, response));
         suggested.put("subject", email.subject());
         suggested.put("sender", email.from());
@@ -246,7 +251,7 @@ public class ActionExecutor {
 
     private Object buildPayload(Email email, AgentResponse response, MailRuntimeConfig runtime, String agentPrompt, String agentRawResult) {
         boolean markAsRead = switch (response.type()) {
-            case NOTICE, NOTE -> true;
+            case RAG, NOTE -> true;
             case NOISE -> runtime.markNoiseAsRead();
             case REQUEST, CAPTURE, DRAFT -> false;
         };
@@ -327,7 +332,21 @@ public class ActionExecutor {
     }
 
     private Object payloadFor(AgentResponseType responseType, String payloadJson) {
-        return processingStateService.deserialize(payloadJson, IntakeMailActionPayload.class);
+        IntakeMailActionPayload payload = processingStateService.deserialize(payloadJson, IntakeMailActionPayload.class);
+        if (payload == null) {
+            return null;
+        }
+        if (!responseType.name().equals(payload.responseType())) {
+            return new IntakeMailActionPayload(
+                responseType.name(),
+                payload.intakeRequest(),
+                payload.sourceId(),
+                payload.processedFolder(),
+                payload.moveEnabled(),
+                payload.markAsRead()
+            );
+        }
+        return payload;
     }
 
     private MailProcessingRoute initialRoute(AgentResponseType responseType) {
@@ -362,6 +381,26 @@ public class ActionExecutor {
 
     static String sanitize(String emailId) {
         return emailId.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    static String storageFileName(String emailId) {
+        String sanitized = sanitize(emailId);
+        if (sanitized.length() <= MAX_STORED_EMAIL_ID_LENGTH) {
+            return sanitized + ".json";
+        }
+        String hash = stableHash(emailId);
+        int prefixLength = Math.max(1, MAX_STORED_EMAIL_ID_LENGTH - hash.length() - 1);
+        return sanitized.substring(0, prefixLength) + "_" + hash + ".json";
+    }
+
+    private static String stableHash(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash, 0, 12);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     private record StepResult(

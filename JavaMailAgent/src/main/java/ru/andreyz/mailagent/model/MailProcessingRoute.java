@@ -7,7 +7,7 @@ public enum MailProcessingRoute {
     MEMORY_PENDING_TASK,
     MEMORY_CAPTURE,
     MEMORY_NOTE,
-    NOTICE_WRITE,
+    RAG_INTAKE,
     MOVE_TO_PROCESSED,
     MARK_AS_READ
 }

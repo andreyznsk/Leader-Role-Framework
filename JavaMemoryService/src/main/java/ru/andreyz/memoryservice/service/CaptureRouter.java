@@ -63,7 +63,7 @@ public class CaptureRouter {
             case "RISK" -> "RISK";
             case "NOTE", "QUESTION", "JOURNAL" -> "NOTE";
             case "PERSON_NOTE" -> "PERSON";
-            case "KNOWLEDGE" -> "RAG";
+            case "KNOWLEDGE", "NOTICE", "RAG" -> "RAG";
             default -> {
                 log.warn("Unknown capture type for intake routing: {}", captureType);
                 yield "NOISE";
@@ -103,8 +103,8 @@ public class CaptureRouter {
                 payload.put("personName", capture.title());
                 payload.put("note", capture.body());
             }
-            case "KNOWLEDGE" -> {
-                payload.put("docType", "KNOWLEDGE");
+            case "KNOWLEDGE", "NOTICE", "RAG" -> {
+                payload.put("docType", "RAG");
                 payload.put("title", capture.title());
                 payload.put("body", capture.body());
             }

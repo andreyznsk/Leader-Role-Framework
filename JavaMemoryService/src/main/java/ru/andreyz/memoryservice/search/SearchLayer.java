@@ -1,7 +1,7 @@
 package ru.andreyz.memoryservice.search;
 
 public enum SearchLayer {
-    NOTICE,
+    NOTE,
     TASK,
     PEOPLE,
     RISK,

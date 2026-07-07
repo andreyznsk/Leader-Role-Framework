@@ -22,8 +22,10 @@ public interface TaskRepository extends CrudRepository<Task, Long> {
            "ORDER BY CASE status " +
            "WHEN 'IN_PROGRESS' THEN 1 " +
            "WHEN 'TODO' THEN 2 " +
-           "WHEN 'BLOCKED' THEN 3 " +
-           "WHEN 'DONE' THEN 4 END, sort_order")
+           "WHEN 'RESEARCH' THEN 3 " +
+           "WHEN 'DELEGATED' THEN 4 " +
+           "WHEN 'BLOCKED' THEN 5 " +
+           "WHEN 'DONE' THEN 6 END, sort_order")
     List<Task> findCurrentTasks();
 
     Optional<Task> findFirstByEmailId(String emailId);

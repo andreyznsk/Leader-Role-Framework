@@ -17,9 +17,9 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class NoticeSearchProvider implements SearchProvider {
+public class NoteSearchProvider implements SearchProvider {
 
-    private static final String NOTICE_SEARCH_SQL = """
+    private static final String NOTE_SEARCH_SQL = """
             SELECT id, title, text, tags, source, created_at,
                    ts_rank_cd(search_vector, (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))) AS rank
             FROM notes
@@ -33,10 +33,10 @@ public class NoticeSearchProvider implements SearchProvider {
     private final PostgresSearchRuntime postgresSearchRuntime;
     private final SearchQueryParser searchQueryParser;
 
-    public NoticeSearchProvider(NoteRepository noteRepository,
-                                NamedParameterJdbcTemplate jdbcTemplate,
-                                PostgresSearchRuntime postgresSearchRuntime,
-                                SearchQueryParser searchQueryParser) {
+    public NoteSearchProvider(NoteRepository noteRepository,
+                              NamedParameterJdbcTemplate jdbcTemplate,
+                              PostgresSearchRuntime postgresSearchRuntime,
+                              SearchQueryParser searchQueryParser) {
         this.noteRepository = noteRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.postgresSearchRuntime = postgresSearchRuntime;
@@ -45,24 +45,24 @@ public class NoticeSearchProvider implements SearchProvider {
 
     @Override
     public SearchLayer layer() {
-        return SearchLayer.NOTICE;
+        return SearchLayer.NOTE;
     }
 
     @Override
     public List<SearchResultItem> search(String query, int limit) {
         var parsed = searchQueryParser.parse(query);
         if (postgresSearchRuntime.isPostgres()) {
-            return jdbcTemplate.query(NOTICE_SEARCH_SQL,
+            return jdbcTemplate.query(NOTE_SEARCH_SQL,
                     new MapSqlParameterSource()
                             .addValue("query", parsed.normalizedQuery().isBlank() ? parsed.originalQuery() : parsed.normalizedQuery())
                             .addValue("limit", limit),
                     (rs, rowNum) -> new SearchResultItem(
-                            SearchLayer.NOTICE,
+                            SearchLayer.NOTE,
                             rs.getString("title"),
                             SearchSupport.firstNonBlank(rs.getString("text"), rs.getString("tags"), rs.getString("source")),
                             "/ui/notes?edit=" + rs.getLong("id") + "#note-" + rs.getLong("id"),
                             String.valueOf(rs.getLong("id")),
-                            "NOTICE",
+                            "NOTE",
                             SearchSupport.clamp((rs.getDouble("rank") * 0.55) + sourceBoost(rs.getString("source"))),
                             rs.getTimestamp("created_at").toInstant(),
                             SearchSupport.matchedFields(parsed.keywords(), orderedFields(
@@ -83,12 +83,12 @@ public class NoticeSearchProvider implements SearchProvider {
             score += sourceBoost(note.source());
             if (score > 0) {
                 results.add(new SearchResultItem(
-                        SearchLayer.NOTICE,
+                        SearchLayer.NOTE,
                         note.title(),
                         SearchSupport.firstNonBlank(note.text(), note.tags(), note.source()),
                         "/ui/notes?edit=" + note.id() + "#note-" + note.id(),
                         String.valueOf(note.id()),
-                        "NOTICE",
+                        "NOTE",
                         SearchSupport.clamp(score),
                         note.createdAt(),
                         SearchSupport.matchedFields(parsed.keywords(), orderedFields(

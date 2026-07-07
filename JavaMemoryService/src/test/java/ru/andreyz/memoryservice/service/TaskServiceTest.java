@@ -4,13 +4,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import ru.andreyz.memoryservice.domain.Person;
 import ru.andreyz.memoryservice.domain.Task;
+import ru.andreyz.memoryservice.domain.TaskLabel;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -24,6 +28,12 @@ class TaskServiceTest {
 
     @Autowired
     private TaskTimelineService taskTimelineService;
+
+    @Autowired
+    private PeopleService peopleService;
+
+    @Autowired
+    private TaskRelationService taskRelationService;
 
     @Test
     void createPending_hasCorrectStatus() {
@@ -127,7 +137,9 @@ class TaskServiceTest {
                 "## Context\nblocked by qa approval",
                 "HIGH",
                 "IN_PROGRESS",
-                LocalDate.now().plusDays(1)
+                LocalDate.now().plusDays(1),
+                null,
+                null
         ));
 
         assertThat(updated.priority()).isEqualTo("HIGH");
@@ -215,5 +227,81 @@ class TaskServiceTest {
         assertThat(taskTimelineService.findEvents(alternative.id()))
                 .extracting(event -> event.eventType())
                 .contains("EMAIL_LINKED", "DESCRIPTION_UPDATED");
+    }
+
+    @Test
+    void delegatedStatusRequiresAssignedPerson() {
+        Task task = taskService.createConfirmed(LocalDate.now(), "Delegation validation", "NORMAL", null, "MANUAL", null);
+
+        assertThatThrownBy(() -> taskService.edit(task.id(), new EditTaskRequest(
+                task.title(),
+                null,
+                task.priority(),
+                "DELEGATED",
+                task.dueDate(),
+                null,
+                List.of()
+        ))).hasMessageContaining("assignedPersonId is required");
+    }
+
+    @Test
+    void edit_canAssignPersonAndLabels() {
+        Person person = peopleService.create(new Person(
+                null, "Иван Иванов", "ivanov", null, null, null, null,
+                null, null, null, null, Instant.now(), Instant.now()
+        ));
+        TaskLabel backend = taskRelationService.createLabel("Backend service test", "#60a5fa");
+        TaskLabel release = taskRelationService.createLabel("Release service test", null);
+        Task task = taskService.createConfirmed(LocalDate.now(), "Assignable task", "HIGH", null, "MANUAL", null);
+
+        Task updated = taskService.edit(task.id(), new EditTaskRequest(
+                task.title(),
+                null,
+                task.priority(),
+                "DELEGATED",
+                task.dueDate(),
+                person.id(),
+                List.of(backend.id(), release.id())
+        ));
+
+        assertThat(updated.status()).isEqualTo("DELEGATED");
+        assertThat(updated.assignedPersonId()).isEqualTo(person.id());
+        assertThat(updated.assignedPerson()).isNotNull();
+        assertThat(updated.assignedPerson().fullName()).isEqualTo("Иван Иванов");
+        assertThat(updated.labels()).extracting(TaskLabel::name)
+                .containsExactly("Backend service test", "Release service test");
+    }
+
+    @Test
+    void edit_canClearAssignedPersonAndWritesTimeline() {
+        Person person = peopleService.create(new Person(
+                null, "Петр Петров", "petrov", null, null, null, null,
+                null, null, null, null, Instant.now(), Instant.now()
+        ));
+        Task task = taskService.createConfirmed(LocalDate.now(), "Task to clear assignee", "NORMAL", null, "MANUAL", null);
+        taskService.edit(task.id(), new EditTaskRequest(
+                task.title(),
+                null,
+                task.priority(),
+                "DELEGATED",
+                task.dueDate(),
+                person.id(),
+                List.of()
+        ));
+
+        Task cleared = taskService.edit(task.id(), new EditTaskRequest(
+                task.title(),
+                null,
+                task.priority(),
+                "TODO",
+                task.dueDate(),
+                null,
+                List.of()
+        ));
+
+        assertThat(cleared.assignedPersonId()).isNull();
+        assertThat(taskTimelineService.findEvents(task.id()))
+                .extracting(event -> event.eventType())
+                .contains("ASSIGNEE_CHANGED");
     }
 }

@@ -86,7 +86,7 @@ class CaptureRouterTest {
         ArgumentCaptor<IntakeCreateRequest> captor = ArgumentCaptor.forClass(IntakeCreateRequest.class);
         verify(intakeService).create(captor.capture());
         assertThat(captor.getValue().suggestedRoute()).isEqualTo("RAG");
-        assertThat(captor.getValue().suggestedPayload().get("docType").asText()).isEqualTo("KNOWLEDGE");
+        assertThat(captor.getValue().suggestedPayload().get("docType").asText()).isEqualTo("RAG");
     }
 
     @Test
