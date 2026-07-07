@@ -1,7 +1,7 @@
-# 2026-07-07_CR-MEM-028: Intake Gateway readable payload and mail body summary
+# 2026-07-07_CR-MEM-033: Intake Gateway readable payload and mail body summary
 
 **Дата:** 2026-07-07  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MEM / JavaMemoryService  
 **Тип:** enhancement + ui  
 **Связанный Issue:** будет создан после публикации CR  
@@ -154,14 +154,14 @@ Breaking changes не требуются.
 
 ## Acceptance Criteria
 
-- [ ] Original Payload в UI больше не отображает `\n`, `\r`, CR/LF как визуальный шум и переносы строк.
-- [ ] Raw original payload в БД/API не мутируется.
-- [ ] Original Payload имеет тот же визуальный размер, что Final Payload.
-- [ ] Длинный Original Payload скроллится внутри своего блока.
-- [ ] Final Payload для mail-derived intake содержит всеобъемлющую summary исходного body письма.
-- [ ] Для `TASK` final payload можно применить как полноценную задачу без повторного чтения письма.
-- [ ] Добавлен E2E сценарий для Intake Gateway payload readability + summary.
-- [ ] Не изменены существующие Flyway migrations.
+- [x] Original Payload в UI больше не отображает `\n`, `\r`, CR/LF как визуальный шум и переносы строк.
+- [x] Raw original payload в БД/API не мутируется.
+- [x] Original Payload имеет тот же визуальный размер, что Final Payload.
+- [x] Длинный Original Payload скроллится внутри своего блока.
+- [x] Final Payload для mail-derived intake содержит всеобъемлющую summary исходного body письма.
+- [x] Для `TASK` final payload можно применить как полноценную задачу без повторного чтения письма.
+- [x] Добавлен E2E сценарий для Intake Gateway payload readability + summary.
+- [x] Не изменены существующие Flyway migrations.
 
 ## После подтверждения пользователя
 

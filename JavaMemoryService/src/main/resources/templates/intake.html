@@ -76,15 +76,13 @@
             <div class="row g-3">
                 <div class="col-lg-6">
                     <label class="form-label small text-muted mb-1">Original payload</label>
-                    <pre class="form-control bg-dark text-light border-secondary small"
-                         style="min-height: 180px; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto;"
+                    <pre class="form-control bg-dark text-light border-secondary small intake-payload-box intake-original-payload"
                          th:text="${item.sourcePayload}">payload</pre>
                 </div>
                 <div class="col-lg-6">
                     <label class="form-label small text-muted mb-1">Final payload</label>
-                    <textarea class="form-control font-monospace small intake-final-payload bg-dark text-light border-secondary"
+                    <textarea class="form-control font-monospace small intake-final-payload bg-dark text-light border-secondary intake-payload-box"
                               rows="10"
-                              style="overflow: auto; resize: vertical;"
                               th:attr="data-item-id=${item.id}"
                               th:text="${item.finalPayload != null ? item.finalPayload : item.suggestedPayload}">{}</textarea>
                 </div>

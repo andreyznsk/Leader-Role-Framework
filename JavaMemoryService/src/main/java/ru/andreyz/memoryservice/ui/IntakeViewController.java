@@ -3,6 +3,9 @@ package ru.andreyz.memoryservice.ui;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,10 +15,13 @@ import ru.andreyz.memoryservice.dto.IntakeItemDto;
 import ru.andreyz.memoryservice.service.IntakeService;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Controller
 @RequestMapping("/ui/intake")
 public class IntakeViewController {
+    private static final Pattern ESCAPED_CONTROL_PATTERN = Pattern.compile("\\\\[nrm]");
+    private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
 
     private final IntakeService intakeService;
     private final ObjectMapper objectMapper;
@@ -48,7 +54,7 @@ public class IntakeViewController {
                 item.id().toString(),
                 item.sourceType(),
                 item.sourceId(),
-                pretty(item.sourcePayload(), item.sourceText()),
+                displayPayload(item.sourcePayload(), item.sourceText()),
                 item.agentProvider(),
                 item.agentPrompt(),
                 pretty(item.agentResult(), item.agentResultText()),
@@ -65,6 +71,31 @@ public class IntakeViewController {
         );
     }
 
+    private String compact(JsonNode node, String fallback) {
+        if (node == null || node.isNull()) {
+            return fallback;
+        }
+        if (node.isTextual()) {
+            return node.textValue();
+        }
+        try {
+            return objectMapper.writeValueAsString(node);
+        } catch (JsonProcessingException e) {
+            return node.toString();
+        }
+    }
+
+    private String displayPayload(JsonNode node, String fallback) {
+        if (node == null || node.isNull()) {
+            return normalizePayloadForDisplay(fallback);
+        }
+        JsonNode normalized = normalizeNodeForDisplay(node);
+        if (normalized.isTextual()) {
+            return normalized.textValue();
+        }
+        return pretty(normalized, fallback);
+    }
+
     private String pretty(JsonNode node, String fallback) {
         if (node == null || node.isNull()) {
             return fallback;
@@ -77,6 +108,39 @@ public class IntakeViewController {
         } catch (JsonProcessingException e) {
             return node.toString();
         }
+    }
+
+    private String normalizePayloadForDisplay(String value) {
+        if (value == null || value.isBlank()) {
+            return value;
+        }
+        String normalized = value
+                .replace("\r\n", " ")
+                .replace('\r', ' ')
+                .replace('\n', ' ');
+        normalized = ESCAPED_CONTROL_PATTERN.matcher(normalized).replaceAll(" ");
+        normalized = WHITESPACE_PATTERN.matcher(normalized).replaceAll(" ").trim();
+        return normalized;
+    }
+
+    private JsonNode normalizeNodeForDisplay(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return node;
+        }
+        if (node.isTextual()) {
+            return TextNode.valueOf(normalizePayloadForDisplay(node.textValue()));
+        }
+        if (node.isArray()) {
+            ArrayNode arrayNode = objectMapper.createArrayNode();
+            node.forEach(child -> arrayNode.add(normalizeNodeForDisplay(child)));
+            return arrayNode;
+        }
+        if (node.isObject()) {
+            ObjectNode objectNode = objectMapper.createObjectNode();
+            node.fields().forEachRemaining(entry -> objectNode.set(entry.getKey(), normalizeNodeForDisplay(entry.getValue())));
+            return objectNode;
+        }
+        return node;
     }
 
     public record IntakeCardView(

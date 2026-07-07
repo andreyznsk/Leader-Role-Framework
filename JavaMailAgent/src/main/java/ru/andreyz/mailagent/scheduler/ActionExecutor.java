@@ -22,9 +22,16 @@ import java.nio.file.StandardCopyOption;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 
@@ -34,6 +41,13 @@ import lombok.RequiredArgsConstructor;
 public class ActionExecutor {
 
     private static final int MAX_STORED_EMAIL_ID_LENGTH = 120;
+    private static final Pattern URL_PATTERN = Pattern.compile("https?://\\S+");
+    private static final Pattern TICKET_PATTERN = Pattern.compile("\\b[A-Z][A-Z0-9]+-\\d+\\b");
+    private static final Pattern FILE_PATTERN = Pattern.compile("\\b\\S+\\.(png|jpe?g|gif|webp|pdf|docx?|xlsx?|pptx?|zip)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ISO_DATE_PATTERN = Pattern.compile("\\b\\d{4}-\\d{2}-\\d{2}\\b");
+    private static final Pattern LOCAL_DATE_PATTERN = Pattern.compile("\\b\\d{1,2}[./]\\d{1,2}[./]\\d{2,4}\\b");
+    private static final Pattern DEADLINE_LINE_PATTERN = Pattern.compile("(?i).*(deadline|due|before|until|by\\s+\\w+|срок|дедлайн|до\\s+\\S+|к\\s+\\S+).*");
+    private static final Pattern EXPECTED_RESULT_LINE_PATTERN = Pattern.compile("(?i).*(expected|result|ready|done when|готов|результат|итог).*");
 
     private final MemoryServiceClient memoryServiceClient;
     private final MailClient mailClient;
@@ -205,13 +219,15 @@ public class ActionExecutor {
     }
 
     private Map<String, Object> buildTaskSuggestedPayload(Email email, AgentResponse response) {
+        MailTaskSummary summary = buildMailTaskSummary(email, response);
         Map<String, Object> suggested = new LinkedHashMap<>();
         suggested.put("title", response.taskTitle());
-        suggested.put("description", buildPendingTaskDescription(email, response));
+        suggested.put("description", buildPendingTaskDescription(email, response, summary));
         suggested.put("emailId", response.emailId());
         suggested.put("sender", response.sender());
         suggested.put("priority", response.priority());
         suggested.put("subject", email.subject());
+        suggested.put("sourceSummary", summary.toMap());
         return suggested;
     }
 
@@ -265,13 +281,19 @@ public class ActionExecutor {
         );
     }
 
-    private String buildPendingTaskDescription(Email email, AgentResponse response) {
-        String agentSummary = normalizeMultiline(response.note());
-        String rawEmail = buildRawEmailBlock(email);
-        if (agentSummary == null) {
-            return rawEmail;
-        }
-        return agentSummary + "\n\n---\n\n" + rawEmail;
+    private String buildPendingTaskDescription(Email email, AgentResponse response, MailTaskSummary summary) {
+        List<String> lines = new ArrayList<>();
+        lines.add("## Mail intake summary");
+        addBullet(lines, "Initiator", summary.initiator());
+        addBullet(lines, "Requested action", summary.requestedAction());
+        addBullet(lines, "Context", summary.context());
+        addBullet(lines, "Deadline/date", summary.deadline());
+        addBullet(lines, "Links/tickets/artifacts", joinList(summary.artifacts()));
+        addBullet(lines, "Expected result", summary.expectedResult());
+        addBullet(lines, "Suggested route", summary.suggestedRoute());
+        addBullet(lines, "Source subject", summary.subject());
+        addBullet(lines, "Received at", summary.receivedAt());
+        return String.join("\n", lines).trim();
     }
 
     private String fallbackMailSummary(Email email, AgentResponse response) {
@@ -329,6 +351,104 @@ public class ActionExecutor {
             return null;
         }
         return value.strip();
+    }
+
+    private MailTaskSummary buildMailTaskSummary(Email email, AgentResponse response) {
+        String body = normalizeMultiline(email.body());
+        return new MailTaskSummary(
+            firstNonBlank(response.sender(), email.from()),
+            firstNonBlank(response.taskTitle(), email.subject(), "Mail task"),
+            firstNonBlank(normalizeMultiline(response.note()), summarizeBody(body)),
+            firstNonBlank(extractDeadline(body), email.receivedAt() != null ? email.receivedAt().toLocalDate().toString() : null),
+            extractArtifacts(email),
+            extractExpectedResult(body),
+            suggestedRoute(response.type()),
+            normalizeMultiline(email.subject()),
+            email.receivedAt() != null ? email.receivedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null
+        );
+    }
+
+    private String summarizeBody(String body) {
+        if (!hasText(body)) {
+            return null;
+        }
+        String normalized = body.replaceAll("\\s+", " ").trim();
+        if (normalized.length() <= 320) {
+            return normalized;
+        }
+        return normalized.substring(0, 317) + "...";
+    }
+
+    private String extractDeadline(String body) {
+        if (!hasText(body)) {
+            return null;
+        }
+        for (String line : body.split("\\R")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            if (ISO_DATE_PATTERN.matcher(trimmed).find()
+                || LOCAL_DATE_PATTERN.matcher(trimmed).find()
+                || DEADLINE_LINE_PATTERN.matcher(trimmed).matches()) {
+                return trimmed;
+            }
+        }
+        return null;
+    }
+
+    private List<String> extractArtifacts(Email email) {
+        Set<String> artifacts = new LinkedHashSet<>();
+        collectMatches(artifacts, URL_PATTERN, email.body());
+        collectMatches(artifacts, TICKET_PATTERN, email.subject());
+        collectMatches(artifacts, TICKET_PATTERN, email.body());
+        collectMatches(artifacts, FILE_PATTERN, email.body());
+        return new ArrayList<>(artifacts);
+    }
+
+    private String extractExpectedResult(String body) {
+        if (!hasText(body)) {
+            return null;
+        }
+        for (String line : body.split("\\R")) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty() && EXPECTED_RESULT_LINE_PATTERN.matcher(trimmed).matches()) {
+                return trimmed;
+            }
+        }
+        return null;
+    }
+
+    private void collectMatches(Set<String> target, Pattern pattern, String text) {
+        if (!hasText(text)) {
+            return;
+        }
+        Matcher matcher = pattern.matcher(text);
+        while (matcher.find()) {
+            target.add(matcher.group().trim());
+        }
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (hasText(value)) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private void addBullet(List<String> lines, String label, String value) {
+        if (hasText(value)) {
+            lines.add("- " + label + ": " + value.trim());
+        }
+    }
+
+    private String joinList(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        return String.join(", ", values);
     }
 
     private Object payloadFor(AgentResponseType responseType, String payloadJson) {
@@ -418,4 +538,38 @@ public class ActionExecutor {
         boolean moveEnabled,
         boolean markAsRead
     ) {}
+
+    private record MailTaskSummary(
+        String initiator,
+        String requestedAction,
+        String context,
+        String deadline,
+        List<String> artifacts,
+        String expectedResult,
+        String suggestedRoute,
+        String subject,
+        String receivedAt
+    ) {
+        private Map<String, Object> toMap() {
+            Map<String, Object> summary = new LinkedHashMap<>();
+            putIfPresent(summary, "initiator", initiator);
+            putIfPresent(summary, "requestedAction", requestedAction);
+            putIfPresent(summary, "context", context);
+            putIfPresent(summary, "deadline", deadline);
+            if (artifacts != null && !artifacts.isEmpty()) {
+                summary.put("artifacts", artifacts);
+            }
+            putIfPresent(summary, "expectedResult", expectedResult);
+            putIfPresent(summary, "suggestedRoute", suggestedRoute);
+            putIfPresent(summary, "subject", subject);
+            putIfPresent(summary, "receivedAt", receivedAt);
+            return summary;
+        }
+
+        private void putIfPresent(Map<String, Object> target, String key, String value) {
+            if (value != null && !value.isBlank()) {
+                target.put(key, value);
+            }
+        }
+    }
 }
