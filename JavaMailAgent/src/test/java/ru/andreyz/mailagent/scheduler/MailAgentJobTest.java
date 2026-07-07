@@ -3,9 +3,12 @@ package ru.andreyz.mailagent.scheduler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import ru.andreyz.common.agent.AgentClient;
 import ru.andreyz.mailagent.client.MailClient;
 import ru.andreyz.mailagent.config.MailConfig;
+import ru.andreyz.mailagent.model.AgentResponse;
+import ru.andreyz.mailagent.model.AgentResponseType;
 import ru.andreyz.mailagent.model.Email;
 import ru.andreyz.mailagent.model.ProcessedEmail;
 import ru.andreyz.mailagent.service.MailControlAuditStore;
@@ -15,12 +18,17 @@ import ru.andreyz.mailagent.service.MailPromptTemplateService;
 import ru.andreyz.mailagent.service.MailRuntimeConfigService;
 
 import java.time.LocalDateTime;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 class MailAgentJobTest {
+
+    @TempDir
+    Path tempDir;
 
     private MailClient mailClient;
     private PromptBuilder promptBuilder;
@@ -43,6 +51,8 @@ class MailAgentJobTest {
         MailConfig.MailProperties mailProperties = new MailConfig.MailProperties();
         mailProperties.setFetchLimit(20);
         MailConfig.PathProperties pathProperties = new MailConfig.PathProperties();
+        pathProperties.setInbox(tempDir.resolve("inbox").toString());
+        pathProperties.setProcessed(tempDir.resolve("processed").toString());
         MailConfig.ImapProperties imap = new MailConfig.ImapProperties();
         MailConfig.EwsProperties ews = new MailConfig.EwsProperties();
         MailConfig.FolderProperties folders = new MailConfig.FolderProperties();
@@ -150,6 +160,25 @@ class MailAgentJobTest {
     void resolveProcessingParallelismFallsBackToAvailableProcessorsWhenUnset() {
         assertThat(job.resolveProcessingParallelism())
             .isEqualTo(Math.max(1, Runtime.getRuntime().availableProcessors()));
+    }
+
+    @Test
+    void pollStoresLongEmailIdsUsingShortenedFileName() throws Exception {
+        String longEmailId = "ews-conv:" + "A".repeat(260);
+        Email email = email(longEmailId, "INBOX");
+        when(processingStateService.findErrorQueue()).thenReturn(List.of());
+        when(processingStateService.findByEmailId(anyString())).thenReturn(java.util.Optional.empty());
+        when(mailClient.listFolders(any())).thenReturn(List.of("INBOX"));
+        when(mailClient.listUnread("INBOX", 20)).thenReturn(List.of(email));
+        when(promptBuilder.build(any(Email.class))).thenReturn("prompt");
+        when(agentClient.complete("prompt")).thenReturn("""
+            {"type":"NOISE","emailId":"%s","sender":"sender@example.com","note":"ignored"}
+            """.formatted(longEmailId));
+
+        job.poll();
+
+        verify(actionExecutor).execute(eq(email), any(AgentResponse.class), eq("prompt"), contains("NOISE"));
+        assertThat(Files.exists(tempDir.resolve("inbox").resolve(ActionExecutor.storageFileName(longEmailId)))).isTrue();
     }
 
     private ProcessedEmail failedEmail(String emailId) {

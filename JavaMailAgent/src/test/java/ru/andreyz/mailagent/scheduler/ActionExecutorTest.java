@@ -315,6 +315,42 @@ class ActionExecutorTest {
     }
 
     @Test
+    void storageFileNameShortIdsStayReadable() {
+        assertEquals("user_test.com.json", ActionExecutor.storageFileName("user@test.com"));
+    }
+
+    @Test
+    void storageFileNameLongIdsAreShortenedWithStableHash() {
+        String longId = "ews-conv:" + "A".repeat(260);
+
+        String fileName = ActionExecutor.storageFileName(longId);
+
+        assertTrue(fileName.endsWith(".json"));
+        assertTrue(fileName.length() < 200);
+        assertEquals(fileName, ActionExecutor.storageFileName(longId));
+    }
+
+    @Test
+    void executeMovesLongIdEmailUsingShortenedStoredFileName() throws Exception {
+        Path inbox = tempDir.resolve("inbox");
+        Files.createDirectories(inbox);
+        String emailId = "ews-conv:" + "A".repeat(260);
+        String storedFileName = ActionExecutor.storageFileName(emailId);
+        Files.writeString(inbox.resolve(storedFileName), "{}");
+
+        AgentResponse response = new AgentResponse(
+            AgentResponseType.NOISE, emailId, "CI notification", null, null, null, null, null, null, null, null,
+            null, null, null, null, null
+        );
+
+        executor.execute(email(emailId), response);
+
+        verify(memoryServiceClient).createIntake(any());
+        assertFalse(Files.exists(inbox.resolve(storedFileName)));
+        assertTrue(Files.exists(tempDir.resolve("processed").resolve(storedFileName)));
+    }
+
+    @Test
     void noteCreatesIntakeItemAndMovesEmailToProcessed() throws Exception {
         Path inbox = tempDir.resolve("inbox");
         Files.createDirectories(inbox);

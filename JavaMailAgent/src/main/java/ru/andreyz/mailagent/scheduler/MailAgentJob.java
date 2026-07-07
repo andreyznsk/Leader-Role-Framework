@@ -245,7 +245,7 @@ public class MailAgentJob {
     private void saveToInbox(Email email) throws IOException {
         Path inboxDir = Path.of(pathProperties.getInbox());
         Files.createDirectories(inboxDir);
-        Path file = inboxDir.resolve(ActionExecutor.sanitize(email.id()) + ".json");
+        Path file = inboxDir.resolve(ActionExecutor.storageFileName(email.id()));
         Files.writeString(file, objectMapper.writeValueAsString(email));
     }
 

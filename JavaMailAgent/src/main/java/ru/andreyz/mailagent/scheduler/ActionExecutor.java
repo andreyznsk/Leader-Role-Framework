@@ -19,6 +19,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 @Component
 public class ActionExecutor {
 
+    private static final int MAX_STORED_EMAIL_ID_LENGTH = 120;
 
     private final MemoryServiceClient memoryServiceClient;
     private final MailClient mailClient;
@@ -99,14 +104,14 @@ public class ActionExecutor {
     }
 
     private Path resolveInbox(String emailId) {
-        return Path.of(pathProperties.getInbox(), sanitize(emailId) + ".json");
+        return Path.of(pathProperties.getInbox(), storageFileName(emailId));
     }
 
     private Path resolveProcessed(String emailId, String processedFolder) {
         String target = processedFolder != null && !processedFolder.isBlank()
                 ? processedFolder
                 : pathProperties.getProcessed();
-        return Path.of(target, sanitize(emailId) + ".json");
+        return Path.of(target, storageFileName(emailId));
     }
 
     private StepResult executeMailIntakeRoute(MailProcessingRoute route,
@@ -376,6 +381,26 @@ public class ActionExecutor {
 
     static String sanitize(String emailId) {
         return emailId.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    static String storageFileName(String emailId) {
+        String sanitized = sanitize(emailId);
+        if (sanitized.length() <= MAX_STORED_EMAIL_ID_LENGTH) {
+            return sanitized + ".json";
+        }
+        String hash = stableHash(emailId);
+        int prefixLength = Math.max(1, MAX_STORED_EMAIL_ID_LENGTH - hash.length() - 1);
+        return sanitized.substring(0, prefixLength) + "_" + hash + ".json";
+    }
+
+    private static String stableHash(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash, 0, 12);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     private record StepResult(
