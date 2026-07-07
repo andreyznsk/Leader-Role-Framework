@@ -38,9 +38,11 @@ public class IntakeService {
 
     public IntakeItemDto create(IntakeCreateRequest request) {
         Instant now = Instant.now();
+        String sourceType = normalizeRequired(request.sourceType(), "sourceType");
+        String suggestedPayloadJson = serializeJson(request.suggestedPayload());
         IntakeItem created = intakeStore.save(new IntakeItem(
                 UUID.randomUUID(),
-                normalizeRequired(request.sourceType(), "sourceType"),
+                sourceType,
                 blankToNull(request.sourceId()),
                 serializeJson(request.sourcePayload()),
                 extractText(request.sourcePayload()),
@@ -49,9 +51,9 @@ public class IntakeService {
                 serializeJson(request.agentResult()),
                 extractText(request.agentResult()),
                 normalizeOptional(request.suggestedRoute()),
-                serializeJson(request.suggestedPayload()),
+                suggestedPayloadJson,
                 null,
-                null,
+                defaultFinalPayloadJson(sourceType, suggestedPayloadJson),
                 "NEW",
                 normalizeConfidence(request.confidence()),
                 defaultCreatedBy(request.createdBy(), request.sourceType()),
@@ -333,5 +335,12 @@ public class IntakeService {
             throw new IllegalArgumentException("finalRoute is required");
         }
         return route;
+    }
+
+    private String defaultFinalPayloadJson(String sourceType, String suggestedPayloadJson) {
+        if (!"MAIL".equals(sourceType)) {
+            return null;
+        }
+        return suggestedPayloadJson;
     }
 }

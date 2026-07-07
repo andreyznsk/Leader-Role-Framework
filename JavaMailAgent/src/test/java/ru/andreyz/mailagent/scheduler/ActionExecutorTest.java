@@ -188,21 +188,76 @@ class ActionExecutorTest {
         assertEquals("TASK", requestCaptor.getValue().get("suggestedRoute"));
         assertEquals(
             """
-            Нужно проверить обновление пайплайна и дать ответ.
-
-            ---
-
-            ## Сырой текст письма
-            Тема: Pipeline update
-            От: ivanov@test.com
-
-            Коллеги,
-            нужно проверить новый pipeline до пятницы.
-            Спасибо.
+            ## Mail intake summary
+            - Initiator: ivanov@test.com
+            - Requested action: Проверить обновление пайплайна
+            - Context: Нужно проверить обновление пайплайна и дать ответ.
+            - Deadline/date: нужно проверить новый pipeline до пятницы.
+            - Suggested route: TASK
+            - Source subject: Pipeline update
+            - Received at: 2026-06-20T10:15:00
             """.strip(),
             suggestedPayload.get("description")
         );
         assertEquals("Проверить обновление пайплайна", suggestedPayload.get("title"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> sourceSummary = (Map<String, Object>) suggestedPayload.get("sourceSummary");
+        assertEquals("ivanov@test.com", sourceSummary.get("initiator"));
+        assertEquals("Проверить обновление пайплайна", sourceSummary.get("requestedAction"));
+        assertEquals("Нужно проверить обновление пайплайна и дать ответ.", sourceSummary.get("context"));
+        assertEquals("нужно проверить новый pipeline до пятницы.", sourceSummary.get("deadline"));
+        assertEquals("TASK", sourceSummary.get("suggestedRoute"));
+    }
+
+    @Test
+    void requestSummaryCapturesArtifactsAndExpectedResult() throws Exception {
+        Path inbox = tempDir.resolve("inbox");
+        Files.createDirectories(inbox);
+        String emailId = "test-request-summary-001";
+        Files.writeString(inbox.resolve(emailId + ".json"), "{}");
+
+        AgentResponse response = new AgentResponse(
+            AgentResponseType.REQUEST, emailId,
+            "Нужно подготовить релизный ответ клиенту.",
+            null,
+            "Подготовить релизный ответ",
+            "HIGH",
+            "pm@test.com",
+            null,
+            null,
+            null,
+            null,
+            null, null, null, null, null
+        );
+
+        Email email = email(
+            emailId,
+            "REL-42 release follow-up",
+            "pm@test.com",
+            """
+            Коллеги,
+            до 2026-07-10 нужно проверить тикет REL-42 и скриншот release.png.
+            Подробности: https://tracker.local/REL-42
+            Ожидаемый результат: подтвердить готовность релиза и отправить ответ клиенту.
+            """
+        );
+
+        executor.execute(email, response);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> requestCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(memoryServiceClient).createIntake(requestCaptor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> suggestedPayload = (Map<String, Object>) requestCaptor.getValue().get("suggestedPayload");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> sourceSummary = (Map<String, Object>) suggestedPayload.get("sourceSummary");
+
+        assertEquals("до 2026-07-10 нужно проверить тикет REL-42 и скриншот release.png.", sourceSummary.get("deadline"));
+        assertEquals("Ожидаемый результат: подтвердить готовность релиза и отправить ответ клиенту.", sourceSummary.get("expectedResult"));
+        assertEquals(
+            List.of("https://tracker.local/REL-42", "REL-42", "release.png"),
+            sourceSummary.get("artifacts")
+        );
     }
 
     @Test

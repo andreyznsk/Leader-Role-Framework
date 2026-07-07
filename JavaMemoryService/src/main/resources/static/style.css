@@ -773,3 +773,16 @@ html.los-collapsed .los-nav-item:hover::after {
 .toastui-editor-md-code-block editor {
   font-family: var(--mono);
 }
+
+.intake-payload-box {
+  height: 16rem;
+  min-height: 16rem;
+  max-height: 16rem;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.intake-original-payload {
+  white-space: pre-wrap;
+  margin-bottom: 0;
+}
