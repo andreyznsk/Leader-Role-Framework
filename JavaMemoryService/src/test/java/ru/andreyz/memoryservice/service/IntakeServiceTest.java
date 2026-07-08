@@ -56,6 +56,29 @@ class IntakeServiceTest {
         assertThat(created.status()).isEqualTo("NEW");
         assertThat(created.sourceType()).isEqualTo("MANUAL");
         assertThat(created.confidence()).isEqualByComparingTo(BigDecimal.valueOf(0.87).setScale(4));
+        assertThat(created.finalPayload()).isNull();
+    }
+
+    @Test
+    void createMailItemCopiesSuggestedPayloadIntoDefaultFinalPayload() {
+        var suggestedPayload = JsonNodeFactory.instance.objectNode()
+                .put("title", "Mail task")
+                .put("description", "summary");
+
+        var created = service.create(new IntakeCreateRequest(
+                "MAIL",
+                "message-1",
+                JsonNodeFactory.instance.objectNode().put("body", "hello"),
+                "mock",
+                "prompt",
+                TextNode.valueOf("{\"route\":\"TASK\"}"),
+                "TASK",
+                suggestedPayload,
+                0.65,
+                "mail-agent"
+        ));
+
+        assertThat(created.finalPayload()).isEqualTo(suggestedPayload);
     }
 
     @Test
