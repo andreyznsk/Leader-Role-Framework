@@ -4,7 +4,7 @@
 **Статус:** Draft  
 **Сервис:** MEM / JavaMemoryService  
 **Тип:** enhancement  
-**Связанный Issue:** TBD
+**Связанный Issue:** #83
 
 ## Проблема / Мотивация
 
