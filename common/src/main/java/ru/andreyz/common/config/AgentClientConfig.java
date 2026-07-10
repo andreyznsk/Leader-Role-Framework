@@ -28,6 +28,13 @@ public class AgentClientConfig {
     @ConditionalOnProperty(name = "agent.provider", havingValue = "agent", matchIfMissing = true)
     public AgentClient agentAgentClient(@Value("${agent.command:}") String agentCommand,
                                         @Value("${agent.timeout-minutes:5}") int timeoutMinutes,
+                                        @Value("${agent.shell.enabled:false}") boolean shellEnabled,
+                                        @Value("${agent.shell.executable:}") String shellExecutable,
+                                        @Value("${agent.shell.login:false}") boolean shellLogin,
+                                        @Value("${agent.shell.interactive:false}") boolean shellInteractive,
+                                        @Value("${agent.startup-probe.enabled:false}") boolean startupProbeEnabled,
+                                        @Value("${agent.startup-probe.prompt:ping}") String startupProbePrompt,
+                                        @Value("${agent.env.path-prepend:}") String pathPrepend,
                                         Environment environment) {
         boolean providerExplicitlyConfigured = environment.containsProperty("agent.provider");
         if (!StringUtils.hasText(agentCommand)) {
@@ -37,7 +44,16 @@ public class AgentClientConfig {
             agentCommand = "agent --print";
         }
         log.info("AgentClient provider: {}", agentCommand);
-        return new CodeProcessAgentClient(agentCommand, timeoutMinutes);
+        return new CodeProcessAgentClient(
+                agentCommand,
+                timeoutMinutes,
+                shellEnabled,
+                shellExecutable,
+                shellLogin,
+                shellInteractive,
+                startupProbeEnabled,
+                startupProbePrompt,
+                pathPrepend);
     }
 
     @Bean
