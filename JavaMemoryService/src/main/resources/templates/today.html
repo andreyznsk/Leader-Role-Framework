@@ -211,9 +211,9 @@
         <div class="card-body p-0">
             <div th:if="${#lists.isEmpty(currentTasks)}" class="text-muted p-3">Задач нет</div>
             <div id="today-list">
-                <div th:each="task : ${currentTasks}"
-                     th:data-id="${task.id}"
-                     class="d-flex align-items-center border-bottom px-3 py-2 task-row">
+                <div th:each="task : ${currentTasks}" class="border-bottom task-row-wrapper">
+                <div th:data-id="${task.id}"
+                     class="d-flex align-items-center px-3 py-2 task-row">
 
                     <!-- Done checkbox -->
                     <button type="button"
@@ -300,6 +300,30 @@
                                 th:attr="data-id=${task.id},data-title=${task.title}"
                                 onclick="openDeleteTaskModal(this.dataset.id, this.dataset.title)">×</button>
                     </div>
+                </div>
+
+                <!-- Related tasks (RELATES_TO) -->
+                <details th:if="${relatedTasksByTaskId.containsKey(task.id)}"
+                          class="related-tasks-details px-3 pb-2" data-testid="today-related-tasks">
+                    <summary class="small text-muted">
+                        Связанные задачи (<span th:text="${#lists.size(relatedTasksByTaskId.get(task.id))}">0</span>)
+                    </summary>
+                    <div class="mt-1 ps-3 d-flex flex-column gap-1">
+                        <div th:each="related : ${relatedTasksByTaskId.get(task.id)}"
+                             class="d-flex flex-wrap align-items-center gap-2 small py-1 border-top">
+                            <a class="related-task-link task-title-clickable"
+                               th:href="@{/ui/tasks/{id}/edit(id=${related.id})}"
+                               th:text="${related.title}">Related task</a>
+                            <span class="badge bg-secondary" th:text="${related.status}">TODO</span>
+                            <span class="badge bg-dark border" th:text="${related.priority}">NORMAL</span>
+                            <span th:if="${related.dueDate != null}" class="text-muted"
+                                  th:text="${#temporals.format(related.dueDate, 'dd.MM.yyyy')}">—</span>
+                            <span th:if="${related.assignedPerson != null}" class="text-muted">
+                                <span>👤 </span><span th:text="${related.assignedPerson.fullName}">Иван Иванов</span>
+                            </span>
+                        </div>
+                    </div>
+                </details>
                 </div>
             </div>
 

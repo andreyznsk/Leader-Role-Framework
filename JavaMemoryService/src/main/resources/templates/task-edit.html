@@ -6,7 +6,7 @@
 <link rel="stylesheet" th:href="@{/vendor/toastui/toastui-editor-dark.min.css}"/>
 <div th:replace="~{fragments/layout :: sidebar}"></div>
 
-<div class="container los-page-content">
+<div class="container-fluid py-3 px-4 los-page-content">
     <div class="d-flex align-items-center mb-3">
         <a href="/ui/today" class="btn btn-sm btn-outline-secondary me-3">← Назад</a>
         <h4 class="mb-0">Задача #<span th:text="${task.id}"></span></h4>
@@ -43,7 +43,7 @@
                         <ul id="task-editor-links-list"></ul>
                     </div>
                     <div class="mt-1">
-                        <a class="btn btn-sm btn-outline-secondary" th:href="${exportUrl}">Export MD</a>
+                        <a class="btn btn-sm btn-outline-secondary" th:href="${exportUrl}" data-skip-unsaved-check="true">Export MD</a>
                     </div>
                 </div>
 
@@ -200,6 +200,22 @@
                             <span class="text-muted small" th:text="${#lists.size(taskLinks)} + ' items'">0 items</span>
                         </div>
 
+                        <details th:if="${!#lists.isEmpty(relatedTaskLinks)}" class="mb-3" data-testid="edit-related-tasks">
+                            <summary class="small text-muted">
+                                Связанные задачи (<span th:text="${#lists.size(relatedTaskLinks)}">0</span>)
+                            </summary>
+                            <div class="mt-2 d-flex flex-column gap-1">
+                                <div th:each="related : ${relatedTaskLinks}"
+                                     class="d-flex flex-wrap align-items-center gap-2 small py-1 border-top">
+                                    <a class="related-task-link"
+                                       th:href="@{/ui/tasks/{id}/edit(id=${related.relatedTaskId})}"
+                                       th:text="${related.relatedTaskTitle != null ? related.relatedTaskTitle : ('TASK-' + related.relatedTaskId)}">Related task</a>
+                                    <span class="badge bg-secondary" th:text="${related.relatedTaskStatus}">TODO</span>
+                                    <span class="badge bg-dark border" th:text="${related.direction}">OUT</span>
+                                </div>
+                            </div>
+                        </details>
+
                         <div th:if="${#lists.isEmpty(taskLinks)}" class="text-muted small">Связей пока нет.</div>
                         <div th:unless="${#lists.isEmpty(taskLinks)}"
                              id="task-links-list"
@@ -298,6 +314,26 @@
             </div>
         </div>
     </div>
+
+    <!-- Unsaved changes guard -->
+    <div class="modal fade" id="unsaved-changes-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Несохранённые изменения</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">В задаче есть несохранённые изменения. Сохранить их перед выходом?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-outline-danger" id="unsaved-changes-discard">Не сохранять</button>
+                    <button type="button" class="btn btn-primary" id="unsaved-changes-save">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -331,7 +367,10 @@ const descriptionEditor = new toastui.Editor({
         }
     }
 });
-descriptionEditor.on('change', updateLinksPreview);
+descriptionEditor.on('change', function () {
+    updateLinksPreview();
+    markDirty();
+});
 
 // Links preview: extract URLs from editor content, render as clickable links
 function updateLinksPreview() {
@@ -381,13 +420,23 @@ function confirmDelete(btn) {
 
 updateLinksPreview();
 
-document.getElementById('task-edit-form').addEventListener('submit', async function (event) {
-    event.preventDefault();
+// Unsaved-changes tracking (warn on navigating away with unsaved edits)
+let formDirty = false;
+let dirtyTrackingArmed = false;
+window.setTimeout(function () { dirtyTrackingArmed = true; }, 300);
 
-    const form = event.currentTarget;
+function markDirty() {
+    if (!dirtyTrackingArmed) return;
+    formDirty = true;
+}
+
+const taskEditForm = document.getElementById('task-edit-form');
+taskEditForm.addEventListener('input', markDirty);
+taskEditForm.addEventListener('change', markDirty);
+
+async function performSave() {
+    const form = taskEditForm;
     const taskId = form.dataset.taskId;
-    const submitter = event.submitter;
-    const closeAfterSave = submitter && submitter.dataset.closeAfterSave === 'true';
     const saveStatus = document.getElementById('save-status');
     const formData = new FormData(form);
     const metaPayload = {
@@ -404,14 +453,14 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
     const originalStatus = statusSelect ? statusSelect.dataset.originalStatus : null;
     if (metaPayload.status === 'DONE' && originalStatus !== 'DONE'
         && !window.confirm('Перевести задачу в статус DONE?')) {
-        return;
+        return false;
     }
     if (metaPayload.status === 'DELEGATED' && !metaPayload.assignedPersonId) {
         saveStatus.textContent = 'Для статуса DELEGATED нужно выбрать исполнителя.';
         saveStatus.classList.remove('d-none');
         saveStatus.classList.remove('alert-success');
         saveStatus.classList.add('alert-danger');
-        return;
+        return false;
     }
 
     try {
@@ -431,19 +480,8 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
             body: description
         });
 
-        if (closeAfterSave) {
-            window.LeaderUiApi.handleSuccess('redirect:/ui/today', {response: {status: 200}, data: null});
-            return;
-        }
-        saveStatus.textContent = 'Задача сохранена';
-        saveStatus.classList.remove('d-none');
-        if (saveStatusTimer) {
-            window.clearTimeout(saveStatusTimer);
-        }
-        saveStatusTimer = window.setTimeout(function () {
-            saveStatus.classList.add('d-none');
-            saveStatus.textContent = '';
-        }, 3000);
+        formDirty = false;
+        return true;
     } catch (error) {
         saveStatus.textContent = error && error.data && error.data.message
             ? error.data.message
@@ -451,8 +489,103 @@ document.getElementById('task-edit-form').addEventListener('submit', async funct
         saveStatus.classList.remove('d-none');
         saveStatus.classList.remove('alert-success');
         saveStatus.classList.add('alert-danger');
+        return false;
     }
+}
+
+taskEditForm.addEventListener('submit', async function (event) {
+    event.preventDefault();
+
+    const submitter = event.submitter;
+    const closeAfterSave = submitter && submitter.dataset.closeAfterSave === 'true';
+
+    const saved = await performSave();
+    if (!saved) return;
+
+    if (closeAfterSave) {
+        window.LeaderUiApi.handleSuccess('redirect:/ui/today', {response: {status: 200}, data: null});
+        return;
+    }
+    const saveStatus = document.getElementById('save-status');
+    saveStatus.textContent = 'Задача сохранена';
+    saveStatus.classList.remove('d-none');
+    if (saveStatusTimer) {
+        window.clearTimeout(saveStatusTimer);
+    }
+    saveStatusTimer = window.setTimeout(function () {
+        saveStatus.classList.add('d-none');
+        saveStatus.textContent = '';
+    }, 3000);
 });
+
+// Guard navigation away from the page while there are unsaved changes
+(function () {
+    const modalEl = document.getElementById('unsaved-changes-modal');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    let pendingHref = null;
+    let pendingIsBack = false;
+
+    function isGuardableLink(link) {
+        if (!link) return false;
+        if (link.target && link.target !== '_self') return false;
+        if (link.dataset.skipUnsavedCheck === 'true') return false;
+        if (link.classList.contains('attachment-open-link')) return false;
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:')) return false;
+        return true;
+    }
+
+    function proceed() {
+        if (pendingIsBack) {
+            window.location.href = document.referrer || '/ui/today';
+        } else if (pendingHref) {
+            window.location.href = pendingHref;
+        }
+        pendingHref = null;
+        pendingIsBack = false;
+    }
+
+    document.addEventListener('click', function (event) {
+        if (!formDirty) return;
+        const link = event.target.closest('a[href]');
+        if (!isGuardableLink(link)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        pendingHref = link.href;
+        pendingIsBack = false;
+        modal.show();
+    }, true);
+
+    window.addEventListener('beforeunload', function (event) {
+        if (!formDirty) return;
+        event.preventDefault();
+        event.returnValue = '';
+    });
+
+    history.pushState({losGuard: true}, '', window.location.href);
+    window.addEventListener('popstate', function () {
+        if (!formDirty) {
+            return;
+        }
+        history.pushState({losGuard: true}, '', window.location.href);
+        pendingHref = null;
+        pendingIsBack = true;
+        modal.show();
+    });
+
+    document.getElementById('unsaved-changes-discard').addEventListener('click', function () {
+        formDirty = false;
+        modal.hide();
+        proceed();
+    });
+
+    document.getElementById('unsaved-changes-save').addEventListener('click', async function () {
+        const saved = await performSave();
+        if (!saved) return;
+        modal.hide();
+        proceed();
+    });
+})();
 
 document.getElementById('timeline-comment-submit')?.addEventListener('click', async function () {
     const form = document.getElementById('timeline-comment-form');

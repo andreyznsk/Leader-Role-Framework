@@ -1,7 +1,7 @@
-# 2026-07-08_CR-MEM-034: Related Task Dropdowns in Task UI
+``# 2026-07-08_CR-MEM-034: Related Task Dropdowns in Task UI
 
 **Дата:** 2026-07-08  
-**Статус:** Draft  
+**Статус:** Implemented  
 **Сервис:** MEM / JavaMemoryService  
 **Тип:** enhancement  
 **Связанный Issue:** #83

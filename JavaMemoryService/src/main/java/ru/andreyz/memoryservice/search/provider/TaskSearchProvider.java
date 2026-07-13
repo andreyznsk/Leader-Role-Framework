@@ -27,14 +27,14 @@ public class TaskSearchProvider implements SearchProvider {
             FROM (
                 SELECT t.id, t.title, t.description, t.status, t.priority, t.due_date, t.source, t.updated_at,
                        d.content_md,
-                       ts_rank_cd(t.search_vector, (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))) AS task_rank,
-                       ts_rank_cd(d.search_vector, (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))) AS description_rank
+                       ts_rank_cd(t.search_vector, (to_tsquery('russian', :tsQuery) || to_tsquery('english', :tsQuery))) AS task_rank,
+                       ts_rank_cd(d.search_vector, (to_tsquery('russian', :tsQuery) || to_tsquery('english', :tsQuery))) AS description_rank
                 FROM tasks t
                 LEFT JOIN task_descriptions d ON d.task_id = t.id
                 WHERE t.status NOT IN ('DELETED', 'ARCHIVED')
                   AND (
-                        t.search_vector @@ (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))
-                        OR d.search_vector @@ (websearch_to_tsquery('russian', :query) || websearch_to_tsquery('english', :query))
+                        t.search_vector @@ (to_tsquery('russian', :tsQuery) || to_tsquery('english', :tsQuery))
+                        OR d.search_vector @@ (to_tsquery('russian', :tsQuery) || to_tsquery('english', :tsQuery))
                   )
             ) sub
             ORDER BY ((COALESCE(task_rank, 0) * 0.50) + (COALESCE(description_rank, 0) * 0.35)) DESC, updated_at DESC
@@ -68,9 +68,12 @@ public class TaskSearchProvider implements SearchProvider {
     public List<SearchResultItem> search(String query, int limit) {
         var parsed = searchQueryParser.parse(query);
         if (postgresSearchRuntime.isPostgres()) {
+            if (parsed.postgresTsQuery().isBlank()) {
+                return List.of();
+            }
             return jdbcTemplate.query(TASK_SEARCH_SQL,
                     new MapSqlParameterSource()
-                            .addValue("query", parsed.normalizedQuery().isBlank() ? parsed.originalQuery() : parsed.normalizedQuery())
+                            .addValue("tsQuery", parsed.postgresTsQuery())
                             .addValue("limit", limit),
                     (rs, rowNum) -> {
                         String contentMd = rs.getString("content_md");

@@ -58,6 +58,7 @@ public class TaskEditController {
         model.addAttribute("exportUrl", "/api/tasks/%d/description/export-md".formatted(id));
         model.addAttribute("attachments", taskAttachmentService.list(id));
         model.addAttribute("taskLinks", taskLinkService.list(id));
+        model.addAttribute("relatedTaskLinks", taskLinkService.listRelated(id));
         model.addAttribute("people", peopleService.findAll().stream()
                 .sorted(java.util.Comparator.comparing(person -> person.fullName().toLowerCase()))
                 .toList());
