@@ -11,6 +11,11 @@
 запрет self-link, запрет точного дубля, удаление связи, а также proposal-flow через
 Intake Gateway (`proposeTaskLink` → `/ui/intake` → Apply).
 
+Также проверяет CR-MEM-034: отображение `RELATES_TO` связей как раскрываемого
+dropdown-блока связанных задач на `/ui/today` и внутри блока `Linked Tasks` на
+`/ui/tasks/{id}/edit`, включая кликабельные названия и зеркальное отображение связи
+с обеих сторон.
+
 ## Preconditions
 - JavaMemoryService запущен на :8082
 
@@ -92,6 +97,48 @@ curl -s "http://localhost:8082/api/tasks/$TASK_A/links" | jq 'length'
 ```
 **Expected:** `204`, затем `1` (осталась только связь с C из шага 6)
 
+### Step 8 — Создать задачи D и E, связать RELATES_TO (для проверки UI CR-MEM-034)
+```bash
+TASK_D=$(curl -s -X POST http://localhost:8082/api/tasks \
+  -H "Content-Type: application/json" \
+  -d "{\"title\": \"E2E Related Task D\", \"date\": \"$TODAY\", \"priority\": \"NORMAL\", \"source\": \"MANUAL\"}" | jq -r '.id')
+TASK_E=$(curl -s -X POST http://localhost:8082/api/tasks \
+  -H "Content-Type: application/json" \
+  -d "{\"title\": \"E2E Related Task E\", \"date\": \"$TODAY\", \"priority\": \"NORMAL\", \"source\": \"MANUAL\"}" | jq -r '.id')
+
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "http://localhost:8082/api/tasks/$TASK_D/links" \
+  -H "Content-Type: application/json" \
+  -d "{\"toTaskId\": $TASK_E, \"linkType\": \"RELATES_TO\"}"
+```
+**Expected:** `201`
+
+### Step 9 — `/ui/today` содержит раскрываемый блок связанных задач и ссылку на E
+```bash
+curl -s "http://localhost:8082/ui/today" > /tmp/e2e_today.html
+grep -c 'data-testid="today-related-tasks"' /tmp/e2e_today.html
+grep -c "/ui/tasks/$TASK_E/edit" /tmp/e2e_today.html
+```
+**Expected:** оба счётчика `>= 1`
+
+### Step 10 — `/ui/tasks/{D}/edit` содержит блок `Linked Tasks` с кликабельным названием связанной задачи
+```bash
+curl -s "http://localhost:8082/ui/tasks/$TASK_D/edit" > /tmp/e2e_edit_d.html
+grep -c "Linked tasks" /tmp/e2e_edit_d.html
+grep -c 'data-testid="edit-related-tasks"' /tmp/e2e_edit_d.html
+grep -c "/ui/tasks/$TASK_E/edit" /tmp/e2e_edit_d.html
+grep -c "E2E Related Task E" /tmp/e2e_edit_d.html
+```
+**Expected:** все счётчики `>= 1`
+
+### Step 11 — `/ui/tasks/{E}/edit` показывает зеркальную связь (D)
+```bash
+curl -s "http://localhost:8082/ui/tasks/$TASK_E/edit" > /tmp/e2e_edit_e.html
+grep -c 'data-testid="edit-related-tasks"' /tmp/e2e_edit_e.html
+grep -c "/ui/tasks/$TASK_D/edit" /tmp/e2e_edit_e.html
+grep -c "E2E Related Task D" /tmp/e2e_edit_e.html
+```
+**Expected:** все счётчики `>= 1`
+
 ## Известное ограничение
 Как и в CR-MEM-030, каскадное удаление связей на уровне БД (`ON DELETE CASCADE`) сработает
 только при жёстком `DELETE` задачи, которого в приложении нет (только soft `archive`).
@@ -103,4 +150,7 @@ curl -s "http://localhost:8082/api/tasks/$TASK_A/links" | jq 'length'
 curl -s -X POST "http://localhost:8082/api/tasks/$TASK_A/archive" > /dev/null
 curl -s -X POST "http://localhost:8082/api/tasks/$TASK_B/archive" > /dev/null
 curl -s -X POST "http://localhost:8082/api/tasks/$TASK_C/archive" > /dev/null
+curl -s -X POST "http://localhost:8082/api/tasks/$TASK_D/archive" > /dev/null
+curl -s -X POST "http://localhost:8082/api/tasks/$TASK_E/archive" > /dev/null
+rm -f /tmp/e2e_today.html /tmp/e2e_edit_d.html /tmp/e2e_edit_e.html
 ```

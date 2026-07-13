@@ -51,6 +51,12 @@ public class TaskLinkService {
                 .toList();
     }
 
+    public List<TaskLinkResponse> listRelated(Long taskId) {
+        return list(taskId).stream()
+                .filter(link -> TaskLink.RELATES_TO.equals(link.linkType()))
+                .toList();
+    }
+
     public void delete(Long taskId, Long linkId) {
         requireTask(taskId);
         TaskLink link = taskLinkRepository.findById(linkId)

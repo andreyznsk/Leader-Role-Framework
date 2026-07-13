@@ -8,6 +8,7 @@ import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.repository.DailyPlanRepository;
 import ru.andreyz.memoryservice.repository.IncidentRepository;
 import ru.andreyz.memoryservice.service.PeopleService;
+import ru.andreyz.memoryservice.service.TaskLinkService;
 import ru.andreyz.memoryservice.service.TaskRelationService;
 import ru.andreyz.memoryservice.service.TaskService;
 
@@ -42,17 +43,20 @@ public class TodayViewController {
     private final PeopleService peopleService;
     private final DailyPlanRepository planRepository;
     private final IncidentRepository incidentRepository;
+    private final TaskLinkService taskLinkService;
 
     public TodayViewController(TaskService taskService,
                                TaskRelationService taskRelationService,
                                PeopleService peopleService,
                                DailyPlanRepository planRepository,
-                               IncidentRepository incidentRepository) {
+                               IncidentRepository incidentRepository,
+                               TaskLinkService taskLinkService) {
         this.taskService = taskService;
         this.taskRelationService = taskRelationService;
         this.peopleService = peopleService;
         this.planRepository = planRepository;
         this.incidentRepository = incidentRepository;
+        this.taskLinkService = taskLinkService;
     }
 
     @GetMapping({"/", "/today"})
@@ -89,11 +93,22 @@ public class TodayViewController {
         long doneTodayCount = allCurrentTasks.stream().filter(t -> "DONE".equals(t.status())).count();
         long openIncidentsCount = incidentRepository.findByStatus("OPEN").size();
 
+        Map<Long, List<Task>> relatedTasksByTaskId = new java.util.LinkedHashMap<>();
+        for (Task task : currentTasks) {
+            List<Task> related = taskLinkService.listRelated(task.id()).stream()
+                    .map(link -> taskService.findById(link.relatedTaskId()))
+                    .toList();
+            if (!related.isEmpty()) {
+                relatedTasksByTaskId.put(task.id(), related);
+            }
+        }
+
         model.addAttribute("today", today);
         model.addAttribute("tomorrow", tomorrow);
         model.addAttribute("pending", pending);
         model.addAttribute("currentTasks", currentTasks);
         model.addAttribute("currentTasksCount", allCurrentTasks.size());
+        model.addAttribute("relatedTasksByTaskId", relatedTasksByTaskId);
         model.addAttribute("pendingCount", pending.size());
         model.addAttribute("doneTodayCount", doneTodayCount);
         model.addAttribute("openIncidentsCount", openIncidentsCount);
