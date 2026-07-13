@@ -717,7 +717,7 @@ docker compose up -d
 | `05_pending_task_flow.md` | HIGH | PENDING → confirm → TODO / reject → ARCHIVED |
 | `17_task_timeline_archive_flow.md` | HIGH | timeline событий задачи + archive flow |
 | `23_task_attachments.md` | HIGH | upload/download/link/delete вложений, отклонение path traversal, недопустимого MIME и превышения размера (CR-MEM-030) |
-| `25_task_links.md` | HIGH | POST/GET/DELETE связей, зеркальные типы, дубль → 409, self-link → 400, MCP proposeTaskLink → intake apply (CR-MEM-031) |
+| `25_task_links.md` | HIGH | POST/GET/DELETE связей, зеркальные типы, дубль → 409, self-link → 400, MCP proposeTaskLink → intake apply (CR-MEM-031); dropdown связанных задач RELATES_TO на `/ui/today` и внутри `Linked Tasks` на `/ui/tasks/{id}/edit`, зеркальное отображение с обеих сторон (CR-MEM-034) |
 | `18_agent_workspace.md` | HIGH | Agent Workspace: UI smoke, Chat mode (mock), аудит в БД, WebSocket upgrade, security whitelist (CR-MEM-012) |
 | `06_incidents.md` | HIGH | OPEN → INVESTIGATING → RESOLVED |
 | `07_risks.md` | MEDIUM | OPEN → MITIGATED + getContext |

@@ -7,6 +7,7 @@ import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.repository.DailyPlanRepository;
 import ru.andreyz.memoryservice.repository.IncidentRepository;
 import ru.andreyz.memoryservice.service.PeopleService;
+import ru.andreyz.memoryservice.service.TaskLinkService;
 import ru.andreyz.memoryservice.service.TaskRelationService;
 import ru.andreyz.memoryservice.service.TaskService;
 
@@ -28,7 +29,8 @@ class TodayViewControllerTest {
         PeopleService peopleService = mock(PeopleService.class);
         DailyPlanRepository planRepository = mock(DailyPlanRepository.class);
         IncidentRepository incidentRepository = mock(IncidentRepository.class);
-        TodayViewController controller = new TodayViewController(taskService, taskRelationService, peopleService, planRepository, incidentRepository);
+        TaskLinkService taskLinkService = mock(TaskLinkService.class);
+        TodayViewController controller = new TodayViewController(taskService, taskRelationService, peopleService, planRepository, incidentRepository, taskLinkService);
         Model model = new ExtendedModelMap();
 
         Task criticalTodo = task(1L, "Critical TODO", "TODO", "CRITICAL", LocalDate.now(), 2);
@@ -62,7 +64,8 @@ class TodayViewControllerTest {
         PeopleService peopleService = mock(PeopleService.class);
         DailyPlanRepository planRepository = mock(DailyPlanRepository.class);
         IncidentRepository incidentRepository = mock(IncidentRepository.class);
-        TodayViewController controller = new TodayViewController(taskService, taskRelationService, peopleService, planRepository, incidentRepository);
+        TaskLinkService taskLinkService = mock(TaskLinkService.class);
+        TodayViewController controller = new TodayViewController(taskService, taskRelationService, peopleService, planRepository, incidentRepository, taskLinkService);
         Model model = new ExtendedModelMap();
 
         LocalDate today = LocalDate.now();
