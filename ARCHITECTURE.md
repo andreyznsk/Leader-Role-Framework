@@ -1,6 +1,6 @@
 # LeaderOS — Architecture - Мастер-Спека
 
-**Последнее обновление:** 2026-07-03
+**Последнее обновление:** 2026-07-13
 **Статус:** Living document — обновлять при любом изменении контрактов между сервисами
 **git:** https://github.com/andreyznsk/Leader-Role-Framework.git
 ---
@@ -45,7 +45,7 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 **Статус:** Implemented
 
 **Роль:** Общая инфраструктура LeaderOS. Содержит единый внешний контракт
-`AgentClient` для вызова LLM из сервисов.
+`AgentClient` для вызова LLM из сервисов и shared Jira client infrastructure для Memory-owned Jira flow.
 
 **Интерфейс:**
 
@@ -58,6 +58,8 @@ AI-powered фреймворк техлида. Автоматизирует ру�
 | `OllamaAgentClient` | Spring AI → Ollama |
 | `GigaChatAgentClient` | Spring AI → GigaChat |
 | `AgentClientConfig` | auto-configuration, выбор по `agent.provider` |
+| `JiraClient` / `AtlassianJiraClient` | shared Jira REST client abstraction и HTTP implementation |
+| `JiraClientConfig` / `JiraIntegrationProperties` | типизированная Jira-конфигурация и auto-configuration |
 
 **Переключение провайдера:**
 ```yaml
@@ -194,6 +196,12 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 |---------|----------|
 | `memory.task_links` | Направленные связи между задачами: `from_task_id`/`to_task_id`/`link_type` (`RELATES_TO`, `BLOCKS`, `DUPLICATES`, `PARENT_OF`). Обратное направление (`BLOCKED_BY`, `DUPLICATED_BY`, `CHILD_OF`) выводится зеркально при чтении, в БД хранится одна запись. `UNIQUE(from_task_id, to_task_id, link_type)`, `CHECK (from_task_id <> to_task_id)`, `ON DELETE CASCADE` по обеим сторонам. Миграция `V22__task_links.java` |
 
+**Новые таблицы (CR-MEM-035):**
+
+| Таблица | Описание |
+|---------|----------|
+| `memory.task_external_issues` | Связь локальной задачи с внешним issue. В MVP используется `external_system=JIRA`, хранит `external_id`, `external_key`, `external_url`, `project_key`, `status` (`CREATING`, `CREATED`, `FAILED`) и безопасный `error_message`. `UNIQUE(task_id, external_system)` защищает от дублей. |
+
 **Ключевые endpoint-ы:**
 
 | Метод | Путь | Описание |
@@ -222,8 +230,11 @@ UI/API для работы с JavaRagService. Даёт REST, Thymeleaf UI и MCP
 | `DELETE` | `/api/notes/{id}` | Удалить заметку: `204 No Content` / `404 Not Found` (hard delete, CR-MEM-011) |
 | `GET/POST/DELETE` | `/api/tasks/{id}/attachments*` | Вложения задачи: список, multipart upload (kind=FILE), внешняя ссылка (kind=LINK), скачивание содержимого, удаление (CR-MEM-030) |
 | `GET/POST/DELETE` | `/api/tasks/{id}/links*` | Связи задачи: список (исходящие + зеркальные входящие, `direction: OUT\|IN`), создать связь → `201`, удалить связь (CR-MEM-031) |
+| `GET` | `/api/tasks/{id}/jira/context` | Jira modal context: integration status, allowlist проектов, issue types, current Jira user и existing Jira link (CR-MEM-035) |
+| `POST` | `/api/tasks/{id}/jira/issues` | Создать Jira issue из локальной задачи или идемпотентно вернуть существующую Jira link (CR-MEM-035) |
 | `GET/POST/PUT/DELETE` | `/api/incidents`, `/api/risks`, `/api/people` | CRUD/soft delete рабочих сущностей |
 | `GET` | `/ui/today` | Web UI: план дня. Сайдбар разделён на вкладки **ToDo** (`/ui/today`, DONE всегда скрыт) и **Done** (`/ui/today?status=DONE`, только DONE); toggle «No Done» убран (CR-MEM-025) |
+| `GET` | `/ui/tasks/{id}/edit` | Task edit page. Для Jira flow при каждом открытии делает safe re-check Jira integration snapshot, поэтому UI восстанавливается после позднего старта Jira без рестарта MemoryService (CR-MEM-035) |
 | `GET` | `/ui/notes` | Web UI: Operational Notes |
 | `GET` | `/ui/captures` | Web UI: Capture Inbox |
 | `GET` | `/ui/search` | Web UI: Global Search — standalone top-level страница (CR-MEM-022, un-relocated из Agent Workspace) |

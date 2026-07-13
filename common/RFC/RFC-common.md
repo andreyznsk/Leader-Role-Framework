@@ -30,6 +30,7 @@
 - Добавить Ollama или GigaChat — дублировать Spring AI интеграцию в каждом сервисе
 
 **Решение:** вынести LLM-слой в отдельный Maven-модуль `common`.
+Дополнительно `common` хранит shared integration clients, которые не должны знать о domain/UI конкретного сервиса. Первый такой кейс — Jira client для `JavaMemoryService`.
 
 ---
 
@@ -64,12 +65,40 @@ Leader-Role-Framework/
 │       │   ├── MockAgentClient.java          ← детерминированный mock
 │       │   ├── OllamaAgentClient.java        ← Spring AI → Ollama
 │       │   └── GigaChatAgentClient.java      ← Spring AI → GigaChat
+│       ├── jira/
+│       │   ├── JiraClient.java
+│       │   ├── AtlassianJiraClient.java
+│       │   ├── JiraIntegrationProperties.java
+│       │   ├── dto/*
+│       │   └── exception/*
 │       └── config/
-│           └── AgentClientConfig.java        ← @ConditionalOnProperty
+│           ├── AgentClientConfig.java        ← @ConditionalOnProperty
+│           └── JiraClientConfig.java         ← @ConditionalOnProperty
 │
 ├── JavaMailAgent/      ← зависит от common
 ├── JavaMemoryService/  ← зависит от common
 └── JavaRagService/     ← зависит от common (будущее)
+```
+
+### 3.1 Jira integration utilities
+
+`common` теперь содержит Jira-доменную область для CR-MEM-035.
+
+Правила:
+- `common` предоставляет только transport/config/dto слой;
+- `common` не знает о `Task`, `Today UI`, `task_external_issues` и business-flow защиты от дублей;
+- Jira client создаётся только при `jira.enabled=true`;
+- конфигурация биндуется из `jira.*` properties;
+- токен и auth headers не должны попадать в логи/exception text без санитизации на стороне вызывающего сервиса.
+
+Минимальный контракт:
+
+```java
+JiraCurrentUser getCurrentUser();
+List<JiraProject> getProjects(Set<String> allowedProjectKeys);
+List<JiraIssueType> getIssueTypes(String projectKey);
+List<JiraAssignableUser> getAssignableUsers(String projectKey, String query);
+JiraCreateIssueResult createIssue(JiraCreateIssueRequest request);
 ```
 
 ---

@@ -7,7 +7,10 @@ import org.springframework.web.bind.annotation.*;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.domain.TaskEvent;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
+import ru.andreyz.memoryservice.service.JiraIntegrationStateService;
+import ru.andreyz.memoryservice.service.JiraStartupHealthChecker;
 import ru.andreyz.memoryservice.service.TaskAttachmentService;
+import ru.andreyz.memoryservice.service.TaskJiraService;
 import ru.andreyz.memoryservice.service.PeopleService;
 import ru.andreyz.memoryservice.service.TaskDescriptionService;
 import ru.andreyz.memoryservice.service.TaskRelationService;
@@ -29,6 +32,9 @@ public class TaskEditController {
     private final PeopleService peopleService;
     private final TaskRelationService taskRelationService;
     private final TaskLinkService taskLinkService;
+    private final TaskJiraService taskJiraService;
+    private final JiraIntegrationStateService jiraIntegrationStateService;
+    private final JiraStartupHealthChecker jiraStartupHealthChecker;
 
     public TaskEditController(TaskService taskService,
                               TaskDescriptionService taskDescriptionService,
@@ -36,7 +42,10 @@ public class TaskEditController {
                               TaskAttachmentService taskAttachmentService,
                               PeopleService peopleService,
                               TaskRelationService taskRelationService,
-                              TaskLinkService taskLinkService) {
+                              TaskLinkService taskLinkService,
+                              TaskJiraService taskJiraService,
+                              JiraIntegrationStateService jiraIntegrationStateService,
+                              JiraStartupHealthChecker jiraStartupHealthChecker) {
         this.taskService = taskService;
         this.taskDescriptionService = taskDescriptionService;
         this.taskTimelineService = taskTimelineService;
@@ -44,10 +53,14 @@ public class TaskEditController {
         this.taskRelationService = taskRelationService;
         this.taskAttachmentService = taskAttachmentService;
         this.taskLinkService = taskLinkService;
+        this.taskJiraService = taskJiraService;
+        this.jiraIntegrationStateService = jiraIntegrationStateService;
+        this.jiraStartupHealthChecker = jiraStartupHealthChecker;
     }
 
     @GetMapping("/{id}/edit")
     public String editForm(@PathVariable Long id, Model model) {
+        jiraStartupHealthChecker.refreshSnapshot();
         Task task = taskService.findById(id);
         String description = taskDescriptionService.getContent(id);
         List<TaskEvent> timeline = taskTimelineService.findEvents(id);
@@ -63,6 +76,8 @@ public class TaskEditController {
                 .sorted(java.util.Comparator.comparing(person -> person.fullName().toLowerCase()))
                 .toList());
         model.addAttribute("taskLabels", taskRelationService.listActiveLabels());
+        model.addAttribute("jiraIssue", taskJiraService.findIssueLink(id).orElse(null));
+        model.addAttribute("jiraIntegration", jiraIntegrationStateService.getSnapshot());
         return "task-edit";
     }
 

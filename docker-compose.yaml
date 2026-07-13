@@ -10,6 +10,7 @@
 # Профили:
 #   (без профиля)     — prod/dev: PostgreSQL + OpenSearch + Dashboards
 #   --profile local   — + Maildev (SMTP-заглушка для разработки)
+#   --profile jira-stub — + Jira HTTP stub для CR-MEM-035 / локального E2E
 
 services:
 
@@ -66,6 +67,27 @@ services:
     ports:
       - "18080:1080"  # Web UI + HTTP API  →  http://localhost:18080
       - "1025:1025"   # SMTP
+    profiles: ["local"]
+
+  # ─────────────────────────────────────────────
+  # Jira Stub — профиль jira-stub
+  # Используется: JavaMemoryService Jira integration MVP / CR-MEM-035
+  # Base URL: http://localhost:19997
+  # ─────────────────────────────────────────────
+  jira-stub:
+    image: nginx:alpine
+    container_name: leader-jira-stub
+    restart: unless-stopped
+    profiles: ["jira-stub"]
+    ports:
+      - "19997:19997"
+    volumes:
+      - ./infra/jira-stub/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:19997/rest/api/2/myself"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 # ─────────────────────────────────────────────
 # Именованные volumes — данные живут между перезапусками

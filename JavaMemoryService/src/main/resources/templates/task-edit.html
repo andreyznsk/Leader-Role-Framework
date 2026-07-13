@@ -144,6 +144,31 @@
                         </button>
                     </div>
 
+                    <section class="mt-4">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="mb-0 fw-semibold">Jira</h6>
+                            <span class="small text-muted" th:text="${jiraIntegration.status}">DISABLED</span>
+                        </div>
+                        <div th:if="${jiraIssue != null}" class="d-grid gap-2">
+                            <a class="btn btn-sm btn-outline-primary"
+                               target="_blank" rel="noopener noreferrer"
+                               th:href="${jiraIssue.url}"
+                               th:text="${jiraIssue.key}">ENG-1</a>
+                        </div>
+                        <div th:if="${jiraIssue == null}" class="d-grid gap-2">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-primary"
+                                    th:disabled="${jiraIntegration.status.name() != 'AVAILABLE'}"
+                                    th:title="${jiraIntegration.status.name() == 'AVAILABLE'} ? 'Создать задачу в Jira' : jiraIntegration.message"
+                                    th:attr="data-task-id=${task.id},data-task-title=${task.title}"
+                                    onclick="openTaskEditJiraModal(this)">
+                                Создать задачу в Jira
+                            </button>
+                            <div class="small text-muted" th:if="${jiraIntegration.status.name() != 'AVAILABLE'}"
+                                 th:text="${jiraIntegration.message}">Jira integration unavailable</div>
+                        </div>
+                    </section>
+
                     <!-- 5. Attachments -->
                     <section data-testid="task-attachments" class="mt-4" id="task-attachments-section"
                               th:attr="data-task-id=${task.id}">
@@ -315,6 +340,58 @@
         </div>
     </div>
 
+    <div class="modal fade" id="task-edit-jira-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title">Создать задачу в Jira</h5>
+                        <div class="small text-muted" id="task-edit-jira-title"></div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="task-edit-jira-alert" class="alert d-none" role="alert"></div>
+                    <form id="task-edit-jira-form">
+                        <input type="hidden" id="task-edit-jira-task-id" th:value="${task.id}"/>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="task-edit-jira-project" class="form-label fw-semibold">Проект</label>
+                                <select id="task-edit-jira-project" class="form-select" required></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="task-edit-jira-issue-type" class="form-label fw-semibold">Issue type</label>
+                                <select id="task-edit-jira-issue-type" class="form-select" required></select>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <label for="task-edit-jira-assignee" class="form-label fw-semibold">Assignee</label>
+                            <select id="task-edit-jira-assignee" class="form-select">
+                                <option value="">Без назначения</option>
+                            </select>
+                        </div>
+                        <div class="mt-3">
+                            <label for="task-edit-jira-summary" class="form-label fw-semibold">Summary</label>
+                            <input id="task-edit-jira-summary" class="form-control" required/>
+                        </div>
+                        <div class="mt-3">
+                            <label for="task-edit-jira-description" class="form-label fw-semibold">Description</label>
+                            <textarea id="task-edit-jira-description" class="form-control" rows="10"></textarea>
+                        </div>
+                        <div id="task-edit-jira-existing" class="mt-3 d-none">
+                            <div class="small text-muted mb-1">У задачи уже есть Jira issue</div>
+                            <a id="task-edit-jira-existing-link" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">Open Jira</a>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" form="task-edit-jira-form" class="btn btn-primary" id="task-edit-jira-submit">Создать</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Unsaved changes guard -->
     <div class="modal fade" id="unsaved-changes-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog">
@@ -340,6 +417,8 @@
 <script th:src="@{/vendor/toastui/toastui-editor-all.min.js}"></script>
 <script>
 let saveStatusTimer = null;
+let taskEditJiraModalInstance = null;
+let taskEditJiraContext = null;
 
 const descriptionEditorEl = document.getElementById('toastui-editor');
 const descriptionEditor = new toastui.Editor({
@@ -419,6 +498,96 @@ function confirmDelete(btn) {
 }
 
 updateLinksPreview();
+
+function setTaskEditJiraAlert(type, message) {
+    const alert = document.getElementById('task-edit-jira-alert');
+    if (!alert) return;
+    if (!message) {
+        alert.className = 'alert d-none';
+        alert.textContent = '';
+        return;
+    }
+    alert.className = 'alert alert-' + (type === 'error' ? 'danger' : (type === 'warning' ? 'warning' : 'success'));
+    alert.textContent = message;
+}
+
+function renderTaskEditJiraFields(context, projectKey) {
+    const projectSelect = document.getElementById('task-edit-jira-project');
+    const issueTypeSelect = document.getElementById('task-edit-jira-issue-type');
+    const assigneeSelect = document.getElementById('task-edit-jira-assignee');
+    if (!projectSelect || !issueTypeSelect || !assigneeSelect) return;
+
+    if (!projectKey) {
+        projectSelect.innerHTML = (context.projects || []).map(function (project) {
+            const selected = context.defaultProject === project.key ? ' selected' : '';
+            return '<option value="' + project.key + '"' + selected + '>' + project.key + ' · ' + (project.name || project.key) + '</option>';
+        }).join('');
+        projectKey = projectSelect.value || context.defaultProject;
+    }
+    const project = (context.projects || []).find(function (item) { return item.key === projectKey; });
+    const issueTypes = project && Array.isArray(project.issueTypes) ? project.issueTypes : [];
+    issueTypeSelect.innerHTML = issueTypes.map(function (type) {
+        const selected = type.name === context.defaultIssueType ? ' selected' : '';
+        return '<option value="' + type.id + '"' + selected + '>' + type.name + '</option>';
+    }).join('');
+
+    const preferredAccountId = (context.matchedAssignee && context.matchedAssignee.accountId)
+        || (context.currentUser && context.currentUser.accountId)
+        || '';
+    const users = project && Array.isArray(project.assignableUsers) ? project.assignableUsers : [];
+    assigneeSelect.innerHTML = '<option value="">Без назначения</option>' + users.map(function (user) {
+        const selected = preferredAccountId === user.accountId ? ' selected' : '';
+        const subtitle = user.email ? ' · ' + user.email : '';
+        return '<option value="' + user.accountId + '"' + selected + '>' + user.displayName + subtitle + '</option>';
+    }).join('');
+}
+
+function setTaskEditExistingIssue(existingIssue) {
+    const block = document.getElementById('task-edit-jira-existing');
+    const link = document.getElementById('task-edit-jira-existing-link');
+    const submit = document.getElementById('task-edit-jira-submit');
+    if (!block || !link || !submit) return;
+    if (existingIssue && existingIssue.url) {
+        block.classList.remove('d-none');
+        link.href = existingIssue.url;
+        link.textContent = existingIssue.key || 'Open Jira';
+        submit.disabled = true;
+        return;
+    }
+    block.classList.add('d-none');
+    link.removeAttribute('href');
+    submit.disabled = false;
+}
+
+async function openTaskEditJiraModal(button) {
+    const taskId = button.dataset.taskId;
+    const title = button.dataset.taskTitle || '';
+    const modalEl = document.getElementById('task-edit-jira-modal');
+    if (!taskId || !modalEl) return;
+    taskEditJiraModalInstance = taskEditJiraModalInstance || bootstrap.Modal.getOrCreateInstance(modalEl);
+    document.getElementById('task-edit-jira-title').textContent = title;
+    document.getElementById('task-edit-jira-task-id').value = taskId;
+    setTaskEditJiraAlert();
+    setTaskEditExistingIssue(null);
+    taskEditJiraModalInstance.show();
+
+    try {
+        const result = await window.LeaderUiApi.request('/api/tasks/' + taskId + '/jira/context');
+        taskEditJiraContext = result.data;
+        document.getElementById('task-edit-jira-summary').value = taskEditJiraContext.summary || '';
+        document.getElementById('task-edit-jira-description').value = taskEditJiraContext.description || '';
+        if (taskEditJiraContext.integrationStatus !== 'AVAILABLE') {
+            document.getElementById('task-edit-jira-submit').disabled = true;
+            setTaskEditJiraAlert('warning', taskEditJiraContext.message || 'Jira integration unavailable');
+            return;
+        }
+        renderTaskEditJiraFields(taskEditJiraContext, null);
+        setTaskEditExistingIssue(taskEditJiraContext.existingIssue);
+    } catch (error) {
+        document.getElementById('task-edit-jira-submit').disabled = true;
+        setTaskEditJiraAlert('error', error?.data?.message || 'Не удалось загрузить Jira context');
+    }
+}
 
 // Unsaved-changes tracking (warn on navigating away with unsaved edits)
 let formDirty = false;
@@ -645,6 +814,39 @@ document.getElementById('attachment-link-btn')?.addEventListener('click', async 
     } catch (error) {
         status.textContent = 'Не удалось добавить ссылку';
         status.classList.remove('d-none');
+    }
+});
+
+document.getElementById('task-edit-jira-project')?.addEventListener('change', function () {
+    if (!taskEditJiraContext) return;
+    renderTaskEditJiraFields(taskEditJiraContext, this.value);
+});
+
+document.getElementById('task-edit-jira-form')?.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const taskId = document.getElementById('task-edit-jira-task-id').value;
+    if (!taskId) return;
+    try {
+        const result = await window.LeaderUiApi.request('/api/tasks/' + taskId + '/jira/issues', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                projectKey: document.getElementById('task-edit-jira-project').value,
+                issueTypeId: document.getElementById('task-edit-jira-issue-type').value,
+                assigneeAccountId: document.getElementById('task-edit-jira-assignee').value || null,
+                summary: document.getElementById('task-edit-jira-summary').value,
+                description: document.getElementById('task-edit-jira-description').value
+            })
+        });
+        const issue = result?.data?.issue;
+        setTaskEditJiraAlert('success', result?.data?.alreadyLinked
+            ? 'Jira issue уже существует: ' + (issue?.key || '')
+            : 'Создан Jira issue: ' + (issue?.key || ''));
+        window.setTimeout(function () {
+            window.location.reload();
+        }, 400);
+    } catch (error) {
+        setTaskEditJiraAlert('error', error?.data?.message || 'Не удалось создать Jira issue');
     }
 });
 

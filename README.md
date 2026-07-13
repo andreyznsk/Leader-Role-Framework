@@ -153,6 +153,31 @@ Web UI:
   http://localhost:8080/ui/status  — почтовый агент
   http://localhost:5601            — OpenSearch Dashboards
 
+### Jira stub for local E2E
+
+Для `CR-MEM-035` и локального тестирования Jira flow можно поднять лёгкий HTTP stub:
+
+```bash
+docker compose --profile jira-stub up -d jira-stub
+```
+
+Использовать в `JavaMemoryService`:
+
+```bash
+JIRA_ENABLED=true
+JIRA_BASE_URL=http://127.0.0.1:19997
+JIRA_TOKEN=test-token
+JIRA_DEFAULT_PROJECT=ENG
+JIRA_ALLOWED_PROJECTS=ENG,OPS
+```
+
+Stub реализует минимальные endpoints MVP-flow:
+- `GET /rest/api/2/myself`
+- `GET /rest/api/2/project/ENG`
+- `GET /rest/api/2/project/OPS`
+- `GET /rest/api/2/user/assignable/search`
+- `POST /rest/api/2/issue`
+
 ---
 
 ## E2E тесты

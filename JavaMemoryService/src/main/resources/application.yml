@@ -59,6 +59,20 @@ capture:
 agent:
   provider: claude
 
+jira:
+  enabled: ${JIRA_ENABLED:false}
+  base-url: ${JIRA_BASE_URL:}
+  username: ${JIRA_USERNAME:}
+  token: ${JIRA_TOKEN:}
+  auth-type: ${JIRA_AUTH_TYPE:BEARER}
+  default-project: ${JIRA_DEFAULT_PROJECT:}
+  allowed-projects: ${JIRA_ALLOWED_PROJECTS:}
+  default-issue-type: ${JIRA_DEFAULT_ISSUE_TYPE:Task}
+  startup-check-enabled: ${JIRA_STARTUP_CHECK_ENABLED:true}
+  timeout:
+    connect: ${JIRA_TIMEOUT_CONNECT:5s}
+    read: ${JIRA_TIMEOUT_READ:20s}
+
 agentWorkspace:
   console:
     allowedCommands: claude

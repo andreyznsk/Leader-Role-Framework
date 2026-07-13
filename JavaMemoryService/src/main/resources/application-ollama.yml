@@ -24,6 +24,21 @@ spring:
           top-p: 1.0
           top-k: 20
 
+jira:
+  enabled: ${JIRA_ENABLED:true}
+  base-url: ${JIRA_BASE_URL:http://172.80.2.1:19997}
+  username: ${JIRA_USERNAME:}
+  token: ${JIRA_TOKEN:test-token}
+  auth-type: ${JIRA_AUTH_TYPE:BEARER}
+  default-project: ${JIRA_DEFAULT_PROJECT:ENG}
+  allowed-projects: ${JIRA_ALLOWED_PROJECTS:ENG,OPS}
+  default-issue-type: ${JIRA_DEFAULT_ISSUE_TYPE:Task}
+  startup-check-enabled: ${JIRA_STARTUP_CHECK_ENABLED:true}
+  timeout:
+    connect: ${JIRA_TIMEOUT_CONNECT:5s}
+    read: ${JIRA_TIMEOUT_READ:20s}
+
+
 app:
   capture:
     inbox-dir: capture-inbox
