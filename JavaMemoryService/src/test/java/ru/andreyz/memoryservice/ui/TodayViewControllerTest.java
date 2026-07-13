@@ -6,8 +6,10 @@ import org.springframework.ui.Model;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.repository.DailyPlanRepository;
 import ru.andreyz.memoryservice.repository.IncidentRepository;
+import ru.andreyz.memoryservice.service.JiraIntegrationStateService;
 import ru.andreyz.memoryservice.service.PeopleService;
 import ru.andreyz.memoryservice.service.TaskLinkService;
+import ru.andreyz.memoryservice.service.TaskJiraService;
 import ru.andreyz.memoryservice.service.TaskRelationService;
 import ru.andreyz.memoryservice.service.TaskService;
 
@@ -30,7 +32,9 @@ class TodayViewControllerTest {
         DailyPlanRepository planRepository = mock(DailyPlanRepository.class);
         IncidentRepository incidentRepository = mock(IncidentRepository.class);
         TaskLinkService taskLinkService = mock(TaskLinkService.class);
-        TodayViewController controller = new TodayViewController(taskService, taskRelationService, peopleService, planRepository, incidentRepository, taskLinkService);
+        TaskJiraService taskJiraService = mock(TaskJiraService.class);
+        JiraIntegrationStateService jiraIntegrationStateService = mock(JiraIntegrationStateService.class);
+        TodayViewController controller = new TodayViewController(taskService, taskRelationService, peopleService, planRepository, incidentRepository, taskLinkService, taskJiraService, jiraIntegrationStateService);
         Model model = new ExtendedModelMap();
 
         Task criticalTodo = task(1L, "Critical TODO", "TODO", "CRITICAL", LocalDate.now(), 2);
@@ -65,7 +69,9 @@ class TodayViewControllerTest {
         DailyPlanRepository planRepository = mock(DailyPlanRepository.class);
         IncidentRepository incidentRepository = mock(IncidentRepository.class);
         TaskLinkService taskLinkService = mock(TaskLinkService.class);
-        TodayViewController controller = new TodayViewController(taskService, taskRelationService, peopleService, planRepository, incidentRepository, taskLinkService);
+        TaskJiraService taskJiraService = mock(TaskJiraService.class);
+        JiraIntegrationStateService jiraIntegrationStateService = mock(JiraIntegrationStateService.class);
+        TodayViewController controller = new TodayViewController(taskService, taskRelationService, peopleService, planRepository, incidentRepository, taskLinkService, taskJiraService, jiraIntegrationStateService);
         Model model = new ExtendedModelMap();
 
         LocalDate today = LocalDate.now();

@@ -39,6 +39,7 @@
 | CR-MEM-032        | [2026-07-03_CR-MEM-032-task-status-delegation-labels.md](2026-07-03_CR-MEM-032-task-status-delegation-labels.md)       | DONE | 2026-07-03 |
 | CR-MEM-033        | [2026-07-07_CR-MEM-033-intake-payload-readable-summary.md](2026-07-07_CR-MEM-033-intake-payload-readable-summary.md)   | Implemented | 2026-07-07 |
 | CR-MEM-034        | [2026-07-08_CR-MEM-034-related-task-dropdowns.md](2026-07-08_CR-MEM-034-related-task-dropdowns.md)                     | Implemented | 2026-07-10 |
+| CR-MEM-035        | [2026-07-13_CR-MEM-035-create-jira-issue-from-today-task.md](2026-07-13_CR-MEM-035-create-jira-issue-from-today-task.md) | Implemented | 2026-07-13 |
 | CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md)                                 | Draft | —          |
 
 ---
@@ -84,6 +85,6 @@
 
 ---
 
-_Следующий свободный номер в MEM серии: **CR-MEM-035**_  
+_Следующий свободный номер в MEM серии: **CR-MEM-036**_  
 _Следующий свободный номер в ARCH серии: **CR-ARCH-008**_  
-_Последнее обновление реестра: 2026-07-10_
+_Последнее обновление реестра: 2026-07-13_

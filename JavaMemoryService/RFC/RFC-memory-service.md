@@ -24,6 +24,7 @@
   отдаёт агрегаты через `/api/stats/usage` и UI `/ui/stats`
 - Даёт две UI-зоны: `Operational Memory` и `Knowledge Gateway`, не дублируя RAG-документы в своей БД
 - Выступает единым control plane UI для runtime-редактирования plugin prompts через `/ui/settings`
+- Владеет Jira issue creation flow для Today/task-edit задач, храня связь task ↔ Jira issue и safe integration status
 
 ---
 
@@ -43,6 +44,16 @@
 | LLM client | common 1.0.0 (`AgentClient`) |
 | Тесты | JUnit 5, Spring Boot Test, MockMvc |
 | Build | Maven, fat JAR через spring-boot-maven-plugin |
+
+### 2.1 Jira integration (CR-MEM-035)
+
+Jira integration в текущем MVP:
+- конфигурируется через `jira.*` properties в `application*.yml`;
+- использует shared `common::jira::JiraClient`;
+- при старте выполняет safe startup check и сохраняет snapshot со статусом `DISABLED | AVAILABLE | UNAVAILABLE`;
+- при каждом открытии `/ui/tasks/{id}/edit` повторно проверяет Jira, чтобы UI мог восстановиться после позднего старта Jira без рестарта сервиса;
+- в assignee select поддерживает только два варианта: `Без назначения` и текущий Jira user;
+- хранит idempotent task ↔ Jira issue link в `task_external_issues`.
 
 ---
 

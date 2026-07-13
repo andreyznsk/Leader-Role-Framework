@@ -7,8 +7,11 @@ import org.springframework.web.bind.annotation.*;
 import ru.andreyz.memoryservice.domain.Task;
 import ru.andreyz.memoryservice.repository.DailyPlanRepository;
 import ru.andreyz.memoryservice.repository.IncidentRepository;
+import ru.andreyz.memoryservice.dto.JiraIssueLinkDto;
 import ru.andreyz.memoryservice.service.PeopleService;
+import ru.andreyz.memoryservice.service.JiraIntegrationStateService;
 import ru.andreyz.memoryservice.service.TaskLinkService;
+import ru.andreyz.memoryservice.service.TaskJiraService;
 import ru.andreyz.memoryservice.service.TaskRelationService;
 import ru.andreyz.memoryservice.service.TaskService;
 
@@ -44,19 +47,25 @@ public class TodayViewController {
     private final DailyPlanRepository planRepository;
     private final IncidentRepository incidentRepository;
     private final TaskLinkService taskLinkService;
+    private final TaskJiraService taskJiraService;
+    private final JiraIntegrationStateService jiraIntegrationStateService;
 
     public TodayViewController(TaskService taskService,
                                TaskRelationService taskRelationService,
                                PeopleService peopleService,
                                DailyPlanRepository planRepository,
                                IncidentRepository incidentRepository,
-                               TaskLinkService taskLinkService) {
+                               TaskLinkService taskLinkService,
+                               TaskJiraService taskJiraService,
+                               JiraIntegrationStateService jiraIntegrationStateService) {
         this.taskService = taskService;
         this.taskRelationService = taskRelationService;
         this.peopleService = peopleService;
         this.planRepository = planRepository;
         this.incidentRepository = incidentRepository;
         this.taskLinkService = taskLinkService;
+        this.taskJiraService = taskJiraService;
+        this.jiraIntegrationStateService = jiraIntegrationStateService;
     }
 
     @GetMapping({"/", "/today"})
@@ -102,6 +111,9 @@ public class TodayViewController {
                 relatedTasksByTaskId.put(task.id(), related);
             }
         }
+        Map<Long, JiraIssueLinkDto> jiraIssuesByTaskId = taskJiraService.findCreatedIssueLinks(
+                currentTasks.stream().map(Task::id).toList()
+        );
 
         model.addAttribute("today", today);
         model.addAttribute("tomorrow", tomorrow);
@@ -112,6 +124,8 @@ public class TodayViewController {
         model.addAttribute("pendingCount", pending.size());
         model.addAttribute("doneTodayCount", doneTodayCount);
         model.addAttribute("openIncidentsCount", openIncidentsCount);
+        model.addAttribute("jiraIntegration", jiraIntegrationStateService.getSnapshot());
+        model.addAttribute("jiraIssuesByTaskId", jiraIssuesByTaskId);
         model.addAttribute("doneView", doneView);
         model.addAttribute("priorityFilter", normalizeFilter(priority));
         model.addAttribute("statusFilter", normalizeFilter(status));
