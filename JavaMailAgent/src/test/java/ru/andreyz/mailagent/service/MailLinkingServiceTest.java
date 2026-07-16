@@ -116,6 +116,7 @@ class MailLinkingServiceTest {
                 request.query().contains("dev1@test.com")
                         && request.query().contains("dev2@test.com")
                         && request.query().contains("conv-release-1")
+                        && request.layers().equals(List.of("TASK", "NOTE", "PEOPLE", "RISK", "INCIDENT", "KNOWLEDGE"))
         ));
         verify(promptBuilder).build(email, classification, searchResponse);
         verify(agentClient).complete("prompt");
