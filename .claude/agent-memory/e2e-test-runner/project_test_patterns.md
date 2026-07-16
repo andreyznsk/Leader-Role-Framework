@@ -283,6 +283,34 @@ flyway_schema_history → repair (только пересчитывает checks
 **Why:** первый CR-MEM-03x (030) прогон без единого дефекта — ни в тесте, ни в приложении. Полезно как baseline "чистой" фичи для сравнения с будущими доработками attachments (например CR-MEM-031 task-links, если он расширяет ту же таблицу/контроллер).
 **How to apply:** при будущих изменениях в TaskAttachmentController/AttachmentStorageService — этот сценарий и spec можно использовать как regression baseline. Если появится жёсткое удаление задач — перепроверить cleanup файлов attachments (текущее ограничение).
 
+## build.sh не пересобирает common/ — BUILD FAILED "package ... does not exist" (2026-07-16, branch bugFix/bug-001)
+
+`./test-runner/build.sh --service JavaMemoryService` падает с `package ru.andreyz.common.jira does not exist`
+(и `ru.andreyz.common.jira.dto`), хотя исходники `common/src/main/java/ru/andreyz/common/jira/*` реально
+существуют на диске. Причина: `build.sh` вызывает `mvn package -q -DskipTests` только внутри директории
+сервиса — зависимость `common` резолвится из локального `~/.m2/repository/ru/andreyz/common/1.0.0/common-1.0.0.jar`,
+а этот jar был установлен раньше (mtime до появления пакета `jira` в `common`) и устарел. Скрипт не делает
+`mvn install` для `common` перед сборкой сервисов.
+
+**Фикс (не требует правки build.sh/конфига):** `cd common && mvn install -q -DskipTests`, затем повторить
+`./test-runner/build.sh --service <Service>`. После этого сборка проходит чисто.
+
+**Why:** это не баг тестируемого CR — просто build.sh не учитывает multi-module reactor order. Ставить
+`common` вручную через `mvn install` — нормальная подготовительная команда, не изменение конфигурации/кода.
+**How to apply:** если build.sh падает с "package ru.andreyz.common.* does not exist" — сначала проверить
+`find ~/.m2/repository/ru/andreyz/common -name '*.jar'` на mtime отставание от `common/src`, и переустановить
+`common` модуль, прежде чем считать это реальным блокером CR.
+
+## CR-MEM bugFix/bug-001 — task_events.source_id VARCHAR(255) overflow (2026-07-16)
+
+Регрессионный тест `tests/task-description-long-emailid.spec.js` (создать PENDING task с emailId >255 символов →
+confirm → PUT description → проверить 200 и что `DESCRIPTION_UPDATED.sourceId` ≤255) — 1/1 PASS с первого прогона
+после пересборки. Фикс в `TaskTimelineService.save()`: `truncate(actorName/sourceId, VARCHAR_COLUMN_LIMIT=255)`
+перед записью `TaskEvent`. Ноль ERROR/Exception в `logs/JavaMemoryService.log` во время прогона.
+
+**How to apply:** этот тест — хороший regression baseline для любых будущих изменений `TaskTimelineService`/
+`task_events` схемы (например если появятся другие VARCHAR(255) поля без truncate).
+
 ### Retry flow — ключевые факты
 
 - Retry-очередь обрабатывается РАНЬШЕ новых писем в каждом poll
