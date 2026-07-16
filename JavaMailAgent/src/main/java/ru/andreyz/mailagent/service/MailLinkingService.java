@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 public class MailLinkingService {
 
 
-    private static final List<String> SEARCH_LAYERS = List.of("TASK", "NOTICE", "PEOPLE", "RISK", "INCIDENT", "KNOWLEDGE");
+    private static final List<String> SEARCH_LAYERS = List.of("TASK", "NOTE", "PEOPLE", "RISK", "INCIDENT", "KNOWLEDGE");
     private static final int RAW_LOG_LIMIT = 2000;
 
     private final MemoryServiceClient memoryServiceClient;

@@ -18,6 +18,8 @@ import java.util.Map;
 @Service
 public class TaskTimelineService {
 
+    private static final int VARCHAR_COLUMN_LIMIT = 255;
+
     private final TaskEventRepository taskEventRepository;
     private final TaskRepository taskRepository;
     private final ObjectMapper objectMapper;
@@ -173,11 +175,11 @@ public class TaskTimelineService {
                 taskId,
                 eventType,
                 actorType,
-                actorName,
+                truncate(actorName, VARCHAR_COLUMN_LIMIT),
                 toJson(oldValue),
                 toJson(newValue),
                 sourceType,
-                sourceId,
+                truncate(sourceId, VARCHAR_COLUMN_LIMIT),
                 summary,
                 Instant.now()
         ));
@@ -238,6 +240,10 @@ public class TaskTimelineService {
 
     private String safeText(String value) {
         return value == null ? "" : value;
+    }
+
+    private static String truncate(String value, int maxLength) {
+        return value != null && value.length() > maxLength ? value.substring(0, maxLength) : value;
     }
 
     private Map<String, Object> fields(Object... keyValues) {
