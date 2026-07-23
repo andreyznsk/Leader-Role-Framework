@@ -48,6 +48,9 @@ Spring Boot 3 приложение. Подключается к корпорат
 (таблица `processed_emails`) для дедупликации между перезапусками.
 Задачи пользователя — по-прежнему в `java-memory-service`.
 
+Актуальная ER-диаграмма PostgreSQL-схемы `mailagent`:
+[PlantUML source](../docs/diagrams/database-schema.puml).
+
 ---
 
 ## 3. Окружения и конфиги

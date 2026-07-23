@@ -1,0 +1,42 @@
+@startuml
+title JavaRagService — PostgreSQL schema: rag
+hide methods
+hide stereotypes
+skinparam linetype ortho
+skinparam entity {
+  BackgroundColor #F7FAFC
+  BorderColor #4A5568
+}
+
+package "rag" {
+  entity "indexed_documents" as indexed_documents {
+    * id : SERIAL <<PK>>
+    --
+    * file_path : TEXT <<UQ>>
+    * file_hash : TEXT
+    * indexed_at : TIMESTAMP
+    chunk_count : INT
+    * status : TEXT
+    error_message : TEXT
+    doc_type : VARCHAR(50)
+  }
+
+  entity "control_settings_audit" as control_settings_audit {
+    * id : BIGSERIAL <<PK>>
+    --
+    * config_version : BIGINT
+    * changed_keys_json : JSONB
+    * request_json : JSONB
+    * applied_json : JSONB
+    * status : VARCHAR(64)
+    message : TEXT
+    * created_at : TIMESTAMP
+  }
+}
+
+note bottom
+  Межтабличные внешние ключи отсутствуют.
+  Векторные данные и chunks хранятся в OpenSearch, не в PostgreSQL.
+  Схема собрана по Flyway V1–V4 из JavaRagService.
+end note
+@enduml

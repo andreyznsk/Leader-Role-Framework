@@ -1,0 +1,392 @@
+@startuml
+title JavaMemoryService — PostgreSQL schema: memory
+hide methods
+hide stereotypes
+skinparam linetype ortho
+skinparam nodesep 45
+skinparam ranksep 55
+skinparam entity {
+  BackgroundColor #F7FAFC
+  BorderColor #4A5568
+}
+
+package "Planning and tasks" {
+  entity "daily_plans" as daily_plans {
+    * id : BIGSERIAL <<PK>>
+    --
+    * plan_date : DATE <<UQ>>
+    summary : TEXT
+    * status : VARCHAR(20)
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "tasks" as tasks {
+    * id : BIGSERIAL <<PK>>
+    --
+    plan_id : BIGINT <<FK>>
+    * title : VARCHAR(500)
+    description : TEXT
+    * status : VARCHAR(20)
+    * priority : VARCHAR(10)
+    due_date : DATE
+    * source : VARCHAR(20)
+    email_id : VARCHAR(500)
+    * sort_order : INT
+    pending_type : VARCHAR(40)
+    suggested_task_id : BIGINT
+    agent_confidence : DOUBLE
+    agent_reason : TEXT
+    source_type : VARCHAR(40)
+    source_subject : VARCHAR(500)
+    source_sender : VARCHAR(500)
+    proposed_description_append : TEXT
+    linked_to_task_id : BIGINT
+    linked_at : TIMESTAMP
+    assigned_person_id : BIGINT <<FK>>
+    search_vector : TSVECTOR
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "task_descriptions" as task_descriptions {
+    * id : BIGSERIAL <<PK>>
+    --
+    * task_id : BIGINT <<FK,UQ>>
+    * content_md : TEXT
+    content_hash : VARCHAR(64)
+    search_vector : TSVECTOR
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "task_events" as task_events {
+    * id : BIGSERIAL <<PK>>
+    --
+    * task_id : BIGINT <<FK>>
+    * event_type : VARCHAR(64)
+    * actor_type : VARCHAR(32)
+    actor_name : VARCHAR(255)
+    old_value_json : TEXT
+    new_value_json : TEXT
+    source_type : VARCHAR(32)
+    source_id : VARCHAR(255)
+    summary : TEXT
+    * created_at : TIMESTAMP
+  }
+
+  entity "task_attachments" as task_attachments {
+    * id : BIGSERIAL <<PK>>
+    --
+    * task_id : BIGINT <<FK>>
+    * kind : VARCHAR(8)
+    filename : VARCHAR(255)
+    title : VARCHAR(255)
+    url : TEXT
+    mime_type : VARCHAR(127)
+    file_size : BIGINT
+    storage_ref : TEXT
+    * created_at : TIMESTAMP
+  }
+
+  entity "task_links" as task_links {
+    * id : BIGSERIAL <<PK>>
+    --
+    * from_task_id : BIGINT <<FK>>
+    * to_task_id : BIGINT <<FK>>
+    * link_type : VARCHAR(16)
+    * created_at : TIMESTAMP
+    --
+    UQ(from_task_id, to_task_id, link_type)
+    CHECK(from_task_id <> to_task_id)
+  }
+
+  entity "task_external_issues" as task_external_issues {
+    * id : BIGSERIAL <<PK>>
+    --
+    * task_id : BIGINT <<FK>>
+    * external_system : VARCHAR(32)
+    external_id : VARCHAR(128)
+    external_key : VARCHAR(128)
+    external_url : TEXT
+    project_key : VARCHAR(64)
+    * status : VARCHAR(32)
+    error_message : TEXT
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+    --
+    UQ(task_id, external_system)
+  }
+
+  entity "task_labels" as task_labels {
+    * id : BIGSERIAL <<PK>>
+    --
+    * name : VARCHAR(200) <<UQ>>
+    color : VARCHAR(50)
+    * archived : BOOLEAN
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "task_label_mapping" as task_label_mapping {
+    * task_id : BIGINT <<PK,FK>>
+    * label_id : BIGINT <<PK,FK>>
+  }
+}
+
+package "People and operations" {
+  entity "people" as people {
+    * id : BIGSERIAL <<PK>>
+    --
+    * full_name : VARCHAR(200)
+    login : VARCHAR(100)
+    email : VARCHAR(200)
+    phone : VARCHAR(50)
+    domain : VARCHAR(200)
+    current_task : TEXT
+    capacity_sprint : INT
+    capacity_month : INT
+    capacity_quarter : INT
+    notes : TEXT
+    search_vector : TSVECTOR
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "people_notes" as people_notes {
+    * id : BIGSERIAL <<PK>>
+    --
+    person_id : BIGINT <<FK>>
+    * note : TEXT
+    tags : VARCHAR(500)
+    * created_at : TIMESTAMP
+  }
+
+  entity "person_notes (legacy)" as person_notes {
+    * id : BIGSERIAL <<PK>>
+    --
+    * person_name : VARCHAR(100)
+    * note : TEXT
+    * created_at : TIMESTAMP
+  }
+
+  entity "incidents" as incidents {
+    * id : BIGSERIAL <<PK>>
+    --
+    * title : VARCHAR(500)
+    * severity : VARCHAR(10)
+    * status : VARCHAR(20)
+    description : TEXT
+    root_cause : TEXT
+    action_items : TEXT
+    * started_at : TIMESTAMP
+    resolved_at : TIMESTAMP
+    search_vector : TSVECTOR
+    * created_at : TIMESTAMP
+  }
+
+  entity "risks" as risks {
+    * id : BIGSERIAL <<PK>>
+    --
+    * title : VARCHAR(500)
+    description : TEXT
+    * probability : VARCHAR(10)
+    * impact : VARCHAR(10)
+    * status : VARCHAR(20)
+    mitigation : TEXT
+    search_vector : TSVECTOR
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "questions" as questions {
+    * id : BIGSERIAL <<PK>>
+    --
+    * title : VARCHAR(500)
+    context : TEXT
+    * status : VARCHAR(20)
+    * created_at : TIMESTAMP
+  }
+}
+
+package "Intake, notes and telemetry" {
+  entity "captures" as captures {
+    * id : BIGSERIAL <<PK>>
+    --
+    * raw_text : TEXT
+    * source : VARCHAR(50)
+    source_id : VARCHAR(500)
+    * status : VARCHAR(20)
+    classified : VARCHAR(20)
+    routed_to : VARCHAR(100)
+    route : VARCHAR(64)
+    target_type : VARCHAR(64)
+    target_id : VARCHAR(128)
+    target_ref : TEXT
+    file_path : TEXT
+    error_message : TEXT
+    * captured_at : TIMESTAMP
+    processed_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+    archived_at : TIMESTAMP
+    --
+    UQ(source, source_id)
+  }
+
+  entity "notes" as notes {
+    * id : BIGSERIAL <<PK>>
+    --
+    * title : VARCHAR(200)
+    text : TEXT
+    tags : VARCHAR(500)
+    * source : VARCHAR(50)
+    search_vector : TSVECTOR
+    * created_at : TIMESTAMP
+  }
+
+  entity "intake_items" as intake_items {
+    * id : UUID <<PK>>
+    --
+    * source_type : VARCHAR(32)
+    source_id : TEXT
+    source_payload_json : JSONB
+    source_text : TEXT
+    agent_provider : VARCHAR(32)
+    agent_prompt : TEXT
+    agent_result_json : JSONB
+    agent_result_text : TEXT
+    suggested_route : VARCHAR(32)
+    suggested_payload_json : JSONB
+    final_route : VARCHAR(32)
+    final_payload_json : JSONB
+    * status : VARCHAR(32)
+    confidence : NUMERIC(5,4)
+    created_by : VARCHAR(128)
+    reviewed_by : VARCHAR(128)
+    * created_at : TIMESTAMP
+    reviewed_at : TIMESTAMP
+    applied_at : TIMESTAMP
+    rejected_at : TIMESTAMP
+    reject_reason : TEXT
+  }
+
+  entity "email_state" as email_state {
+    * id : BIGSERIAL <<PK>>
+    --
+    * message_id : VARCHAR(500) <<UQ>>
+    subject : VARCHAR(1000)
+    sender : VARCHAR(500)
+    received_at : TIMESTAMP
+    classification : VARCHAR(20)
+    * status : VARCHAR(20)
+    summary : TEXT
+    * created_at : TIMESTAMP
+  }
+
+  entity "usage_events" as usage_events {
+    * id : BIGSERIAL <<PK>>
+    --
+    * event_type : VARCHAR(64)
+    * source : VARCHAR(64)
+    * status : VARCHAR(32)
+    correlation_id : TEXT
+    entity_type : VARCHAR(64)
+    entity_id : VARCHAR(128)
+    duration_ms : BIGINT
+    * saved_minutes : INT
+    metadata_json : JSONB
+    * created_at : TIMESTAMPTZ
+  }
+
+  entity "agent_workspace_runs" as agent_workspace_runs {
+    * id : UUID <<PK>>
+    --
+    * mode : VARCHAR(32)
+    * provider : VARCHAR(64)
+    prompt : TEXT
+    * status : VARCHAR(32)
+    duration_ms : BIGINT
+    error_message : TEXT
+    * created_at : TIMESTAMP
+  }
+}
+
+package "Plugin control plane" {
+  entity "plugin_settings" as plugin_settings {
+    * plugin_code : VARCHAR(64) <<PK>>
+    --
+    * plugin_type : VARCHAR(64)
+    * enabled : BOOLEAN
+    config_json : JSONB
+    secret_ref : VARCHAR(255)
+    * created_at : TIMESTAMPTZ
+    * updated_at : TIMESTAMPTZ
+  }
+
+  entity "plugin_heartbeats" as plugin_heartbeats {
+    * plugin_code : VARCHAR(64) <<PK>>
+    --
+    * status : VARCHAR(32)
+    message : VARCHAR(500)
+    * last_heartbeat_at : TIMESTAMPTZ
+    * updated_at : TIMESTAMPTZ
+  }
+
+  entity "control_plugins" as control_plugins {
+    * id : BIGSERIAL <<PK>>
+    --
+    * code : VARCHAR(64) <<UQ>>
+    * name : VARCHAR(255)
+    * base_url : VARCHAR(512)
+    * enabled : BOOLEAN
+    * status : VARCHAR(32)
+    last_sync_at : TIMESTAMP
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "control_plugin_settings_snapshot" as control_plugin_settings_snapshot {
+    * id : BIGSERIAL <<PK>>
+    --
+    * plugin_code : VARCHAR(64) <<UQ>>
+    * descriptor_json : JSONB
+    * config_version : BIGINT
+    * synced_at : TIMESTAMP
+  }
+
+  entity "control_plugin_audit" as control_plugin_audit {
+    * id : BIGSERIAL <<PK>>
+    --
+    * plugin_code : VARCHAR(64)
+    * action : VARCHAR(64)
+    * request_json : JSONB
+    * response_json : JSONB
+    * status : VARCHAR(32)
+    message : TEXT
+    * created_at : TIMESTAMP
+  }
+}
+
+daily_plans ||--o{ tasks : "plan_id / CASCADE"
+people ||--o{ people_notes : "person_id / CASCADE"
+people ||--o{ tasks : "assigned_person_id"
+tasks ||--o| task_descriptions : "task_id / CASCADE"
+tasks ||--o{ task_events : "task_id / CASCADE"
+tasks ||--o{ task_attachments : "task_id / CASCADE"
+tasks ||--o{ task_external_issues : "task_id"
+tasks ||--o{ task_label_mapping : "task_id / CASCADE"
+task_labels ||--o{ task_label_mapping : "label_id"
+tasks ||--o{ task_links : "from_task_id / CASCADE"
+tasks ||--o{ task_links : "to_task_id / CASCADE"
+
+note bottom of tasks
+  suggested_task_id и linked_to_task_id выглядят как ссылки на tasks.id,
+  но в актуальных миграциях не объявлены внешними ключами.
+end note
+
+note bottom of control_plugins
+  plugin_code в snapshot/audit и code в control_plugins связаны логически.
+  Физические FK в миграциях отсутствуют.
+end note
+
+@enduml

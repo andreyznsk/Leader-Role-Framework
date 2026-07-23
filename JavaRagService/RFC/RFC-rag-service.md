@@ -79,6 +79,9 @@ JavaRagService ──depends on──→  common 1.0.0 (future AgentClient featu
 | PostgreSQL | Docker (общий с JavaMemoryService) | localhost:5432 |
 | Ollama + mxbai-embed-large | локально (Metal) | localhost:11434 |
 
+Актуальная ER-диаграмма PostgreSQL-схемы `rag`:
+[PlantUML source](../docs/diagrams/database-schema.puml).
+
 > **Важно:** OpenSearch внутри Docker доступен по `172.80.2.1:9200` (bridge IP), а не по `localhost:9200`. `localhost:9200` не работает с хоста в текущей конфигурации.
 
 > **Ollama — не в Docker.** Docker на macOS — это Linux VM, Metal acceleration внутри недоступен. Ollama нативно на M1 даёт GPU embeddings, ~2GB RAM.

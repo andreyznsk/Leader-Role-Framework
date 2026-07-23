@@ -1,0 +1,61 @@
+@startuml
+title JavaMailAgent — PostgreSQL schema: mailagent
+hide methods
+hide stereotypes
+skinparam linetype ortho
+skinparam entity {
+  BackgroundColor #F7FAFC
+  BorderColor #4A5568
+}
+
+package "mailagent" {
+  entity "processed_emails" as processed_emails {
+    * id : BIGSERIAL <<PK>>
+    --
+    * email_id : VARCHAR(512) <<UQ>>
+    folder : VARCHAR(255)
+    sender : VARCHAR(255)
+    subject : VARCHAR(512)
+    * agent_type : VARCHAR(16)
+    processed_at : TIMESTAMP
+    output_path : TEXT
+    response_type : VARCHAR(32)
+    * status : VARCHAR(32)
+    * failed_route : VARCHAR(64)
+    route_payload_json : TEXT
+    action_result_json : TEXT
+    error_message : TEXT
+    * attempts_count : INT
+    first_seen_at : TIMESTAMP
+    last_attempt_at : TIMESTAMP
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "prompt_templates" as prompt_templates {
+    * id : BIGSERIAL <<PK>>
+    --
+    * code : VARCHAR(128) <<UQ>>
+    * template : TEXT
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "control_settings_audit" as control_settings_audit {
+    * id : BIGSERIAL <<PK>>
+    --
+    * config_version : BIGINT
+    * changed_keys_json : JSONB
+    * request_json : JSONB
+    * applied_json : JSONB
+    * status : VARCHAR(32)
+    message : TEXT
+    * created_at : TIMESTAMP
+  }
+}
+
+note bottom
+  Межтабличные внешние ключи отсутствуют.
+  Схема собрана по Flyway V1–V9 из JavaMailAgent.
+end note
+@enduml

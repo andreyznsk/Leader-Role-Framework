@@ -138,6 +138,9 @@ SPRING_PROFILES_ACTIVE=prod java -jar JavaMemoryService/target/memory-service.ja
 
 ## 4. База данных
 
+Актуальная ER-диаграмма PostgreSQL-схемы `memory`:
+[PlantUML source](../docs/diagrams/database-schema.puml).
+
 ### 4.0 Prompt editing ideology
 
 `JavaMemoryService` не хранит prompt templates внешних plugin-сервисов как master-data,
