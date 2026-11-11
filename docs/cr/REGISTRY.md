@@ -40,7 +40,7 @@
 | CR-MEM-033        | [2026-07-07_CR-MEM-033-intake-payload-readable-summary.md](2026-07-07_CR-MEM-033-intake-payload-readable-summary.md)   | Implemented | 2026-07-07 |
 | CR-MEM-034        | [2026-07-08_CR-MEM-034-related-task-dropdowns.md](2026-07-08_CR-MEM-034-related-task-dropdowns.md)                     | Implemented | 2026-07-10 |
 | CR-MEM-035        | [2026-07-13_CR-MEM-035-create-jira-issue-from-today-task.md](2026-07-13_CR-MEM-035-create-jira-issue-from-today-task.md) | Implemented | 2026-07-13 |
-| CR-MEM-036        | [2026-11-11_CR-MEM-036-mcp-task-date-range.md](2026-11-11_CR-MEM-036-mcp-task-date-range.md) | Draft | 2026-11-11 |
+| CR-MEM-036        | [2026-11-11_CR-MEM-036-mcp-task-date-range.md](2026-11-11_CR-MEM-036-mcp-task-date-range.md) | Implemented | 2026-11-11 |
 | CR-MEM-BUGFIX-001 | [CR-MEM-BUGFIX-001-confirm-task-pending.md](CR-MEM-BUGFIX-001-confirm-task-pending.md)                                 | Draft | —          |
 
 ---
