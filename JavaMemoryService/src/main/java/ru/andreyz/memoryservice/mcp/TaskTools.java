@@ -4,6 +4,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 import ru.andreyz.memoryservice.domain.Task;
+import ru.andreyz.memoryservice.dto.TaskRangeRequest;
 import ru.andreyz.memoryservice.dto.AgentProposalResponse;
 import ru.andreyz.memoryservice.dto.TaskLinkResponse;
 import ru.andreyz.memoryservice.service.AgentIntakeProposalService;
@@ -40,6 +41,16 @@ public class TaskTools {
         return status != null
                 ? taskService.findByDateAndStatus(localDate, status)
                 : taskService.findByDate(localDate);
+    }
+
+    @Tool(description = "Get tasks by inclusive dueDate range (maximum 365 days apart). Omit status for all statuses.")
+    public List<Task> getTasksInRange(
+            @ToolParam(description = "First due date, inclusive, YYYY-MM-DD") String from,
+            @ToolParam(description = "Last due date, inclusive, YYYY-MM-DD") String to,
+            @ToolParam(description = "Status: TODO|RESEARCH|IN_PROGRESS|DELEGATED|DONE|BLOCKED", required = false) String status) {
+        return taskService.findByRange(
+                TaskRangeRequest.parseDate(from),
+                TaskRangeRequest.parseDate(to), status);
     }
 
     @Tool(description = "Create a task proposal in Intake Gateway. This does not write directly to tasks. User must review and apply it in /ui/intake.")
