@@ -385,6 +385,23 @@ public class TaskService {
         return target;
     }
 
+    public List<Task> findByRange(LocalDate from, LocalDate to, String status) {
+        if (from == null || to == null) {
+            throw new TaskRangeException("invalid_date_format", "Both from and to are required");
+        }
+        if (from.isAfter(to)) {
+            throw new TaskRangeException("invalid_date_range", "from must be on or before to");
+        }
+        if (java.time.temporal.ChronoUnit.DAYS.between(from, to) > 365) {
+            throw new TaskRangeException("range_too_large", "Date range must not exceed 365 days");
+        }
+        if (status != null && !java.util.Set.of(
+                "TODO", "RESEARCH", "IN_PROGRESS", "DELEGATED", "DONE", "BLOCKED").contains(status)) {
+            throw new TaskRangeException("invalid_status", "Unknown task status: " + status);
+        }
+        return taskRelationService.enrich(taskRepository.findByRange(from, to, status));
+    }
+
     public List<Task> findByDate(LocalDate date) {
         return taskRelationService.enrich(planRepository.findByPlanDate(date)
                 .map(plan -> taskRepository.findByPlanIdOrderBySortOrder(plan.id()).stream()

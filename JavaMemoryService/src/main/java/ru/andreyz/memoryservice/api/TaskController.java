@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.andreyz.memoryservice.domain.Task;
+import ru.andreyz.memoryservice.dto.TaskRangeRequest;
 import ru.andreyz.memoryservice.dto.CreatePendingTaskRequest;
 import ru.andreyz.memoryservice.dto.CreateTaskRequest;
 import ru.andreyz.memoryservice.dto.EditTaskRequest;
@@ -47,6 +48,14 @@ public class TaskController {
                     .toList();
         }
         return ResponseEntity.ok(tasks);
+    }
+
+    @PostMapping("/range")
+    public ResponseEntity<List<Task>> getTasksInRange(
+            @RequestBody TaskRangeRequest request) {
+        return ResponseEntity.ok(taskService.findByRange(
+                TaskRangeRequest.parseDate(request.from()),
+                TaskRangeRequest.parseDate(request.to()), request.status()));
     }
 
     @PostMapping

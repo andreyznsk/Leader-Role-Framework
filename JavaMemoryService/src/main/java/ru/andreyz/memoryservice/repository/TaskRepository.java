@@ -28,5 +28,11 @@ public interface TaskRepository extends CrudRepository<Task, Long> {
            "WHEN 'DONE' THEN 6 END, sort_order")
     List<Task> findCurrentTasks();
 
+    @Query("SELECT * FROM tasks WHERE due_date >= :from AND due_date <= :to " +
+           "AND (CAST(:status AS VARCHAR) IS NULL OR status = :status) " +
+           "ORDER BY due_date, sort_order, id")
+    List<Task> findByRange(@Param("from") LocalDate from, @Param("to") LocalDate to,
+                           @Param("status") String status);
+
     Optional<Task> findFirstByEmailId(String emailId);
 }
